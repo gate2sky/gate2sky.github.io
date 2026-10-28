@@ -1,0 +1,61 @@
+{{define "content"}}
+{{$csrf := .Auth.Session.CSRFToken}}
+<div class="page-head"><h1>Account</h1></div>
+
+{{if and .Passkeys .Page.Welcome}}
+<section class="card callout">
+  <h2>Sign in faster next time</h2>
+  <p>Add a passkey and sign in with your fingerprint, face or device PIN instead of waiting for an email. Passkeys can’t be phished.</p>
+  <div class="actions">
+    <button type="button" class="button" data-passkey-register data-rd="{{.Page.Next}}">Add a passkey</button>
+    <a href="{{.Page.Next}}">Skip for now →</a>
+  </div>
+  <p class="passkey-error flash flash-error" role="alert" hidden></p>
+</section>
+{{end}}
+
+<section class="card">
+  <h2>Profile</h2>
+  <dl class="stats">
+    <div><dt>Email</dt><dd>{{.Auth.User.Email}}</dd></div>
+    {{with .Auth.User.Name}}<div><dt>Name</dt><dd>{{.}}</dd></div>{{end}}
+    <div><dt>Member since</dt><dd>{{datetime .Auth.User.CreatedAt}}</dd></div>
+  </dl>
+</section>
+
+{{if .Passkeys}}
+<section class="card">
+  <div class="card-head"><h2>Passkeys</h2><span class="muted">{{len .Page.Passkeys}}</span></div>
+  <p class="muted">Sign in without email codes. Each device or password manager has its own passkey.</p>
+  {{if .Page.Passkeys}}
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Name</th><th>Added</th><th>Last used</th><th></th></tr></thead>
+    <tbody>
+    {{range .Page.Passkeys}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td>{{ago .CreatedAt}}</td>
+      <td>{{ago .LastUsedAt}}</td>
+      <td class="right">
+        <form method="post" action="/account/passkeys/{{.ID}}/delete" class="inline">
+          <input type="hidden" name="csrf_token" value="{{$csrf}}">
+          <button type="submit" class="link danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}
+  <p class="empty-inline">No passkeys yet.</p>
+  {{end}}
+  <div class="form form-row">
+    <input name="passkey-name" maxlength="64" placeholder="Name, e.g. MacBook or 1Password" aria-label="Passkey name" autocomplete="off">
+    <button type="button" class="button" data-passkey-register data-name-input="passkey-name">Add a passkey</button>
+  </div>
+  <p class="passkey-error flash flash-error" role="alert" hidden></p>
+</section>
+{{end}}
+{{end}}

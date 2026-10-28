@@ -19,8 +19,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
+
 	"github.com/jgermade/securegate/internal/config"
-	"github.com/jgermade/securegate/internal/names"
+	"github.com/jgermade/securegate/internal/mail"
+	"github.com/jgermade/securegate/internal/manage"
 	"github.com/jgermade/securegate/internal/store"
 	"github.com/jgermade/securegate/internal/tunnel"
 )
@@ -33,7 +36,9 @@ type Options struct {
 	Config   *config.Config
 	Store    *store.Store
 	Registry *tunnel.Registry
-	Names    *names.Checker
+	Manage   *manage.Service
+	// Mailer sends sign-in codes. Defaults to the configured SMTP server.
+	Mailer mail.Sender
 	// Secret signs OAuth state and tunnel access cookies. Keep it stable
 	// across restarts so visitors stay signed in to private tunnels.
 	Secret []byte
@@ -48,10 +53,13 @@ type Server struct {
 	cfg       *config.Config
 	store     *store.Store
 	registry  *tunnel.Registry
-	names     *names.Checker
+	manage    *manage.Service
+	mailer    mail.Sender
 	log       *slog.Logger
 	signer    signer
 	nonces    *nonceSet
+	codes     *codeStore
+	webauthn  *webauthn.WebAuthn
 	cookies   cookieNames
 	providers []provider
 	pages     map[string]*template.Template
@@ -60,7 +68,7 @@ type Server struct {
 }
 
 type cookieNames struct {
-	session, oauth, flash, access string
+	session, oauth, flash, access, emailLogin, passkey string
 }
 
 // New builds the handler.
@@ -76,10 +84,15 @@ func New(o Options) (*Server, error) {
 		cfg:      o.Config,
 		store:    o.Store,
 		registry: o.Registry,
-		names:    o.Names,
+		manage:   o.Manage,
+		mailer:   o.Mailer,
 		log:      o.Logger,
 		signer:   signer{key: o.Secret},
 		nonces:   newNonceSet(),
+		codes:    newCodeStore(),
+	}
+	if s.mailer == nil {
+		s.mailer = mail.New(s.cfg.Auth.Email, s.log)
 	}
 	// The __Host- prefix stops tunnel subdomains, which serve arbitrary
 	// content, from planting cookies for the dashboard (or each other).
@@ -88,10 +101,25 @@ func New(o Options) (*Server, error) {
 		prefix = "__Host-"
 	}
 	s.cookies = cookieNames{
-		session: prefix + "securegate",
-		oauth:   prefix + "securegate-oauth",
-		flash:   prefix + "securegate-flash",
-		access:  prefix + "securegate-access",
+		session:    prefix + "securegate",
+		oauth:      prefix + "securegate-oauth",
+		flash:      prefix + "securegate-flash",
+		access:     prefix + "securegate-access",
+		emailLogin: prefix + "securegate-email",
+		passkey:    prefix + "securegate-passkey",
+	}
+	if s.cfg.PasskeysEnabled() {
+		wa, err := webauthn.New(&webauthn.Config{
+			RPID:          s.cfg.Domain(),
+			RPDisplayName: "securegate",
+			// Tunnel subdomains may claim this RP ID too, so assertions
+			// are only accepted from the dashboard's exact origin.
+			RPOrigins: []string{s.cfg.DashboardURL("")},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("web: passkeys: %w", err)
+		}
+		s.webauthn = wa
 	}
 	for _, pc := range s.cfg.Auth.Providers {
 		redirect := s.cfg.DashboardURL("/auth/" + pc.ID + "/callback")
@@ -141,12 +169,27 @@ func (s *Server) routes() http.Handler {
 
 	mux.HandleFunc("GET /{$}", s.handleHome)
 	mux.HandleFunc("GET /login", s.handleLoginPage)
-	mux.HandleFunc("GET /auth/{provider}/login", s.handleLogin)
-	mux.HandleFunc("GET /auth/{provider}/callback", s.handleCallback)
+	mux.HandleFunc("GET /auth/{provider}/login", s.handleOAuthLogin)
+	mux.HandleFunc("GET /auth/{provider}/callback", s.handleOAuthCallback)
 	mux.HandleFunc("GET /tunnel-auth", s.handleTunnelAuth)
+	if s.cfg.Auth.Email.Enabled() {
+		mux.Handle("POST /login/email", s.sameOrigin(s.handleEmailLogin))
+		mux.HandleFunc("GET /login/code", s.handleCodePage)
+		mux.Handle("POST /login/code", s.sameOrigin(s.handleCodeLogin))
+	}
+	if s.webauthn != nil {
+		mux.Handle("POST /login/passkey/options", s.sameOrigin(s.handlePasskeyLoginOptions))
+		mux.Handle("POST /login/passkey", s.sameOrigin(s.handlePasskeyLogin))
+	}
 
 	user := s.requireUser
 	mux.Handle("POST /logout", user(s.handleLogout))
+	mux.Handle("GET /account", user(s.handleAccount))
+	if s.webauthn != nil {
+		mux.Handle("POST /account/passkeys/options", user(s.handlePasskeyRegisterOptions))
+		mux.Handle("POST /account/passkeys", user(s.handlePasskeyRegister))
+		mux.Handle("POST /account/passkeys/{id}/delete", user(s.handleDeletePasskey))
+	}
 	mux.Handle("POST /subdomains", user(s.handleCreateSubdomain))
 	mux.Handle("GET /subdomains/{name}", user(s.handleSubdomain))
 	mux.Handle("POST /subdomains/{name}/access", user(s.handleSetAccess))
@@ -157,6 +200,7 @@ func (s *Server) routes() http.Handler {
 
 	admin := func(h http.HandlerFunc) http.Handler { return s.requireUser(s.requireAdmin(h)) }
 	mux.Handle("GET /admin", admin(s.handleAdmin))
+	mux.Handle("POST /admin/users", admin(s.handleAdminCreateUser))
 	mux.Handle("POST /admin/users/{id}/disable", admin(s.handleSetUserDisabled(true)))
 	mux.Handle("POST /admin/users/{id}/enable", admin(s.handleSetUserDisabled(false)))
 
@@ -166,8 +210,8 @@ func (s *Server) routes() http.Handler {
 func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
-		h.Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; img-src 'self' https: data:; "+
-			"form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+		h.Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; "+
+			"connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "same-origin")
@@ -235,17 +279,63 @@ func (s *Server) requireUser(next http.HandlerFunc) http.Handler {
 		}
 		// Tunnel subdomains are same-site with the dashboard, so SameSite
 		// cookies do not stop them from submitting forms here: check both
-		// the origin and a per-session token.
-		if o := r.Header.Get("Origin"); o != "" && o != s.cfg.DashboardURL("") {
+		// the origin and a per-session token (a header for fetch requests).
+		if !s.fromDashboard(r) {
 			s.renderError(w, r, http.StatusForbidden, "Cross-origin request blocked.")
 			return
 		}
-		if subtle.ConstantTimeCompare([]byte(r.PostFormValue("csrf_token")), []byte(a.Session.CSRFToken)) != 1 {
+		token := r.Header.Get("X-CSRF-Token")
+		if token == "" {
+			token = r.PostFormValue("csrf_token")
+		}
+		if subtle.ConstantTimeCompare([]byte(token), []byte(a.Session.CSRFToken)) != 1 {
 			s.renderError(w, r, http.StatusForbidden, "Invalid form token. Reload the page and try again.")
 			return
 		}
 		next(w, r)
 	})
+}
+
+// fromDashboard reports whether a request was sent by a dashboard page,
+// going by its Origin (or, for older browsers, Referer) header.
+func (s *Server) fromDashboard(r *http.Request) bool {
+	origin := s.cfg.DashboardURL("")
+	if o := r.Header.Get("Origin"); o != "" {
+		return o == origin
+	}
+	ref := r.Header.Get("Referer")
+	return ref == "" || ref == origin || strings.HasPrefix(ref, origin+"/")
+}
+
+// sameOrigin guards the sign-in forms and calls, which have no session to
+// carry a CSRF token yet.
+func (s *Server) sameOrigin(next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+		if r.Header.Get("Origin") == "" && r.Header.Get("Referer") == "" || !s.fromDashboard(r) {
+			s.renderError(w, r, http.StatusForbidden, "Cross-origin request blocked.")
+			return
+		}
+		next(w, r)
+	})
+}
+
+// clientIP is the visitor's address, for rate limiting and logs.
+func (s *Server) clientIP(r *http.Request) string {
+	if s.cfg.HTTP.TrustProxyHeaders {
+		// The last entry was added by the proxy we trust.
+		if xff := r.Header.Values("X-Forwarded-For"); len(xff) > 0 {
+			parts := strings.Split(xff[len(xff)-1], ",")
+			if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
+				return ip
+			}
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
@@ -308,15 +398,16 @@ func (s *Server) takeFlash(w http.ResponseWriter, r *http.Request) *flash {
 
 // view is the data every dashboard template receives.
 type view struct {
-	Title  string
-	Auth   *authInfo
-	Flash  *flash
-	Domain string
-	Page   any
+	Title    string
+	Auth     *authInfo
+	Flash    *flash
+	Domain   string
+	Passkeys bool
+	Page     any
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page, title string, data any) {
-	v := view{Title: title, Auth: currentAuth(r), Domain: s.cfg.Domain(), Page: data}
+	v := view{Title: title, Auth: currentAuth(r), Domain: s.cfg.Domain(), Passkeys: s.webauthn != nil, Page: data}
 	v.Flash = s.takeFlash(w, r)
 	var buf bytes.Buffer
 	if err := s.pages[page].Execute(&buf, v); err != nil {
@@ -346,7 +437,7 @@ func (s *Server) parseTemplates() (map[string]*template.Template, error) {
 		"bytes":      humanBytes,
 	}
 	pages := map[string]*template.Template{}
-	for _, p := range []string{"login", "dashboard", "subdomain", "admin", "error"} {
+	for _, p := range []string{"login", "login_code", "account", "dashboard", "subdomain", "admin", "error"} {
 		t, err := template.New("layout.html").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html")
 		if err != nil {
 			return nil, fmt.Errorf("parse template %s: %w", p, err)

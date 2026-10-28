@@ -4,19 +4,21 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
+	"errors"
+	"strings"
 	"time"
 )
 
-// User is an account created on first OAuth sign-in.
+// User is an account, identified by a verified email address. Users sign in
+// with a code sent to that address, a passkey, or a linked OAuth identity.
 type User struct {
 	ID          int64
-	Provider    string
-	Subject     string
 	Email       string
 	Name        string
-	Username    string
 	AvatarURL   string
+	WebAuthnID  []byte
 	Disabled    bool
 	CreatedAt   time.Time
 	LastLoginAt time.Time
@@ -24,11 +26,8 @@ type User struct {
 
 // DisplayName is the best human-readable name for the user.
 func (u *User) DisplayName() string {
-	switch {
-	case u.Name != "":
+	if u.Name != "" {
 		return u.Name
-	case u.Username != "":
-		return u.Username
 	}
 	return u.Email
 }
@@ -43,33 +42,60 @@ type Identity struct {
 	AvatarURL string
 }
 
-const userColumns = `id, provider, subject, email, name, username, avatar_url, disabled, created_at, last_login_at`
+const userColumns = `id, email, name, avatar_url, webauthn_id, disabled, created_at, last_login_at`
 
 type scanner interface{ Scan(dest ...any) error }
 
 func scanUser(row scanner) (*User, error) {
 	var u User
 	var created, lastLogin int64
-	if err := row.Scan(&u.ID, &u.Provider, &u.Subject, &u.Email, &u.Name, &u.Username,
-		&u.AvatarURL, &u.Disabled, &created, &lastLogin); err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.WebAuthnID, &u.Disabled, &created, &lastLogin); err != nil {
 		return nil, notFound(err)
 	}
 	u.CreatedAt, u.LastLoginAt = fromUnix(created), fromUnix(lastLogin)
 	return &u, nil
 }
 
-// UpsertUser creates the user for this identity, or refreshes its profile.
-func (s *Store) UpsertUser(ctx context.Context, id Identity) (*User, error) {
-	now := unix(s.now())
-	row := s.db.QueryRowContext(ctx, `
-		INSERT INTO users (provider, subject, email, name, username, avatar_url, created_at, last_login_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (provider, subject) DO UPDATE SET
-			email = excluded.email, name = excluded.name, username = excluded.username,
-			avatar_url = excluded.avatar_url, last_login_at = excluded.last_login_at
+// NormalizeEmail lowercases and trims an email address.
+func NormalizeEmail(email string) string { return strings.ToLower(strings.TrimSpace(email)) }
+
+func newWebAuthnID() []byte {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return b
+}
+
+type execer interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func (s *Store) createUser(ctx context.Context, db execer, email, name, avatar string) (*User, error) {
+	u, err := scanUser(db.QueryRowContext(ctx, `
+		INSERT INTO users (email, name, avatar_url, webauthn_id, created_at) VALUES (?, ?, ?, ?, ?)
 		RETURNING `+userColumns,
-		id.Provider, id.Subject, id.Email, id.Name, id.Username, id.AvatarURL, now, now)
-	return scanUser(row)
+		NormalizeEmail(email), name, avatar, newWebAuthnID(), unix(s.now())))
+	if isUniqueViolation(err) {
+		return nil, ErrConflict
+	}
+	return u, err
+}
+
+// CreateUser adds an account for a (verified) email address. It returns
+// ErrConflict if one exists.
+func (s *Store) CreateUser(ctx context.Context, email, name string) (*User, error) {
+	return s.createUser(ctx, s.db, email, name, "")
+}
+
+// EnsureUser returns the account for email, creating it if needed.
+func (s *Store) EnsureUser(ctx context.Context, email string) (*User, error) {
+	u, err := s.UserByEmail(ctx, email)
+	if errors.Is(err, ErrNotFound) {
+		u, err = s.CreateUser(ctx, email, "")
+		if errors.Is(err, ErrConflict) {
+			return s.UserByEmail(ctx, email)
+		}
+	}
+	return u, err
 }
 
 // UserByID returns a user.
@@ -77,17 +103,78 @@ func (s *Store) UserByID(ctx context.Context, id int64) (*User, error) {
 	return scanUser(s.db.QueryRowContext(ctx, `SELECT `+userColumns+` FROM users WHERE id = ?`, id))
 }
 
-// UserSummary is a user plus the number of subdomains they own.
+// UserByEmail returns the user with this email address.
+func (s *Store) UserByEmail(ctx context.Context, email string) (*User, error) {
+	return scanUser(s.db.QueryRowContext(ctx, `SELECT `+userColumns+` FROM users WHERE email = ?`, NormalizeEmail(email)))
+}
+
+// UserByWebAuthnID returns the user with this WebAuthn user handle.
+func (s *Store) UserByWebAuthnID(ctx context.Context, id []byte) (*User, error) {
+	return scanUser(s.db.QueryRowContext(ctx, `SELECT `+userColumns+` FROM users WHERE webauthn_id = ?`, id))
+}
+
+// LoginOAuth returns the user for an OAuth identity. A new identity is
+// linked to the account with the same (verified) email, or to a new one.
+func (s *Store) LoginOAuth(ctx context.Context, id Identity) (*User, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var userID int64
+	err = tx.QueryRowContext(ctx, `SELECT user_id FROM identities WHERE provider = ? AND subject = ?`, id.Provider, id.Subject).Scan(&userID)
+	switch {
+	case err == nil:
+		if _, err := tx.ExecContext(ctx, `UPDATE identities SET username = ? WHERE provider = ? AND subject = ?`, id.Username, id.Provider, id.Subject); err != nil {
+			return nil, err
+		}
+	case errors.Is(err, sql.ErrNoRows):
+		u, err := scanUser(tx.QueryRowContext(ctx, `SELECT `+userColumns+` FROM users WHERE email = ?`, NormalizeEmail(id.Email)))
+		if errors.Is(err, ErrNotFound) {
+			u, err = s.createUser(ctx, tx, id.Email, id.Name, id.AvatarURL)
+		}
+		if err != nil {
+			return nil, err
+		}
+		userID = u.ID
+		if _, err := tx.ExecContext(ctx, `INSERT INTO identities (provider, subject, user_id, username, created_at) VALUES (?, ?, ?, ?, ?)`,
+			id.Provider, id.Subject, userID, id.Username, unix(s.now())); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, err
+	}
+	// Fill in profile details the user doesn't have yet.
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE users SET
+			name = CASE WHEN name = '' THEN ? ELSE name END,
+			avatar_url = CASE WHEN ? != '' THEN ? ELSE avatar_url END
+		WHERE id = ?`, id.Name, id.AvatarURL, id.AvatarURL, userID); err != nil {
+		return nil, err
+	}
+	u, err := scanUser(tx.QueryRowContext(ctx, `SELECT `+userColumns+` FROM users WHERE id = ?`, userID))
+	if err != nil {
+		return nil, err
+	}
+	return u, tx.Commit()
+}
+
+// UserSummary is a user plus counts for the admin views.
 type UserSummary struct {
 	User
 	Subdomains int
+	Passkeys   int
+	Providers  string
 }
 
 // ListUsers returns every user, most recently active first.
 func (s *Store) ListUsers(ctx context.Context) ([]UserSummary, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+userColumns+`, (SELECT COUNT(*) FROM subdomains d WHERE d.user_id = users.id)
-		FROM users ORDER BY last_login_at DESC`)
+		SELECT `+userColumns+`,
+			(SELECT COUNT(*) FROM subdomains d WHERE d.user_id = users.id),
+			(SELECT COUNT(*) FROM passkeys p WHERE p.user_id = users.id),
+			COALESCE((SELECT GROUP_CONCAT(provider, ', ') FROM identities i WHERE i.user_id = users.id), '')
+		FROM users ORDER BY last_login_at DESC, id`)
 	if err != nil {
 		return nil, err
 	}
@@ -96,14 +183,20 @@ func (s *Store) ListUsers(ctx context.Context) ([]UserSummary, error) {
 	for rows.Next() {
 		var us UserSummary
 		var created, lastLogin int64
-		if err := rows.Scan(&us.ID, &us.Provider, &us.Subject, &us.Email, &us.Name, &us.Username,
-			&us.AvatarURL, &us.Disabled, &created, &lastLogin, &us.Subdomains); err != nil {
+		if err := rows.Scan(&us.ID, &us.Email, &us.Name, &us.AvatarURL, &us.WebAuthnID, &us.Disabled, &created, &lastLogin,
+			&us.Subdomains, &us.Passkeys, &us.Providers); err != nil {
 			return nil, err
 		}
 		us.CreatedAt, us.LastLoginAt = fromUnix(created), fromUnix(lastLogin)
 		out = append(out, us)
 	}
 	return out, rows.Err()
+}
+
+// TouchLogin records a successful sign-in.
+func (s *Store) TouchLogin(ctx context.Context, userID int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET last_login_at = ? WHERE id = ?`, unix(s.now()), userID)
+	return err
 }
 
 // SetUserDisabled blocks or unblocks a user. Disabling also ends their
@@ -127,6 +220,75 @@ func (s *Store) SetUserDisabled(ctx context.Context, id int64, disabled bool) er
 		}
 	}
 	return tx.Commit()
+}
+
+// Passkey is a WebAuthn credential. Credential holds the library's
+// serialized credential record; the store treats it as opaque.
+type Passkey struct {
+	ID           int64
+	UserID       int64
+	CredentialID []byte
+	Name         string
+	Credential   []byte
+	CreatedAt    time.Time
+	LastUsedAt   time.Time
+}
+
+// AddPasskey stores a new credential for a user.
+func (s *Store) AddPasskey(ctx context.Context, userID int64, name string, credentialID, credential []byte) (*Passkey, error) {
+	p := &Passkey{UserID: userID, CredentialID: credentialID, Name: name, Credential: credential, CreatedAt: s.now().Truncate(time.Second)}
+	err := s.db.QueryRowContext(ctx, `
+		INSERT INTO passkeys (user_id, credential_id, name, credential, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+		userID, credentialID, name, credential, unix(p.CreatedAt)).Scan(&p.ID)
+	if isUniqueViolation(err) {
+		return nil, ErrConflict
+	}
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// PasskeysByUser lists a user's passkeys, oldest first.
+func (s *Store) PasskeysByUser(ctx context.Context, userID int64) ([]*Passkey, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, user_id, credential_id, name, credential, created_at, last_used_at
+		FROM passkeys WHERE user_id = ? ORDER BY created_at, id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Passkey
+	for rows.Next() {
+		var p Passkey
+		var created, used int64
+		if err := rows.Scan(&p.ID, &p.UserID, &p.CredentialID, &p.Name, &p.Credential, &created, &used); err != nil {
+			return nil, err
+		}
+		p.CreatedAt, p.LastUsedAt = fromUnix(created), fromUnix(used)
+		out = append(out, &p)
+	}
+	return out, rows.Err()
+}
+
+// UpdatePasskeyUse stores the credential record after a successful
+// sign-in (it carries the authenticator's signature counter).
+func (s *Store) UpdatePasskeyUse(ctx context.Context, credentialID, credential []byte) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE passkeys SET credential = ?, last_used_at = ? WHERE credential_id = ?`,
+		credential, unix(s.now()), credentialID)
+	return err
+}
+
+// DeletePasskey removes one of a user's passkeys.
+func (s *Store) DeletePasskey(ctx context.Context, userID, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM passkeys WHERE id = ? AND user_id = ?`, id, userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // Session is a signed-in browser.
@@ -168,12 +330,15 @@ func (s *Store) CreateSession(ctx context.Context, userID int64, ttl time.Durati
 	if err != nil {
 		return "", nil, err
 	}
+	if err := s.TouchLogin(ctx, userID); err != nil {
+		return "", nil, err
+	}
 	return token, sess, nil
 }
 
 const sessionUserQuery = `
 	SELECT s.id, s.user_id, s.csrf_token, s.created_at, s.expires_at,
-		u.id, u.provider, u.subject, u.email, u.name, u.username, u.avatar_url, u.disabled, u.created_at, u.last_login_at
+		u.id, u.email, u.name, u.avatar_url, u.webauthn_id, u.disabled, u.created_at, u.last_login_at
 	FROM sessions s JOIN users u ON u.id = s.user_id `
 
 func (s *Store) scanSessionUser(row scanner) (*Session, *User, error) {
@@ -181,7 +346,7 @@ func (s *Store) scanSessionUser(row scanner) (*Session, *User, error) {
 	var u User
 	var sCreated, sExpires, uCreated, uLogin int64
 	if err := row.Scan(&sess.ID, &sess.UserID, &sess.CSRFToken, &sCreated, &sExpires,
-		&u.ID, &u.Provider, &u.Subject, &u.Email, &u.Name, &u.Username, &u.AvatarURL, &u.Disabled, &uCreated, &uLogin); err != nil {
+		&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.WebAuthnID, &u.Disabled, &uCreated, &uLogin); err != nil {
 		return nil, nil, notFound(err)
 	}
 	sess.CreatedAt, sess.ExpiresAt = fromUnix(sCreated), fromUnix(sExpires)

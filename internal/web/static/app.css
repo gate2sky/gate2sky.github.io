@@ -158,3 +158,14 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 
 .error-page { max-width: 560px; margin: 48px auto; }
 .error-page h1 { font-size: 22px; margin-bottom: 8px; }
+
+.icon { width: 20px; height: 20px; flex: none; }
+.divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; margin: 22px 0 6px; }
+.divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.form-login { text-align: left; margin-top: 14px; }
+.login .flash { text-align: left; margin: 16px 0 0; }
+.code-input { font-size: 22px !important; letter-spacing: .3em; text-align: center; font-variant-numeric: tabular-nums; }
+.callout { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--info-bg); }
+.actions { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 14px; }
+a.who { color: var(--muted); }
+a.who:hover { color: var(--fg); text-decoration: none; }

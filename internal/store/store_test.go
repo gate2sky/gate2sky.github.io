@@ -38,16 +38,18 @@ func newKey(t *testing.T) ssh.PublicKey {
 func TestUsersAndSessions(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t)
-	u, err := s.UpsertUser(ctx, Identity{Provider: "gh", Subject: "1", Email: "a@x.com", Name: "A"})
-	if err != nil {
-		t.Fatal(err)
+	u, err := s.CreateUser(ctx, " A@X.com ", "A")
+	if err != nil || u.Email != "a@x.com" || len(u.WebAuthnID) != 32 {
+		t.Fatalf("CreateUser = %+v, %v", u, err)
 	}
-	u2, err := s.UpsertUser(ctx, Identity{Provider: "gh", Subject: "1", Email: "new@x.com"})
-	if err != nil {
-		t.Fatal(err)
+	if _, err := s.CreateUser(ctx, "a@x.com", ""); !errors.Is(err, ErrConflict) {
+		t.Fatalf("duplicate email: %v", err)
 	}
-	if u2.ID != u.ID || u2.Email != "new@x.com" {
-		t.Fatalf("upsert did not update the same user: %+v", u2)
+	if again, err := s.EnsureUser(ctx, "A@x.com"); err != nil || again.ID != u.ID {
+		t.Fatalf("EnsureUser = %+v, %v", again, err)
+	}
+	if byHandle, err := s.UserByWebAuthnID(ctx, u.WebAuthnID); err != nil || byHandle.ID != u.ID {
+		t.Fatalf("UserByWebAuthnID = %+v, %v", byHandle, err)
 	}
 
 	token, sess, err := s.CreateSession(ctx, u.ID, time.Hour)
@@ -55,7 +57,7 @@ func TestUsersAndSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, gotUser, err := s.SessionByToken(ctx, token)
-	if err != nil || got.ID != sess.ID || gotUser.ID != u.ID || got.CSRFToken == "" {
+	if err != nil || got.ID != sess.ID || gotUser.ID != u.ID || got.CSRFToken == "" || gotUser.LastLoginAt.IsZero() {
 		t.Fatalf("SessionByToken = %+v, %+v, %v", got, gotUser, err)
 	}
 	if _, _, err := s.SessionByToken(ctx, token+"x"); !errors.Is(err, ErrNotFound) {
@@ -82,11 +84,70 @@ func TestUsersAndSessions(t *testing.T) {
 	}
 }
 
+func TestLoginOAuthLinksByEmail(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	existing, _ := s.CreateUser(ctx, "dev@x.com", "")
+
+	// A new identity with a known email joins that account and fills in
+	// missing profile details.
+	u, err := s.LoginOAuth(ctx, Identity{Provider: "github", Subject: "42", Email: "DEV@x.com", Name: "Dev", Username: "dev", AvatarURL: "https://a/x.png"})
+	if err != nil || u.ID != existing.ID || u.Name != "Dev" || u.AvatarURL != "https://a/x.png" {
+		t.Fatalf("LoginOAuth = %+v, %v", u, err)
+	}
+	// The identity stays linked even if the provider's email changes.
+	u2, err := s.LoginOAuth(ctx, Identity{Provider: "github", Subject: "42", Email: "other@x.com", Name: "Renamed"})
+	if err != nil || u2.ID != existing.ID || u2.Name != "Dev" {
+		t.Fatalf("second LoginOAuth = %+v, %v", u2, err)
+	}
+	// Unknown identity and email: a new account.
+	u3, err := s.LoginOAuth(ctx, Identity{Provider: "google", Subject: "g1", Email: "new@x.com"})
+	if err != nil || u3.ID == existing.ID || u3.Email != "new@x.com" {
+		t.Fatalf("new LoginOAuth = %+v, %v", u3, err)
+	}
+	users, _ := s.ListUsers(ctx)
+	if len(users) != 2 {
+		t.Fatalf("users = %+v", users)
+	}
+	for _, us := range users {
+		if us.ID == existing.ID && us.Providers != "github" {
+			t.Errorf("providers = %q", us.Providers)
+		}
+	}
+}
+
+func TestPasskeys(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	u, _ := s.CreateUser(ctx, "a@x.com", "")
+	other, _ := s.CreateUser(ctx, "b@x.com", "")
+	p, err := s.AddPasskey(ctx, u.ID, "laptop", []byte("cred-1"), []byte(`{"v":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddPasskey(ctx, other.ID, "dup", []byte("cred-1"), []byte("{}")); !errors.Is(err, ErrConflict) {
+		t.Fatalf("duplicate credential: %v", err)
+	}
+	if err := s.UpdatePasskeyUse(ctx, []byte("cred-1"), []byte(`{"v":2}`)); err != nil {
+		t.Fatal(err)
+	}
+	list, err := s.PasskeysByUser(ctx, u.ID)
+	if err != nil || len(list) != 1 || string(list[0].Credential) != `{"v":2}` || list[0].LastUsedAt.IsZero() {
+		t.Fatalf("PasskeysByUser = %+v, %v", list, err)
+	}
+	if err := s.DeletePasskey(ctx, other.ID, p.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("deleted another user's passkey: %v", err)
+	}
+	if err := s.DeletePasskey(ctx, u.ID, p.ID); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSubdomainsAndGrants(t *testing.T) {
 	ctx := context.Background()
 	s := openTest(t)
-	alice, _ := s.UpsertUser(ctx, Identity{Provider: "gh", Subject: "1", Email: "alice@x.com"})
-	bob, _ := s.UpsertUser(ctx, Identity{Provider: "gh", Subject: "2", Email: "bob@x.com"})
+	alice, _ := s.CreateUser(ctx, "alice@x.com", "")
+	bob, _ := s.CreateUser(ctx, "bob@x.com", "")
 
 	app, err := s.CreateSubdomain(ctx, alice.ID, "app", AccessPrivate)
 	if err != nil {

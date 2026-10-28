@@ -1,15 +1,10 @@
 package web
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
-	"crypto/rsa"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/crypto/ssh"
 )
 
 func TestSigner(t *testing.T) {
@@ -72,40 +67,5 @@ func TestStripCookies(t *testing.T) {
 	stripCookies(r, "securegate-access")
 	if _, ok := r.Header["Cookie"]; ok {
 		t.Error("empty Cookie header left behind")
-	}
-}
-
-func authorizedKey(t *testing.T, pub any, comment string) string {
-	t.Helper()
-	k, err := ssh.NewPublicKey(pub)
-	if err != nil {
-		t.Fatal(err)
-	}
-	line := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(k)))
-	if comment != "" {
-		line += " " + comment
-	}
-	return line
-}
-
-func TestParseKeys(t *testing.T) {
-	pub, _, _ := ed25519.GenerateKey(rand.Reader)
-	ed := authorizedKey(t, pub, "alice@laptop")
-	keys, err := parseKeys("\n# comment\n" + ed + "\n\n" + authorizedKey(t, pub, "") + "\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(keys) != 2 || keys[0].name != "alice@laptop" || keys[1].name != "ssh-ed25519" {
-		t.Fatalf("keys = %+v", keys)
-	}
-	if _, err := parseKeys("not a key"); err == nil {
-		t.Error("garbage accepted")
-	}
-	weak, err := rsa.GenerateKey(rand.Reader, 1024)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := parseKeys(authorizedKey(t, &weak.PublicKey, "")); err == nil || !strings.Contains(err.Error(), "2048") {
-		t.Errorf("weak RSA key: %v", err)
 	}
 }

@@ -16,7 +16,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -25,11 +24,10 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/jgermade/securegate/internal/config"
-	"github.com/jgermade/securegate/internal/names"
-	"github.com/jgermade/securegate/internal/sshd"
+	"github.com/jgermade/securegate/internal/mail"
+	"github.com/jgermade/securegate/internal/server"
 	"github.com/jgermade/securegate/internal/store"
 	"github.com/jgermade/securegate/internal/tunnel"
-	"github.com/jgermade/securegate/internal/web"
 )
 
 const domain = "gate.test"
@@ -37,19 +35,58 @@ const domain = "gate.test"
 type harness struct {
 	t        *testing.T
 	cfg      *config.Config
+	yaml     []byte
+	srv      *server.Server
 	store    *store.Store
 	registry *tunnel.Registry
 	idp      *fakeIDP
+	mail     *mailbox
 	web      *httptest.Server
 	sshAddr  string
 }
 
-func newHarness(t *testing.T) *harness {
+// mailbox captures sign-in emails.
+type mailbox struct{ ch chan mail.Message }
+
+func (m *mailbox) Send(_ context.Context, msg mail.Message) error {
+	m.ch <- msg
+	return nil
+}
+
+// code waits for the next email to addr and returns the code in it.
+func (m *mailbox) code(t *testing.T, addr string) string {
 	t.Helper()
-	h := &harness{t: t, idp: newFakeIDP(t)}
+	select {
+	case msg := <-m.ch:
+		if msg.To != addr {
+			t.Fatalf("email went to %s, want %s", msg.To, addr)
+		}
+		code := regexp.MustCompile(`\b\d{6}\b`).FindString(msg.Body)
+		if code == "" {
+			t.Fatalf("no code in email:\n%s", msg.Body)
+		}
+		return code
+	case <-time.After(5 * time.Second):
+		t.Fatalf("no email to %s", addr)
+	}
+	return ""
+}
+
+// none checks that no email is sent.
+func (m *mailbox) none(t *testing.T) {
+	t.Helper()
+	select {
+	case msg := <-m.ch:
+		t.Fatalf("unexpected email to %s", msg.To)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func newHarness(t *testing.T, extraConfig ...string) *harness {
+	t.Helper()
+	h := &harness{t: t, idp: newFakeIDP(t), mail: &mailbox{ch: make(chan mail.Message, 10)}}
 	dir := t.TempDir()
-	var err error
-	h.cfg, err = config.Parse(fmt.Appendf(nil, `
+	h.yaml = fmt.Appendf(nil, `
 public_url: http://%s
 data_dir: %s
 ssh:
@@ -57,6 +94,8 @@ ssh:
 auth:
   admins: [admin@example.com]
   allowed_domains: [example.com]
+  email:
+    log_only: true
   providers:
     - id: test
       type: oidc
@@ -64,44 +103,32 @@ auth:
       issuer: %s
       client_id: %s
       client_secret: %s
-`, domain, dir, h.idp.URL, idpClientID, idpClientSecret))
+%s`, domain, dir, h.idp.URL, idpClientID, idpClientSecret, strings.Join(extraConfig, "\n"))
+	var err error
+	h.cfg, err = config.Parse(h.yaml)
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.store, err = store.Open(filepath.Join(dir, "test.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { h.store.Close() })
-	h.registry = tunnel.NewRegistry()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if testing.Verbose() {
 		log = slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
+	h.srv, err = server.New(h.cfg, log, server.Options{Version: "test", Mailer: h.mail})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { h.srv.Close() })
+	h.store, h.registry = h.srv.Store(), h.srv.Registry()
 
-	_, hostPriv, _ := ed25519.GenerateKey(rand.Reader)
-	hostKey, _ := ssh.NewSignerFromKey(hostPriv)
-	sshSrv := sshd.New(h.cfg, h.store, h.registry, hostKey, log)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	h.sshAddr = ln.Addr().String()
-	go sshSrv.Serve(ln)
-	t.Cleanup(func() { sshSrv.Close() })
+	go h.srv.SSH().Serve(ln)
+	t.Cleanup(func() { h.srv.SSH().Close() })
 
-	handler, err := web.New(web.Options{
-		Config:   h.cfg,
-		Store:    h.store,
-		Registry: h.registry,
-		Names:    names.NewChecker(nil),
-		Secret:   []byte(strings.Repeat("s", 32)),
-		Logger:   log,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	h.web = httptest.NewServer(handler)
+	h.web = httptest.NewServer(h.srv.Handler())
 	t.Cleanup(h.web.Close)
 	return h
 }
@@ -198,7 +225,7 @@ func newSigner(t *testing.T) ssh.Signer {
 func (h *harness) setup(email, name string, access store.Access) (*store.User, *store.Subdomain, ssh.Signer) {
 	h.t.Helper()
 	ctx := context.Background()
-	u, err := h.store.UpsertUser(ctx, store.Identity{Provider: "test", Subject: "sub-" + email, Email: email})
+	u, err := h.store.EnsureUser(ctx, email)
 	if err != nil {
 		h.t.Fatal(err)
 	}
@@ -456,7 +483,7 @@ func TestLogin(t *testing.T) {
 	b := h.browser(true)
 
 	// Anonymous visitors see the provider list.
-	if _, body := get(t, b, "http://"+domain+"/"); !strings.Contains(body, "Continue with Test IdP") {
+	if _, body := get(t, b, "http://"+domain+"/"); !strings.Contains(body, `href="/auth/test/login?rd=%2F">Test IdP</a>`) || !strings.Contains(body, "Email me a sign-in code") {
 		t.Fatalf("login page:\n%s", body)
 	}
 	h.login(b, "alice@example.com")
@@ -488,7 +515,7 @@ func TestLogin(t *testing.T) {
 
 	// Signing out ends the session.
 	post(t, b, "/", "/logout", url.Values{})
-	if _, body := get(t, b, "http://"+domain+"/"); !strings.Contains(body, "Continue with") {
+	if _, body := get(t, b, "http://"+domain+"/"); !strings.Contains(body, "Email me a sign-in code") {
 		t.Error("still signed in after logout")
 	}
 }
@@ -512,7 +539,7 @@ func TestDashboardManagesSubdomains(t *testing.T) {
 	// Reserved and taken names are refused.
 	_, body = post(t, b, "/", "/subdomains", url.Values{"name": {"www"}})
 	if !strings.Contains(body, "reserved") {
-		t.Error("reserved name accepted")
+		t.Errorf("reserved name accepted:\n%s", body)
 	}
 	other := h.browser(true)
 	h.login(other, "bob@example.com")

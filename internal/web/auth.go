@@ -67,19 +67,60 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, rd, http.StatusFound)
 		return
 	}
-	s.renderLogin(w, r, http.StatusOK, rd)
+	s.renderLogin(w, r, http.StatusOK, rd, "")
 }
 
-func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int, rd string) {
-	type button struct{ URL, Name string }
-	var buttons []button
+type loginPage struct {
+	RD        string
+	Email     bool
+	Providers []loginButton
+	Error     string
+}
+
+type loginButton struct{ URL, Name string }
+
+func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int, rd, errMsg string) {
+	page := loginPage{RD: rd, Email: s.cfg.Auth.Email.Enabled(), Error: errMsg}
 	for _, p := range s.providers {
-		buttons = append(buttons, button{"/auth/" + p.ID() + "/login?rd=" + url.QueryEscape(rd), p.Name()})
+		page.Providers = append(page.Providers, loginButton{"/auth/" + p.ID() + "/login?rd=" + url.QueryEscape(rd), p.Name()})
 	}
-	s.render(w, r, status, "login", "Sign in", struct{ Providers []button }{buttons})
+	s.render(w, r, status, "login", "Sign in", page)
 }
 
-func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+// startSession signs user in on this browser. It returns a message for
+// the user when they may not sign in.
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user *store.User, method string) (string, bool) {
+	if user.Disabled {
+		return "Your account has been disabled by an administrator.", false
+	}
+	if !s.cfg.EmailAllowed(user.Email) {
+		s.log.Info("sign-in denied", "method", method, "email", user.Email)
+		return fmt.Sprintf("The account %s is not allowed to use this securegate.", user.Email), false
+	}
+	token, sess, err := s.store.CreateSession(r.Context(), user.ID, s.cfg.Auth.SessionTTL)
+	if err != nil {
+		s.log.Error("create session", "err", err)
+		return "Something went wrong. Please try again.", false
+	}
+	s.log.Info("signed in", "method", method, "email", user.Email, "user_id", user.ID, "ip", s.clientIP(r))
+	s.setCookie(w, s.cookies.session, token, sess.ExpiresAt)
+	return "", true
+}
+
+// afterLogin is where a new session goes: straight to rd, or first to the
+// account page to suggest a passkey when the user has none.
+func (s *Server) afterLogin(r *http.Request, user *store.User, rd string) string {
+	if s.webauthn == nil {
+		return rd
+	}
+	keys, err := s.store.PasskeysByUser(r.Context(), user.ID)
+	if err != nil || len(keys) > 0 {
+		return rd
+	}
+	return "/account?welcome=1&rd=" + url.QueryEscape(rd)
+}
+
+func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) {
 	p := s.provider(r.PathValue("provider"))
 	if p == nil {
 		s.renderError(w, r, http.StatusNotFound, "Unknown sign-in provider.")
@@ -102,7 +143,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
-func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	p := s.provider(r.PathValue("provider"))
 	if p == nil {
 		s.renderError(w, r, http.StatusNotFound, "Unknown sign-in provider.")
@@ -138,30 +179,22 @@ func (s *Server) handleCallback(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(id.AvatarURL, "https://") {
 		id.AvatarURL = "" // the dashboard's CSP only loads HTTPS images
 	}
+	// Check before creating an account for someone who may not sign in.
 	if !s.cfg.EmailAllowed(id.Email) {
-		s.log.Info("sign-in denied", "provider", p.ID(), "email", id.Email)
+		s.log.Info("sign-in denied", "method", p.ID(), "email", id.Email)
 		s.renderError(w, r, http.StatusForbidden, fmt.Sprintf("The account %s is not allowed to use this securegate.", id.Email))
 		return
 	}
-	user, err := s.store.UpsertUser(r.Context(), *id)
+	user, err := s.store.LoginOAuth(r.Context(), *id)
 	if err != nil {
-		s.log.Error("save user", "err", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong. Please try again.")
+		s.internalError(w, r, "save user", err)
 		return
 	}
-	if user.Disabled {
-		s.renderError(w, r, http.StatusForbidden, "Your account has been disabled by an administrator.")
+	if msg, ok := s.startSession(w, r, user, p.ID()); !ok {
+		s.renderError(w, r, http.StatusForbidden, msg)
 		return
 	}
-	token, sess, err := s.store.CreateSession(r.Context(), user.ID, s.cfg.Auth.SessionTTL)
-	if err != nil {
-		s.log.Error("create session", "err", err)
-		s.renderError(w, r, http.StatusInternalServerError, "Something went wrong. Please try again.")
-		return
-	}
-	s.log.Info("signed in", "provider", p.ID(), "email", user.Email, "user_id", user.ID)
-	s.setCookie(w, s.cookies.session, token, sess.ExpiresAt)
-	http.Redirect(w, r, flow.Redirect, http.StatusFound)
+	http.Redirect(w, r, s.afterLogin(r, user, flow.Redirect), http.StatusFound)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {

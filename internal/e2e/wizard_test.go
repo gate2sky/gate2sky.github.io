@@ -1,0 +1,213 @@
+package e2e
+
+import (
+	"bytes"
+	"context"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"golang.org/x/crypto/ssh"
+
+	"github.com/jgermade/securegate/internal/config"
+	"github.com/jgermade/securegate/internal/store"
+	"github.com/jgermade/securegate/internal/wizard"
+)
+
+// lineReader hands out one line per Read, like a person typing: the
+// accessible prompts each wrap the input in a new scanner.
+type lineReader struct {
+	lines []string
+	ended bool
+}
+
+func (r *lineReader) Ended() bool { return r.ended }
+
+func (r *lineReader) Read(p []byte) (int, error) {
+	if len(r.lines) == 0 {
+		r.ended = true
+		return 0, io.EOF
+	}
+	n := copy(p, r.lines[0]+"\n")
+	r.lines = r.lines[1:]
+	return n, nil
+}
+
+func runWizard(t *testing.T, path string, answers ...string) string {
+	t.Helper()
+	var out bytes.Buffer
+	in := &lineReader{lines: answers}
+	w := &wizard.Wizard{Path: path, Accessible: true, In: in, Out: &out}
+	if err := w.Run(context.Background()); err != nil {
+		t.Fatalf("wizard: %v\n%s", err, out.String())
+	}
+	if in.ended {
+		t.Fatalf("the wizard wanted more answers than given\n%s", out.String())
+	}
+	if len(in.lines) > 0 {
+		t.Fatalf("wizard ended with %d unused answers %q\n%s", len(in.lines), in.lines, out.String())
+	}
+	return out.String()
+}
+
+func TestWizardSetup(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "etc", "securegate.yaml")
+	out := runWizard(t, path,
+		// Domain and HTTPS.
+		"https://gate.example.org", "1",
+		// Let's Encrypt email, then HTTP, HTTPS and SSH listen addresses.
+		"ops@example.org", "", "", "",
+		// Email codes over SMTP, passkeys, GitHub too.
+		"1", "", "y",
+		// SMTP: host, port, encryption, user, password, sender.
+		"smtp.example.org", "", "", "mailer", "s3cret", "",
+		// GitHub client ID and secret.
+		"gh-id", "gh-secret",
+		// Admins, allowed domains, other emails, allow everyone.
+		"ops@example.org", "example.org", "", "",
+		// Data directory.
+		"",
+	)
+	if !strings.Contains(out, "Saved "+path) || !strings.Contains(out, "*.gate.example.org") {
+		t.Fatalf("output:\n%s", out)
+	}
+	fi, err := os.Stat(path)
+	if err != nil || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("config file mode: %v %v", fi, err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		raw, _ := os.ReadFile(path)
+		t.Fatalf("written config does not load: %v\n%s", err, raw)
+	}
+	checks := map[string]string{
+		cfg.PublicURL:                      "https://gate.example.org",
+		cfg.HTTP.Listen:                    ":80",
+		cfg.HTTP.TLS.Listen:                ":443",
+		cfg.HTTP.TLS.ACME.Email:            "ops@example.org",
+		cfg.SSH.Listen:                     ":2222",
+		cfg.Auth.Email.SMTP.Host:           "smtp.example.org",
+		cfg.Auth.Email.SMTP.TLS:            "starttls",
+		cfg.Auth.Email.SMTP.Password:       "s3cret",
+		cfg.Auth.Email.From:                "securegate <no-reply@gate.example.org>",
+		cfg.Auth.Providers[0].ClientID:     "gh-id",
+		cfg.Auth.Providers[0].Type:         "github",
+		cfg.Auth.AllowedDomains[0]:         "example.org",
+		cfg.DataDir:                        filepath.Join(filepath.Dir(path), "data"),
+		strings.Join(cfg.Auth.Admins, ","): "ops@example.org",
+	}
+	for got, want := range checks {
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	}
+	if !cfg.HTTP.TLS.ACME.Enabled || cfg.Auth.Email.SMTP.Port != 587 || !cfg.PasskeysEnabled() {
+		t.Errorf("config = %+v", cfg)
+	}
+}
+
+func TestWizardManagesRunningServer(t *testing.T) {
+	h := newHarness(t)
+	h.serveAdmin()
+	path := filepath.Join(t.TempDir(), "securegate.yaml")
+	os.WriteFile(path, h.yaml, 0o600)
+	key := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(newSigner(t).PublicKey()))) + " wizard-key"
+
+	out := runWizard(t, path,
+		"1", // Subdomains
+		"1", // + Register a subdomain (the list is empty)
+		"wiz", "dev@example.com", "3", key,
+		"1", // the new subdomain
+		"2", // Change who can open it
+		"1", // Public
+		"6", // ← Back
+		"3", // ← Back
+		"4", // Exit
+	)
+	if !strings.Contains(out, "Registered http://wiz.gate.test for dev@example.com with 1 SSH key(s)") ||
+		!strings.Contains(out, "-R wiz:80:localhost:3000") || !strings.Contains(out, "Access set to public") {
+		t.Fatalf("output:\n%s", out)
+	}
+	d, err := h.store.SubdomainByName(t.Context(), "wiz")
+	if err != nil || d.OwnerEmail != "dev@example.com" || d.Access != store.AccessPublic || d.Keys != 1 {
+		t.Fatalf("subdomain = %+v, %v", d, err)
+	}
+
+	// Users: add one, then disable it.
+	out = runWizard(t, path,
+		"2",                  // Users
+		"2",                  // + Add a user (after dev@example.com)
+		"newbie@example.com", // email
+		"2",                  // newbie
+		"y",                  // disable
+		"4",                  // ← Back
+		"4",                  // Exit
+	)
+	u, err := h.store.UserByEmail(t.Context(), "newbie@example.com")
+	if err != nil || !u.Disabled {
+		t.Fatalf("user = %+v, %v\n%s", u, err, out)
+	}
+}
+
+func TestWizardKeepsCommentsAndSecrets(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "securegate.yaml")
+	original := `# Production gate. Ask ops before changing.
+public_url: http://localhost:8080
+data_dir: ./state
+auth:
+  admins: [ops@example.com]
+  email:
+    log_only: true
+  providers:
+    - id: github
+      type: github
+      client_id: abc
+      client_secret: ${GH_SECRET} # from the vault
+`
+	os.WriteFile(path, []byte(original), 0o640)
+	out := runWizard(t, path,
+		"3", // Server settings
+		// Keep every answer as it is.
+		"", "", // URL, HTTPS
+		"", "", // HTTP and SSH listen
+		"", "", "", // email mode, passkeys, GitHub
+		"", "", // GitHub client ID and secret
+		"", "", "", "", // who can sign in
+		"",  // data directory
+		"4", // Exit
+	)
+	raw, _ := os.ReadFile(path)
+	for _, want := range []string{"# Production gate. Ask ops before changing.", "${GH_SECRET}", "# from the vault", "data_dir: ./state"} {
+		if !bytes.Contains(raw, []byte(want)) {
+			t.Errorf("lost %q:\n%s", want, raw)
+		}
+	}
+	if !strings.Contains(out, "GH_SECRET") {
+		t.Errorf("no warning about the unset variable:\n%s", out)
+	}
+	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o640 {
+		t.Errorf("file mode changed to %v", fi.Mode().Perm())
+	}
+}
+
+func TestWizardStopsWhenInputEnds(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "securegate.yaml")
+	var out bytes.Buffer
+	w := &wizard.Wizard{Path: path, Accessible: true, In: &lineReader{lines: []string{"http://localhost:8080"}}, Out: &out}
+	done := make(chan error, 1)
+	go func() { done <- w.Run(context.Background()) }()
+	select {
+	case err := <-done:
+		if err != nil || !strings.Contains(out.String(), "Nothing was saved") {
+			t.Fatalf("err = %v\n%s", err, out.String())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the wizard did not stop when its input ended")
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Error("a configuration was saved from incomplete answers")
+	}
+}

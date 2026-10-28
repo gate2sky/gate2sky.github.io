@@ -49,17 +49,33 @@ func (s *Store) Close() error { return s.db.Close() }
 var migrations = []string{
 	`CREATE TABLE users (
 		id            INTEGER PRIMARY KEY,
-		provider      TEXT NOT NULL,
-		subject       TEXT NOT NULL,
-		email         TEXT NOT NULL,
+		email         TEXT NOT NULL UNIQUE,
 		name          TEXT NOT NULL DEFAULT '',
-		username      TEXT NOT NULL DEFAULT '',
 		avatar_url    TEXT NOT NULL DEFAULT '',
+		webauthn_id   BLOB NOT NULL UNIQUE,
 		disabled      INTEGER NOT NULL DEFAULT 0,
 		created_at    INTEGER NOT NULL,
-		last_login_at INTEGER NOT NULL,
-		UNIQUE (provider, subject)
+		last_login_at INTEGER NOT NULL DEFAULT 0
 	);
+	CREATE TABLE identities (
+		provider   TEXT NOT NULL,
+		subject    TEXT NOT NULL,
+		user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		username   TEXT NOT NULL DEFAULT '',
+		created_at INTEGER NOT NULL,
+		PRIMARY KEY (provider, subject)
+	);
+	CREATE INDEX identities_user ON identities(user_id);
+	CREATE TABLE passkeys (
+		id            INTEGER PRIMARY KEY,
+		user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		credential_id BLOB NOT NULL UNIQUE,
+		name          TEXT NOT NULL,
+		credential    BLOB NOT NULL,
+		created_at    INTEGER NOT NULL,
+		last_used_at  INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX passkeys_user ON passkeys(user_id);
 	CREATE TABLE sessions (
 		id         TEXT PRIMARY KEY,
 		token_hash BLOB NOT NULL UNIQUE,

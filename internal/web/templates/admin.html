@@ -30,12 +30,12 @@
   <div class="card-head"><h2>Users</h2><span class="muted">{{len .Page.Users}}</span></div>
   <div class="table-wrap">
   <table class="table">
-    <thead><tr><th>User</th><th>Provider</th><th>Subdomains</th><th>Last sign-in</th><th></th></tr></thead>
+    <thead><tr><th>User</th><th>Sign-in</th><th>Subdomains</th><th>Last sign-in</th><th></th></tr></thead>
     <tbody>
     {{range .Page.Users}}
     <tr{{if .Disabled}} class="disabled"{{end}}>
-      <td><strong>{{.DisplayName}}</strong><div class="muted small">{{.Email}}</div></td>
-      <td>{{.Provider}}{{with .Username}} <div class="muted small">{{.}}</div>{{end}}</td>
+      <td><strong>{{.DisplayName}}</strong>{{if .Name}}<div class="muted small">{{.Email}}</div>{{end}}</td>
+      <td class="small">email{{if .Passkeys}} · {{.Passkeys}} passkey{{if ne .Passkeys 1}}s{{end}}{{end}}{{with .Providers}} · {{.}}{{end}}</td>
       <td>{{.Subdomains}}</td>
       <td>{{ago .LastLoginAt}}</td>
       <td class="right">
@@ -51,5 +51,11 @@
     </tbody>
   </table>
   </div>
+  <form method="post" action="/admin/users" class="form form-row">
+    <input type="hidden" name="csrf_token" value="{{$csrf}}">
+    <input type="email" name="email" required placeholder="new.user@example.com" aria-label="Email of the new user" autocomplete="off">
+    <button type="submit" class="button button-secondary">Add user</button>
+  </form>
+  <p class="hint">Added users sign in with that email address. Who may sign in at all is set by <code>auth.allowed_*</code> in the configuration.</p>
 </section>
 {{end}}

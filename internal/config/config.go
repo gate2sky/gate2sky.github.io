@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/mail"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -26,10 +28,11 @@ type Config struct {
 	// DataDir holds the SQLite database, the SSH host key and other state.
 	DataDir string `yaml:"data_dir"`
 
-	HTTP   HTTPConfig `yaml:"http"`
-	SSH    SSHConfig  `yaml:"ssh"`
-	Auth   AuthConfig `yaml:"auth"`
-	Limits Limits     `yaml:"limits"`
+	HTTP   HTTPConfig  `yaml:"http"`
+	SSH    SSHConfig   `yaml:"ssh"`
+	Auth   AuthConfig  `yaml:"auth"`
+	Admin  AdminConfig `yaml:"admin"`
+	Limits Limits      `yaml:"limits"`
 
 	// ReservedSubdomains are names nobody can register, on top of the
 	// built-in list (www, admin, api, ...).
@@ -76,17 +79,55 @@ type SSHConfig struct {
 	PublicHost        string        `yaml:"public_host"`
 	PublicPort        int           `yaml:"public_port"`
 	KeepaliveInterval time.Duration `yaml:"keepalive_interval"`
+	// ProxyProtocol expects a PROXY protocol header (v1 or v2) on every
+	// SSH connection, e.g. from Traefik or HAProxy, to learn client IPs.
+	ProxyProtocol bool `yaml:"proxy_protocol"`
+}
+
+type AdminConfig struct {
+	// Socket is the Unix socket `securegate config` and `securegate status`
+	// use to manage the running server. Defaults to <data_dir>/admin.sock.
+	Socket string `yaml:"socket"`
 }
 
 type AuthConfig struct {
 	SessionTTL time.Duration `yaml:"session_ttl"`
 	// AllowEveryone lets any account with a verified email sign in. When
 	// false, only AllowedEmails, AllowedDomains and Admins can sign in.
-	AllowEveryone  bool             `yaml:"allow_everyone"`
-	AllowedEmails  []string         `yaml:"allowed_emails"`
-	AllowedDomains []string         `yaml:"allowed_domains"`
-	Admins         []string         `yaml:"admins"`
-	Providers      []ProviderConfig `yaml:"providers"`
+	AllowEveryone  bool     `yaml:"allow_everyone"`
+	AllowedEmails  []string `yaml:"allowed_emails"`
+	AllowedDomains []string `yaml:"allowed_domains"`
+	Admins         []string `yaml:"admins"`
+
+	// Email enables sign-in with a one-time code sent by email.
+	Email EmailConfig `yaml:"email"`
+	// DisablePasskeys turns off passkey (WebAuthn) sign-in.
+	DisablePasskeys bool `yaml:"disable_passkeys"`
+	// Providers are optional OAuth sign-in providers.
+	Providers []ProviderConfig `yaml:"providers"`
+}
+
+type EmailConfig struct {
+	// From is the sender, e.g. "securegate <no-reply@gate.example.com>".
+	From    string        `yaml:"from"`
+	CodeTTL time.Duration `yaml:"code_ttl"`
+	SMTP    SMTPConfig    `yaml:"smtp"`
+	// LogOnly writes emails to the log instead of sending them. Only for
+	// local development: anyone reading the log can sign in.
+	LogOnly bool `yaml:"log_only"`
+}
+
+// Enabled reports whether email sign-in is configured.
+func (e EmailConfig) Enabled() bool { return e.SMTP.Host != "" || e.LogOnly }
+
+type SMTPConfig struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	// TLS is "starttls" (default), "tls" (implicit, usually port 465) or
+	// "none" (only for a relay on localhost).
+	TLS string `yaml:"tls"`
 }
 
 type ProviderConfig struct {
@@ -120,18 +161,26 @@ type Limits struct {
 
 // Load reads the YAML file at path. ${VAR} references are replaced with
 // environment variables before parsing, so secrets can stay out of the file.
+// Relative paths in the file are resolved against the file's directory.
 func Load(path string) (*Config, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return Parse(raw)
+	cfg, err := parse(raw, filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
 
 var envRef = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 
-// Parse parses and validates a configuration document.
-func Parse(raw []byte) (*Config, error) {
+// Parse parses and validates a configuration document. Relative paths are
+// left as they are, relative to the working directory.
+func Parse(raw []byte) (*Config, error) { return parse(raw, "") }
+
+func parse(raw []byte, base string) (*Config, error) {
 	// Expand ${VAR} in values only, so comments may mention variables
 	// that are not set.
 	var doc yaml.Node
@@ -155,6 +204,9 @@ func Parse(raw []byte) (*Config, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	cfg.setDefaults()
+	if base != "" {
+		cfg.resolvePaths(base)
+	}
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
@@ -202,6 +254,25 @@ func (c *Config) setDefaults() {
 	if c.Auth.SessionTTL == 0 {
 		c.Auth.SessionTTL = 7 * 24 * time.Hour
 	}
+	if c.Admin.Socket == "" {
+		c.Admin.Socket = filepath.Join(c.DataDir, "admin.sock")
+	}
+	if c.Auth.Email.CodeTTL == 0 {
+		c.Auth.Email.CodeTTL = 10 * time.Minute
+	}
+	if c.Auth.Email.SMTP.TLS == "" {
+		c.Auth.Email.SMTP.TLS = "starttls"
+	}
+	if c.Auth.Email.SMTP.Port == 0 {
+		switch c.Auth.Email.SMTP.TLS {
+		case "tls":
+			c.Auth.Email.SMTP.Port = 465
+		case "none":
+			c.Auth.Email.SMTP.Port = 25
+		default:
+			c.Auth.Email.SMTP.Port = 587
+		}
+	}
 	if c.Limits.SubdomainsPerUser == 0 {
 		c.Limits.SubdomainsPerUser = 10
 	}
@@ -225,6 +296,14 @@ func (c *Config) setDefaults() {
 	c.Auth.AllowedEmails = lowerAll(c.Auth.AllowedEmails)
 	c.Auth.AllowedDomains = lowerAll(c.Auth.AllowedDomains)
 	c.Auth.Admins = lowerAll(c.Auth.Admins)
+}
+
+func (c *Config) resolvePaths(base string) {
+	for _, p := range []*string{&c.DataDir, &c.HTTP.TLS.CertFile, &c.HTTP.TLS.KeyFile, &c.SSH.HostKeyFile, &c.Admin.Socket} {
+		if *p != "" && !filepath.IsAbs(*p) {
+			*p = filepath.Join(base, *p)
+		}
+	}
 }
 
 var providerID = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
@@ -261,8 +340,24 @@ func (c *Config) validate() error {
 		return errors.New("public_url must use https:// when http.tls is enabled")
 	}
 
-	if len(c.Auth.Providers) == 0 {
-		return errors.New("auth.providers: configure at least one OAuth provider")
+	if !c.Auth.Email.Enabled() && len(c.Auth.Providers) == 0 {
+		return errors.New("auth: configure email sign-in (auth.email.smtp) or at least one OAuth provider (auth.providers)")
+	}
+	if smtp := c.Auth.Email.SMTP; smtp.Host != "" {
+		if c.Auth.Email.From == "" {
+			return errors.New("auth.email.from is required to send sign-in codes")
+		}
+		if _, err := mail.ParseAddress(c.Auth.Email.From); err != nil {
+			return fmt.Errorf("auth.email.from: %w", err)
+		}
+		switch smtp.TLS {
+		case "starttls", "tls", "none":
+		default:
+			return errors.New("auth.email.smtp.tls must be starttls, tls or none")
+		}
+	}
+	if c.Auth.Email.CodeTTL < time.Minute || c.Auth.Email.CodeTTL > time.Hour {
+		return errors.New("auth.email.code_ttl must be between 1m and 1h")
 	}
 	seen := map[string]bool{}
 	for i, p := range c.Auth.Providers {
@@ -292,6 +387,9 @@ func (c *Config) validate() error {
 	}
 	return nil
 }
+
+// PasskeysEnabled reports whether users can sign in with passkeys.
+func (c *Config) PasskeysEnabled() bool { return !c.Auth.DisablePasskeys }
 
 // Domain is the dashboard host without port; tunnels are its subdomains.
 func (c *Config) Domain() string { return c.publicURL.Hostname() }

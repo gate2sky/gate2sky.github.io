@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -138,5 +140,21 @@ func TestEnvValues(t *testing.T) {
 		if cfg.SSHPort() != 2200 {
 			t.Errorf("port = %d", cfg.SSHPort())
 		}
+	}
+}
+
+func TestLoadResolvesRelativePaths(t *testing.T) {
+	t.Setenv("TEST_SECRET", "x")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "securegate.yaml")
+	if err := os.WriteFile(path, []byte(base+"data_dir: state\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "state"); cfg.DataDir != want || cfg.Admin.Socket != filepath.Join(want, "admin.sock") {
+		t.Errorf("DataDir = %q, socket = %q; want under %q", cfg.DataDir, cfg.Admin.Socket, want)
 	}
 }

@@ -6,6 +6,8 @@
 <title>{{.Title}} · securegate</title>
 <link rel="stylesheet" href="/static/app.css">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+{{with .Auth}}<meta name="csrf-token" content="{{.Session.CSRFToken}}">{{end}}
+{{if .Passkeys}}<script src="/static/passkeys.js" defer></script>{{end}}
 </head>
 <body>
 <header class="topbar">
@@ -18,7 +20,7 @@
     <nav class="nav">
       <a href="/">Subdomains</a>
       {{if .Admin}}<a href="/admin">Admin</a>{{end}}
-      <span class="who">{{if .User.AvatarURL}}<img src="{{.User.AvatarURL}}" alt="" class="avatar">{{end}}<span>{{.User.Email}}</span></span>
+      <a href="/account" class="who">{{if .User.AvatarURL}}<img src="{{.User.AvatarURL}}" alt="" class="avatar">{{end}}<span>{{.User.Email}}</span></a>
       <form method="post" action="/logout" class="inline">
         <input type="hidden" name="csrf_token" value="{{.Session.CSRFToken}}">
         <button type="submit" class="link">Sign out</button>
