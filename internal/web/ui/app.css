@@ -423,8 +423,8 @@ input:not([type=radio]):focus, textarea:focus { outline: none; border-color: var
 .command {
   display: flex; align-items: center; gap: 12px; margin: 12px 0;
   padding: 7px 7px 7px 14px; font-size: 13px; border-radius: 10px;
-  background: var(--mk-bg); color: var(--mk-fg); border: .5px solid var(--mk-line);
-  box-shadow: 0 1px 2px rgb(0 0 0 / .05) inset;
+  background: #fff; color: var(--mk-fg); border: .5px solid var(--mk-line);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .05);
 }
 .command code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 4px 0; scrollbar-width: none; }
 .command code::before { content: "$ "; color: var(--mk-comment); user-select: none; }
@@ -434,10 +434,10 @@ input:not([type=radio]):focus, textarea:focus { outline: none; border-color: var
 .tok-arg { color: var(--mk-yellow); }
 .copy {
   flex: none; font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 6px; cursor: pointer;
-  border: 0; background: #fff; color: var(--mk-fg); box-shadow: 0 0 0 .5px var(--mk-line), 0 1px 2px rgb(0 0 0 / .08);
+  border: 0; background: #f3f2ea; color: var(--mk-fg); box-shadow: 0 0 0 .5px var(--mk-line);
   transition: background-color .12s;
 }
-.copy:hover { background: #f3f2ea; }
+.copy:hover { background: #e9e8de; }
 
 /* Facts, in a grid of tiles tinted by their icon's color. */
 
