@@ -130,13 +130,13 @@
   <section class="card">
     <h2>Connection</h2>
     <div :if="sub.tunnel">
-      <dl class="stats">
-        <div><dt>Client</dt><dd>{{ sub.tunnel.client_addr }}</dd></div>
-        <div><dt>SSH key</dt><dd>{{ sub.tunnel.key_name }}</dd></div>
-        <div><dt>Connected</dt><dd>{{ ago(sub.tunnel.created_at) }}</dd></div>
-        <div><dt>Requests</dt><dd>{{ sub.tunnel.requests }}</dd></div>
-        <div><dt>Traffic in / out</dt><dd>{{ bytes(sub.tunnel.bytes_in) }} / {{ bytes(sub.tunnel.bytes_out) }}</dd></div>
-        <div><dt>Open streams</dt><dd>{{ sub.tunnel.active_conns }}</dd></div>
+      <dl class="stats stats-3">
+        <div class="tone-blue"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg>Client</dt><dd>{{ sub.tunnel.client_addr }}</dd></div>
+        <div class="tone-purple"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M21 12v2"/></svg>SSH key</dt><dd>{{ sub.tunnel.key_name }}</dd></div>
+        <div class="tone-green"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Connected</dt><dd>{{ ago(sub.tunnel.created_at) }}</dd></div>
+        <div class="tone-orange"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6"/></svg>Requests</dt><dd>{{ sub.tunnel.requests }}</dd></div>
+        <div class="tone-teal"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 20V4M4 8l4-4 4 4M16 4v16M12 16l4 4 4-4"/></svg>Traffic in / out</dt><dd>{{ bytes(sub.tunnel.bytes_in) }} / {{ bytes(sub.tunnel.bytes_out) }}</dd></div>
+        <div class="tone-pink"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg>Open streams</dt><dd>{{ sub.tunnel.active_conns }}</dd></div>
       </dl>
       <button type="button" class="button button-secondary" @click="disconnect">Disconnect</button>
       <p class="muted">To connect again later, or from another machine with an authorized key:</p>

@@ -2,10 +2,10 @@
    the min-width query at the end widens them for larger screens.
 
    Close to current macOS: a slowly drifting wallpaper behind translucent,
-   blurred materials, system colors, segmented controls and grouped lists.
+   blurred materials, system colors, tabs, option cards and lists.
    One theme, between light and dark: light text on the mid-gray wallpaper
    and toolbar, dark text on the light cards (which set their own tokens),
-   and Monokai for code. */
+   and a light Monokai for code. */
 :root {
   color-scheme: dark;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, "Helvetica Neue", sans-serif;
@@ -73,17 +73,25 @@
   color: var(--fg);
 }
 
-/* Monokai, for code. */
+/* A light Monokai, for code: its hues, deep enough to read on paper. */
 :root {
-  --mk-bg: #272822;
-  --mk-line: #3e3d32;
-  --mk-fg: #f8f8f2;
-  --mk-comment: #75715e;
-  --mk-pink: #f92672;
-  --mk-green: #a6e22e;
-  --mk-yellow: #e6db74;
-  --mk-purple: #ae81ff;
+  --mk-bg: #fbfaf4;
+  --mk-line: rgb(0 0 0 / .13);
+  --mk-fg: #272822;
+  --mk-comment: #9a967e;
+  --mk-pink: #d0105c;
+  --mk-green: #4d7c0f;
+  --mk-yellow: #a35b00;
+  --mk-purple: #7547c9;
 }
+
+/* Colors for icons and tinted tiles. */
+.tone-blue { --tone: #0a84ff; }
+.tone-purple { --tone: #a35ce6; }
+.tone-green { --tone: #28b24b; }
+.tone-orange { --tone: #ff9500; }
+.tone-teal { --tone: #20a8c4; }
+.tone-pink { --tone: #ff2d55; }
 
 * { box-sizing: border-box; }
 
@@ -145,7 +153,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 code, pre, textarea { font-family: var(--mono); }
 code { font-size: .9em; }
-p code, .hint code { background: var(--mk-bg); color: var(--mk-yellow); padding: 1px 6px; border-radius: 5px; }
+p code, .hint code { background: var(--mk-bg); color: var(--mk-pink); padding: 1px 6px; border-radius: 5px; box-shadow: 0 0 0 .5px var(--mk-line); }
 
 h1 { font-size: 24px; line-height: 1.2; margin: 0; letter-spacing: -.022em; font-weight: 700; }
 h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: -.01em; font-weight: 600; }
@@ -163,23 +171,27 @@ h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: -.01em; font-weight: 600
   box-shadow: 0 .5px 0 var(--material-edge) inset;
 }
 .topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; }
+.topbar-inner > .nav { align-self: stretch; }
 .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 650; font-size: 15px; letter-spacing: -.01em; color: var(--fg); }
 .brand:hover { text-decoration: none; }
 .logo { width: 28px; height: 28px; border-radius: 7px; box-shadow: 0 1px 3px rgb(0 0 0 / .3); }
 .nav { display: flex; align-items: center; gap: 6px; }
 
-.segmented {
-  display: inline-flex; padding: 2px; gap: 2px; border-radius: 9px; background: var(--fill);
+/* Tabs along the bottom edge of the toolbar. */
+.tabs { display: flex; align-self: stretch; }
+.tabs > a {
+  position: relative; display: flex; align-items: center; gap: 6px; padding: 0 10px;
+  color: var(--muted); font-size: 13px; font-weight: 500;
+  transition: color .15s, background-color .15s;
 }
-.segmented > a {
-  padding: 6px 12px; border-radius: 7px; color: var(--fg); font-size: 13px; font-weight: 500;
-  transition: background-color .15s, box-shadow .15s;
+.tabs > a:hover { text-decoration: none; color: var(--fg); background: var(--fill-2); }
+.tabs > a.active { color: var(--fg); font-weight: 600; }
+.tabs > a::after {
+  content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0;
+  background: #64b5ff; transform: scaleX(0); transition: transform .2s;
 }
-.segmented > a:hover { text-decoration: none; background: var(--fill-2); }
-.segmented > a.active, .segmented > a.active:hover {
-  background: rgb(255 255 255 / .2); font-weight: 600;
-  box-shadow: 0 .5px 0 rgb(255 255 255 / .14) inset, 0 1px 3px rgb(0 0 0 / .18);
-}
+.tabs > a.active::after { transform: scaleX(1); }
+.tab-icon { display: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .who {
   display: inline-flex; align-items: center; gap: 8px; min-width: 0;
@@ -373,35 +385,46 @@ input:not([type=radio]):focus, textarea:focus { outline: none; border-color: var
   border: .5px solid var(--field-line); border-left: 0; border-radius: 0 var(--radius-control) var(--radius-control) 0; background: var(--fill-2);
 }
 
-/* Radios as a grouped list, like System Settings. */
-[data-c79-box]:has(> .radio) {
-  display: grid; gap: 0; border-radius: 11px; overflow: hidden;
-  background: var(--fill-2); border: .5px solid var(--line);
-}
+/* Radios as option cards: an icon, the label and hint, and a check. The
+   radio itself stays in the label, hidden, for the keyboard. */
+[data-c79-box]:has(> .radio) { display: grid; gap: 10px; }
 .radio {
-  display: flex !important; align-items: center; gap: 12px; font-weight: normal !important; font-size: 14px !important;
-  padding: 11px 14px; cursor: pointer; position: relative; transition: background-color .12s;
+  position: relative; display: flex !important; align-items: center; gap: 12px;
+  font-weight: normal !important; font-size: 14px !important; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  background: var(--field); box-shadow: 0 0 0 .5px var(--field-line), 0 1px 2px rgb(0 0 0 / .05);
+  transition: box-shadow .15s, background-color .15s;
 }
-.radio + .radio { box-shadow: 0 -.5px 0 var(--separator); }
-.radio:hover { background: var(--fill-2); }
-.radio:has(input:checked) { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.radio > span { display: grid; gap: 1px; }
+.radio:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 50%, transparent), 0 3px 10px rgb(0 0 0 / .08); }
+.radio input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.radio-icon {
+  flex: none; width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center;
+  background: var(--fill); color: var(--muted); transition: background .15s, color .15s;
+}
+.radio-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.radio-text { display: grid; gap: 1px; flex: 1; min-width: 0; }
 .radio .muted { font-size: 12px; }
-input[type=radio] {
-  appearance: none; -webkit-appearance: none; flex: none; margin: 0; width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
-  background: var(--field); border: .5px solid color-mix(in srgb, var(--fg) 35%, transparent); box-shadow: 0 .5px 1px rgb(0 0 0 / .1);
-  transition: border-width .12s, background-color .12s;
+.radio-check {
+  flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  box-shadow: inset 0 0 0 1.5px var(--field-line); transition: background-color .15s, box-shadow .15s;
 }
-input[type=radio]:checked { background: #fff; border: 5px solid var(--accent); }
-input[type=radio]:focus-visible { box-shadow: var(--ring); border-radius: 50%; }
+.radio-check svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(.5); transition: opacity .15s, transform .2s; }
+.radio:has(input:checked) {
+  background: color-mix(in srgb, var(--tone) 8%, var(--field));
+  box-shadow: 0 0 0 1.5px var(--tone), 0 4px 14px color-mix(in srgb, var(--tone) 22%, transparent);
+}
+.radio:has(input:checked) .radio-icon { color: #fff; background: linear-gradient(160deg, color-mix(in srgb, var(--tone) 65%, #fff), var(--tone)); }
+.radio:has(input:checked) .radio-check { background: var(--tone); box-shadow: none; }
+.radio:has(input:checked) .radio-check svg { opacity: 1; transform: none; }
+.radio:has(input:focus-visible) { box-shadow: 0 0 0 1.5px var(--tone), var(--ring); }
+.radio:has(input:disabled) { opacity: .5; cursor: default; }
 
-/* A command to copy, as a terminal line in Monokai. */
+/* A command to copy, as a terminal line in light Monokai. */
 
 .command {
   display: flex; align-items: center; gap: 12px; margin: 12px 0;
   padding: 7px 7px 7px 14px; font-size: 13px; border-radius: 10px;
-  background: var(--mk-bg); color: var(--mk-fg); border: .5px solid rgb(0 0 0 / .4);
-  box-shadow: 0 .5px 0 rgb(255 255 255 / .06) inset, 0 4px 14px rgb(0 0 0 / .16);
+  background: var(--mk-bg); color: var(--mk-fg); border: .5px solid var(--mk-line);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .05) inset;
 }
 .command code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 4px 0; scrollbar-width: none; }
 .command code::before { content: "$ "; color: var(--mk-comment); user-select: none; }
@@ -411,17 +434,27 @@ input[type=radio]:focus-visible { box-shadow: var(--ring); border-radius: 50%; }
 .tok-arg { color: var(--mk-yellow); }
 .copy {
   flex: none; font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 6px; cursor: pointer;
-  border: 0; background: var(--mk-line); color: var(--mk-fg); box-shadow: 0 .5px 0 rgb(255 255 255 / .08) inset;
+  border: 0; background: #fff; color: var(--mk-fg); box-shadow: 0 0 0 .5px var(--mk-line), 0 1px 2px rgb(0 0 0 / .08);
   transition: background-color .12s;
 }
-.copy:hover { background: #49483e; }
+.copy:hover { background: #f3f2ea; }
 
-/* Facts, in a grid of tiles. */
+/* Facts, in a grid of tiles tinted by their icon's color. */
 
 .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 16px; }
-.stats div { background: var(--fill-2); border: .5px solid var(--line); border-radius: 10px; padding: 10px 14px; }
-.stats dt { font-size: 12px; color: var(--muted); }
-.stats dd { margin: 2px 0 0; font-weight: 600; font-size: 14px; letter-spacing: -.01em; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.stats div {
+  border-radius: 12px; padding: 12px 14px;
+  background: color-mix(in srgb, var(--tone, #8e8e93) 9%, var(--field));
+  box-shadow: 0 0 0 .5px color-mix(in srgb, var(--tone, #8e8e93) 28%, transparent);
+}
+.stats dt { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.stats dd { margin: 8px 0 0; font-weight: 600; font-size: 14px; letter-spacing: -.01em; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.stat-icon {
+  flex: none; width: 24px; height: 24px; padding: 4px; border-radius: 7px;
+  fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tone, #8e8e93) 65%, #fff), var(--tone, #8e8e93));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--tone, #8e8e93) 40%, transparent);
+}
 
 .empty { text-align: center; padding: 28px 16px; }
 .hide-narrow { display: none; }
@@ -454,13 +487,15 @@ input[type=radio]:focus-visible { box-shadow: var(--ring); border-radius: 50%; }
 
 @media (min-width: 400px) {
   .brand-name { display: inline; }
+  .tab-icon { display: block; }
 }
 
 @media (min-width: 640px) {
   .wrap { padding: 0 24px; }
   .topbar-inner { gap: 16px; }
   .nav { gap: 10px; }
-  .segmented > a { padding: 3px 14px; }
+  .tabs > a { padding: 0 14px; }
+  .tabs > a::after { left: 12px; right: 12px; }
   .who { padding-right: 10px; }
   .who span:last-child { display: inline; }
   main.wrap { padding-top: 36px; }
@@ -474,6 +509,10 @@ input[type=radio]:focus-visible { box-shadow: var(--ring); border-radius: 50%; }
   span.hide-narrow { display: inline; }
   div.hide-narrow { display: block; }
   .stats { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  [data-c79-box]:has(> .radio) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .radio { flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px; }
+  .radio-check { position: absolute; top: 14px; right: 14px; }
   .stats dd { font-size: 15px; }
   .button { font-size: 13px; padding: 6px 16px; }
   .button-plain { padding: 5px 10px; }
