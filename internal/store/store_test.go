@@ -135,6 +135,15 @@ func TestPasskeys(t *testing.T) {
 	if err != nil || len(list) != 1 || string(list[0].Credential) != `{"v":2}` || list[0].LastUsedAt.IsZero() {
 		t.Fatalf("PasskeysByUser = %+v, %v", list, err)
 	}
+	if err := s.RenamePasskey(ctx, other.ID, p.ID, "stolen"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("renamed another user's passkey: %v", err)
+	}
+	if err := s.RenamePasskey(ctx, u.ID, p.ID, "work laptop"); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := s.PasskeysByUser(ctx, u.ID); list[0].Name != "work laptop" {
+		t.Fatalf("name after rename = %q", list[0].Name)
+	}
 	if err := s.DeletePasskey(ctx, other.ID, p.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("deleted another user's passkey: %v", err)
 	}
@@ -195,7 +204,13 @@ func TestSubdomainsAndGrants(t *testing.T) {
 	if _, err := s.DeleteKey(ctx, api.ID, k1.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("deleted a key through another subdomain: %v", err)
 	}
-	if k, err := s.DeleteKey(ctx, app.ID, k1.ID); err != nil || k.Name != "laptop" {
+	if err := s.RenameKey(ctx, api.ID, k1.ID, "stolen"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("renamed a key through another subdomain: %v", err)
+	}
+	if err := s.RenameKey(ctx, app.ID, k1.ID, "work laptop"); err != nil {
+		t.Fatal(err)
+	}
+	if k, err := s.DeleteKey(ctx, app.ID, k1.ID); err != nil || k.Name != "work laptop" {
 		t.Fatalf("DeleteKey = %+v, %v", k, err)
 	}
 

@@ -166,12 +166,9 @@ func (s *Server) handlePasskeyRegister(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "The passkey could not be verified. Please try again.")
 		return
 	}
-	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	name := passkeyName(r.URL.Query().Get("name"))
 	if name == "" {
 		name = "Passkey added " + time.Now().UTC().Format("2006-01-02")
-	}
-	if len([]rune(name)) > 64 {
-		name = string([]rune(name)[:64])
 	}
 	data, err := json.Marshal(cred)
 	if err != nil {
@@ -190,6 +187,41 @@ func (s *Server) handlePasskeyRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("passkey added", "user_id", a.User.ID, "name", name)
 	writeJSON(w, http.StatusOK, passkeyView(pk))
+}
+
+// passkeyName is a passkey's name as given, trimmed to 64 characters.
+func passkeyName(name string) string {
+	name = strings.TrimSpace(name)
+	if len([]rune(name)) > 64 {
+		name = string([]rune(name)[:64])
+	}
+	return name
+}
+
+func (s *Server) handleRenamePasskey(w http.ResponseWriter, r *http.Request) {
+	a := currentAuth(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	var req struct {
+		Name string `json:"name"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	name := passkeyName(req.Name)
+	if name == "" {
+		jsonError(w, http.StatusBadRequest, "The name can't be empty.")
+		return
+	}
+	err := s.store.RenamePasskey(r.Context(), a.User.ID, id, name)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		jsonError(w, http.StatusNotFound, "That passkey no longer exists.")
+	case err != nil:
+		s.internalError(w, "rename passkey", err)
+	default:
+		s.log.Info("passkey renamed", "user_id", a.User.ID, "passkey_id", id, "name", name)
+		writeJSON(w, http.StatusOK, map[string]string{"name": name})
+	}
 }
 
 func (s *Server) handleDeletePasskey(w http.ResponseWriter, r *http.Request) {

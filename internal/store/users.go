@@ -279,6 +279,18 @@ func (s *Store) UpdatePasskeyUse(ctx context.Context, credentialID, credential [
 	return err
 }
 
+// RenamePasskey changes the name of one of a user's passkeys.
+func (s *Store) RenamePasskey(ctx context.Context, userID, id int64, name string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE passkeys SET name = ? WHERE id = ? AND user_id = ?`, name, id, userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // DeletePasskey removes one of a user's passkeys.
 func (s *Store) DeletePasskey(ctx context.Context, userID, id int64) error {
 	res, err := s.db.ExecContext(ctx, `DELETE FROM passkeys WHERE id = ? AND user_id = ?`, id, userID)

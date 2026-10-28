@@ -36,7 +36,8 @@
   $: document.title = `${name} · gate2sky`
 
   $attached(() => {
-    const timer = setInterval(() => document.hidden || load(), 5000)
+    // Not while a key is being renamed: a reload would redraw its form.
+    const timer = setInterval(() => document.hidden || renaming || load(), 5000)
     const off = $detached(() => {
       clearInterval(timer)
       off()
@@ -85,6 +86,27 @@
       keyError = e.message
     }
     busy = false
+  }
+
+  // The key whose name is being edited, by id, and its new name.
+  let renaming = 0
+  let newName = ""
+
+  const startRename = key => {
+    renaming = key.id
+    newName = key.name
+    setTimeout(() => document.querySelector('[name="rename-key"]')?.select())
+  }
+
+  const renameKey = async key => {
+    try {
+      const { name } = await api("PATCH", `${path()}/keys/${key.id}`, { name: newName })
+      renaming = 0
+      toast(`Key renamed to "${name}".`)
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    load()
   }
 
   const removeKey = async key => {
@@ -163,11 +185,23 @@
         <thead><tr><th>Name</th><th>Fingerprint</th><th class="hide-narrow">Added</th><th class="hide-narrow">Last used</th><th></th></tr></thead>
         <tbody>
           <tr :each="key in sub.key_list" :key="key.id">
-            <td>{{ key.name }} <div class="muted small">{{ key.type }}</div></td>
+            <td>
+              <form :if="renaming === key.id" class="form-row rename" @submit.prevent="renameKey(key)">
+                <input name="rename-key" maxlength="64" required autocomplete="off" aria-label="New name"
+                       :value="newName" @input="newName = $event.target.value" @keydown="$event.key === 'Escape' && (renaming = 0)">
+                <button type="submit" class="button">Save</button>
+                <button type="button" class="link" @click="renaming = 0">Cancel</button>
+              </form>
+              <span :else>{{ key.name }}</span>
+              <div class="muted small">{{ key.type }}</div>
+            </td>
             <td><code class="small">{{ key.fingerprint }}</code></td>
             <td class="hide-narrow">{{ ago(key.created_at) }}</td>
             <td class="hide-narrow">{{ ago(key.last_used_at) }}</td>
-            <td class="right"><button type="button" class="link danger" @click="removeKey(key)">Remove</button></td>
+            <td class="right row-actions">
+              <button type="button" class="link" @click="startRename(key)">Rename</button>
+              <button type="button" class="link danger" @click="removeKey(key)">Remove</button>
+            </td>
           </tr>
         </tbody>
       </table>

@@ -47,6 +47,7 @@ type Tunnel struct {
 	CreatedAt time.Time
 
 	access    atomic.Value // store.Access
+	keyName   atomic.Value // string
 	transport *http.Transport
 	registry  *Registry
 	done      chan struct{}
@@ -67,6 +68,7 @@ func New(opts Options) *Tunnel {
 		done:      make(chan struct{}),
 	}
 	t.access.Store(opts.Access)
+	t.keyName.Store(opts.KeyName)
 	t.transport = &http.Transport{
 		DialContext:           t.dialContext,
 		MaxIdleConnsPerHost:   16,
@@ -84,6 +86,9 @@ func (t *Tunnel) Access() store.Access { return t.access.Load().(store.Access) }
 
 // SetAccess changes the access level of a live tunnel.
 func (t *Tunnel) SetAccess(a store.Access) { t.access.Store(a) }
+
+// SetKeyName changes the name shown for the key that opened the tunnel.
+func (t *Tunnel) SetKeyName(name string) { t.keyName.Store(name) }
 
 // Transport sends HTTP requests through the tunnel.
 func (t *Tunnel) Transport() http.RoundTripper { return t.transport }
@@ -166,7 +171,7 @@ func (t *Tunnel) Stats() Stats {
 		Subdomain:     t.Subdomain,
 		OwnerID:       t.OwnerID,
 		Access:        t.Access(),
-		KeyName:       t.KeyName,
+		KeyName:       t.keyName.Load().(string),
 		ClientAddr:    t.ClientAddr,
 		ClientVersion: t.ClientVersion,
 		CreatedAt:     t.CreatedAt,
@@ -252,6 +257,14 @@ func (r *Registry) List() []*Tunnel {
 	r.mu.RUnlock()
 	sort.Slice(out, func(i, j int) bool { return out[i].Subdomain < out[j].Subdomain })
 	return out
+}
+
+// RenameKey renames the key of the tunnel on subdomain if it was opened
+// with keyID.
+func (r *Registry) RenameKey(subdomain string, keyID int64, name string) {
+	if t := r.Get(subdomain); t != nil && t.KeyID == keyID {
+		t.SetKeyName(name)
+	}
 }
 
 // CloseKey closes the tunnel on subdomain if it was opened with keyID.
