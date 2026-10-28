@@ -1,6 +1,11 @@
 <script :setup="{ command = '' }">
   // A command to copy, with a button that copies it. (Not `text`: on a
   // component's tag `:text` is jq79's directive, never a prop.)
+  // The words of the command, each with its kind for the syntax colors.
+  const kind = (word, i) =>
+    i === 0 ? "cmd" : word.startsWith("-") ? "flag" : /^\d+$/.test(word) ? "num" : "arg"
+  $: words = command.split(" ").map((word, i) => ({ i, text: i ? " " + word : word, kind: kind(word, i) }))
+
   let copied = false
   const copy = async () => {
     try {
@@ -15,6 +20,6 @@
 </script>
 
 <div class="command">
-  <code>{{ command }}</code>
+  <code><span :each="word in words" :key="word.i" :class="'tok-' + word.kind">{{ word.text }}</span></code>
   <button type="button" class="copy" @click="copy">{{ copied ? "Copied" : "Copy" }}</button>
 </div>

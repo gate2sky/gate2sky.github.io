@@ -6,17 +6,17 @@
 <meta name="robots" content="noindex">
 <title>{{.Title}}</title>
 <style>
-  :root { color-scheme: dark; --fg:#fff; --muted:#e0e3ea; --bg:#1c1e24; --line:rgb(255 255 255 / .16); --link:#b8daff; }
+  :root { color-scheme: light; --fg:#333a3e; --muted:#5f676c; --bg:#4b5060; --line:rgb(0 0 0 / .1); --link:#0a5fc2; }
   * { box-sizing: border-box; }
   body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px; color:var(--fg);
     font:15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, Roboto, sans-serif; -webkit-font-smoothing:antialiased;
-    background: radial-gradient(60vmax 50vmax at 8% -6%, rgb(10 132 255 / .24), transparent 70%),
-      radial-gradient(52vmax 46vmax at 100% 4%, rgb(191 90 242 / .2), transparent 70%),
-      radial-gradient(64vmax 50vmax at 70% 108%, rgb(64 200 224 / .14), transparent 70%), var(--bg) fixed; }
-  main { max-width:520px; width:100%; background:rgb(100 105 120 / .88); -webkit-backdrop-filter:blur(28px) saturate(170%); backdrop-filter:blur(28px) saturate(170%);
-    border:.5px solid var(--line); border-radius:14px; padding:32px; box-shadow:0 .5px 0 rgb(255 255 255 / .12) inset, 0 14px 36px rgb(0 0 0 / .5); }
+    background: radial-gradient(60vmax 50vmax at 8% -6%, rgb(10 132 255 / .5), transparent 70%),
+      radial-gradient(52vmax 46vmax at 100% 4%, rgb(191 90 242 / .42), transparent 70%),
+      radial-gradient(64vmax 50vmax at 70% 108%, rgb(64 200 224 / .38), transparent 70%), var(--bg) fixed; }
+  main { max-width:520px; width:100%; background:rgb(246 247 250 / .84); -webkit-backdrop-filter:blur(28px) saturate(170%); backdrop-filter:blur(28px) saturate(170%);
+    border:.5px solid var(--line); border-radius:14px; padding:32px; box-shadow:0 .5px 0 rgb(255 255 255 / .8) inset, 0 14px 36px rgb(10 14 30 / .3); }
   .code { display:inline-block; font:600 12px/1 ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace; color:var(--muted); letter-spacing:.06em;
-    background:rgb(255 255 255 / .13); padding:5px 9px; border-radius:999px; }
+    background:rgb(0 0 0 / .06); padding:5px 9px; border-radius:999px; }
   h1 { margin:12px 0 8px; font-size:22px; letter-spacing:-.02em; }
   p { margin:0 0 16px; color:var(--muted); }
   a { color:var(--link); text-decoration:none; }

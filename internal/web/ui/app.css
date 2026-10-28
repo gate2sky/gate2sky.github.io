@@ -1,10 +1,11 @@
 /* gate2sky dashboard, mobile first: the base rules are for phones, and
-   the min-width query at the end widens them for larger screens. Close to current macOS: a soft wallpaper behind
-   translucent, blurred materials (toolbar, cards, HUD toasts), system
-   colors, segmented controls and grouped lists. */
+   the min-width query at the end widens them for larger screens.
 
-/* One theme, between light and dark: a graphite wallpaper with soft
-   color glows, and lighter frosted materials on top of it. */
+   Close to current macOS: a slowly drifting wallpaper behind translucent,
+   blurred materials, system colors, segmented controls and grouped lists.
+   One theme, between light and dark: light text on the mid-gray wallpaper
+   and toolbar, dark text on the light cards (which set their own tokens),
+   and Monokai for code. */
 :root {
   color-scheme: dark;
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, "Helvetica Neue", sans-serif;
@@ -12,16 +13,16 @@
 
   --fg: #fff;
   --muted: #e0e3ea;
-  --bg: #1c1e24;
-  --wall-1: rgb(10 132 255 / .24);
-  --wall-2: rgb(191 90 242 / .2);
-  --wall-3: rgb(64 200 224 / .14);
-  --wall-4: rgb(255 159 10 / .08);
+  --bg: #4b5060;
+  --wall-1: rgb(10 132 255 / .5);
+  --wall-2: rgb(191 90 242 / .42);
+  --wall-3: rgb(64 200 224 / .38);
+  --wall-4: rgb(255 159 10 / .26);
 
   /* Materials: translucent fills that blur what is behind them. */
-  --material: rgb(100 105 120 / .88);
-  --material-bar: rgb(26 28 34 / .8);
-  --material-hud: rgb(100 105 120 / .94);
+  --material: rgb(246 247 250 / .84);
+  --material-bar: rgb(40 43 53 / .62);
+  --material-hud: rgb(250 250 252 / .9);
   --material-edge: rgb(255 255 255 / .2);
   --blur: blur(28px) saturate(170%);
 
@@ -31,11 +32,12 @@
   --field-line: rgb(255 255 255 / .24);
   --line: rgb(255 255 255 / .2);
   --separator: rgb(255 255 255 / .15);
-  --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 14px 36px rgb(0 0 0 / .5);
+  --shadow: 0 1px 2px rgb(0 0 0 / .16), 0 14px 36px rgb(10 14 30 / .3);
+  --button-2: rgb(255 255 255 / .14);
+  --button-2-shadow: 0 .5px 0 rgb(255 255 255 / .12) inset, 0 0 0 .5px rgb(0 0 0 / .18), 0 1px 2px rgb(0 0 0 / .18);
   --shadow-pop: 0 2px 6px rgb(0 0 0 / .2), 0 22px 56px rgb(10 14 30 / .45);
 
-  /* --accent fills controls; --link is the same blue, light enough to read
-     as text on the graphite materials. */
+  /* --accent fills controls; --link is the same blue, as text. */
   --accent: #0071e3;
   --accent-fg: #fff;
   --link: #b8daff;
@@ -49,6 +51,38 @@
 
   --radius: 14px;
   --radius-control: 8px;
+}
+
+/* Light materials: dark text, and the tokens that go with it. */
+.card, .toast {
+  --fg: #333a3e;
+  --muted: #5f676c;
+  --link: #0a5fc2;
+  --ok: #1d7a35;
+  --err: #c0271d;
+  --warn: #8a5300;
+  --fill: rgb(0 0 0 / .06);
+  --fill-2: rgb(0 0 0 / .035);
+  --field: rgb(255 255 255 / .92);
+  --field-line: rgb(0 0 0 / .16);
+  --line: rgb(0 0 0 / .1);
+  --separator: rgb(0 0 0 / .09);
+  --material-edge: rgb(255 255 255 / .8);
+  --button-2: #fff;
+  --button-2-shadow: 0 0 0 .5px rgb(0 0 0 / .16), 0 1px 2px rgb(0 0 0 / .1);
+  color: var(--fg);
+}
+
+/* Monokai, for code. */
+:root {
+  --mk-bg: #272822;
+  --mk-line: #3e3d32;
+  --mk-fg: #f8f8f2;
+  --mk-comment: #75715e;
+  --mk-pink: #f92672;
+  --mk-green: #a6e22e;
+  --mk-yellow: #e6db74;
+  --mk-purple: #ae81ff;
 }
 
 * { box-sizing: border-box; }
@@ -69,19 +103,38 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* The wallpaper the materials blur. */
-body::before {
+/* The wallpaper the materials blur: two layers of color glows that drift
+   slowly, each its own way. Only transforms move, so it stays cheap. */
+body::before, body::after {
   content: "";
   position: fixed;
-  inset: 0;
+  inset: -25%;
   z-index: -1;
   pointer-events: none;
+  will-change: transform;
+}
+body::before {
   background:
-    radial-gradient(60vmax 50vmax at 8% -6%, var(--wall-1), transparent 70%),
-    radial-gradient(52vmax 46vmax at 100% 4%, var(--wall-2), transparent 70%),
-    radial-gradient(64vmax 50vmax at 70% 108%, var(--wall-3), transparent 70%),
-    radial-gradient(40vmax 34vmax at -6% 96%, var(--wall-4), transparent 70%),
-    var(--bg);
+    radial-gradient(40% 36% at 24% 22%, var(--wall-1), transparent 70%),
+    radial-gradient(34% 32% at 78% 26%, var(--wall-2), transparent 70%);
+  animation: drift-a 38s ease-in-out infinite alternate;
+}
+body::after {
+  background:
+    radial-gradient(42% 34% at 66% 78%, var(--wall-3), transparent 70%),
+    radial-gradient(30% 28% at 22% 76%, var(--wall-4), transparent 70%);
+  animation: drift-b 46s ease-in-out infinite alternate;
+}
+@keyframes drift-a {
+  from { transform: translate(-4%, -3%) rotate(0deg) scale(1); }
+  to { transform: translate(5%, 4%) rotate(14deg) scale(1.12); }
+}
+@keyframes drift-b {
+  from { transform: translate(4%, 3%) rotate(0deg) scale(1.08); }
+  to { transform: translate(-5%, -4%) rotate(-12deg) scale(.96); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before, body::after { animation: none; }
 }
 
 ::selection { background: color-mix(in srgb, var(--accent) 45%, transparent); }
@@ -92,7 +145,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 code, pre, textarea { font-family: var(--mono); }
 code { font-size: .9em; }
-p code, .hint code { background: var(--fill-2); padding: 1px 5px; border-radius: 5px; }
+p code, .hint code { background: var(--mk-bg); color: var(--mk-yellow); padding: 1px 6px; border-radius: 5px; }
 
 h1 { font-size: 24px; line-height: 1.2; margin: 0; letter-spacing: -.022em; font-weight: 700; }
 h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: -.01em; font-weight: 600; }
@@ -275,8 +328,8 @@ td .badge { margin-right: 6px; }
 .button:focus-visible { box-shadow: var(--ring); border-radius: var(--radius-control); }
 .button-block { display: flex; width: 100%; padding-top: 8px; padding-bottom: 8px; }
 .button-secondary {
-  color: var(--fg); background: rgb(255 255 255 / .14);
-  box-shadow: 0 .5px 0 rgb(255 255 255 / .12) inset, 0 0 0 .5px rgb(0 0 0 / .18), 0 1px 2px rgb(0 0 0 / .18);
+  color: var(--fg); background: var(--button-2);
+  box-shadow: var(--button-2-shadow);
 }
 .button-danger {
   --accent: #d92d23;
@@ -309,7 +362,7 @@ input:not([type=radio]), textarea {
   padding: 9px 12px; width: 100%;
   transition: box-shadow .15s, border-color .15s;
 }
-input::placeholder, textarea::placeholder { color: #b4b9c5; opacity: 1; }
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); opacity: 1; }
 textarea { font-size: 14px; line-height: 1.55; resize: vertical; }
 input:not([type=radio]):focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
 
@@ -336,28 +389,32 @@ input:not([type=radio]):focus, textarea:focus { outline: none; border-color: var
 .radio .muted { font-size: 12px; }
 input[type=radio] {
   appearance: none; -webkit-appearance: none; flex: none; margin: 0; width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
-  background: var(--field); border: .5px solid rgb(255 255 255 / .3); box-shadow: 0 .5px 1px rgb(0 0 0 / .15);
+  background: var(--field); border: .5px solid color-mix(in srgb, var(--fg) 35%, transparent); box-shadow: 0 .5px 1px rgb(0 0 0 / .1);
   transition: border-width .12s, background-color .12s;
 }
 input[type=radio]:checked { background: #fff; border: 5px solid var(--accent); }
 input[type=radio]:focus-visible { box-shadow: var(--ring); border-radius: 50%; }
 
-/* A command to copy, as a terminal line. */
+/* A command to copy, as a terminal line in Monokai. */
 
 .command {
   display: flex; align-items: center; gap: 12px; margin: 12px 0;
   padding: 7px 7px 7px 14px; font-size: 13px; border-radius: 10px;
-  background: rgb(28 30 36 / .78); color: #e9eaee; border: .5px solid rgb(0 0 0 / .35);
-  box-shadow: 0 .5px 0 rgb(255 255 255 / .08) inset, 0 4px 14px rgb(0 0 0 / .12);
+  background: var(--mk-bg); color: var(--mk-fg); border: .5px solid rgb(0 0 0 / .4);
+  box-shadow: 0 .5px 0 rgb(255 255 255 / .06) inset, 0 4px 14px rgb(0 0 0 / .16);
 }
 .command code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 4px 0; scrollbar-width: none; }
-.command code::before { content: "$ "; color: #7dd87a; user-select: none; }
+.command code::before { content: "$ "; color: var(--mk-comment); user-select: none; }
+.tok-cmd { color: var(--mk-green); }
+.tok-flag { color: var(--mk-pink); }
+.tok-num { color: var(--mk-purple); }
+.tok-arg { color: var(--mk-yellow); }
 .copy {
   flex: none; font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 6px; cursor: pointer;
-  border: 0; background: rgb(255 255 255 / .12); color: #fff; box-shadow: 0 .5px 0 rgb(255 255 255 / .1) inset;
+  border: 0; background: var(--mk-line); color: var(--mk-fg); box-shadow: 0 .5px 0 rgb(255 255 255 / .08) inset;
   transition: background-color .12s;
 }
-.copy:hover { background: rgb(255 255 255 / .2); }
+.copy:hover { background: #49483e; }
 
 /* Facts, in a grid of tiles. */
 
