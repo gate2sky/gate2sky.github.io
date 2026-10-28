@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	sgmail "github.com/jgermade/securegate/internal/mail"
-	"github.com/jgermade/securegate/internal/store"
+	g2smail "github.com/gate2sky/gate2sky.github.io/internal/mail"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
 )
 
 const (
@@ -174,9 +174,9 @@ func (s *Server) handleEmailLogin(w http.ResponseWriter, r *http.Request) {
 	if s.mayUseEmail(r.Context(), email) {
 		code := sixDigits()
 		s.codes.add(flow.ID, code, ttl)
-		msg := sgmail.Message{
+		msg := g2smail.Message{
 			To:      email,
-			Subject: "Your securegate sign-in code: " + code,
+			Subject: "Your gate2sky sign-in code: " + code,
 			Body: fmt.Sprintf("Your sign-in code for %s is:\n\n    %s\n\nIt expires in %d minutes and works once.\n\n"+
 				"If you did not try to sign in, you can ignore this email: nobody can sign in without the code.\n",
 				s.cfg.DashboardURL("/"), code, int(ttl.Minutes())),

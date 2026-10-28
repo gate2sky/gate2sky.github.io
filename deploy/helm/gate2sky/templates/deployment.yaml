@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "securegate.fullname" . }}
+  name: {{ include "gate2sky.fullname" . }}
   labels:
-    {{- include "securegate.labels" . | nindent 4 }}
+    {{- include "gate2sky.labels" . | nindent 4 }}
 spec:
   # Tunnels live in the memory of one process and SQLite is not shared:
-  # securegate runs as a single replica.
+  # gate2sky runs as a single replica.
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      {{- include "securegate.selectorLabels" . | nindent 6 }}
+      {{- include "gate2sky.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "securegate.selectorLabels" . | nindent 8 }}
+        {{- include "gate2sky.selectorLabels" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
@@ -31,14 +31,14 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: securegate
+        - name: gate2sky
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args: ["start", "--config", "/etc/securegate/securegate.yaml"]
+          args: ["start", "--config", "/etc/gate2sky/gate2sky.yaml"]
           env:
-            - name: SECUREGATE_CONFIG
-              value: /etc/securegate/securegate.yaml
-          {{- with (include "securegate.secretName" .) }}
+            - name: GATE2SKY_CONFIG
+              value: /etc/gate2sky/gate2sky.yaml
+          {{- with (include "gate2sky.secretName" .) }}
           envFrom:
             - secretRef:
                 name: {{ . }}
@@ -65,18 +65,18 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: config
-              mountPath: /etc/securegate
+              mountPath: /etc/gate2sky
               readOnly: true
             - name: data
               mountPath: /data
       volumes:
         - name: config
           configMap:
-            name: {{ include "securegate.fullname" . }}
+            name: {{ include "gate2sky.fullname" . }}
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
-            claimName: {{ .Values.persistence.existingClaim | default (include "securegate.fullname" .) }}
+            claimName: {{ .Values.persistence.existingClaim | default (include "gate2sky.fullname" .) }}
           {{- else }}
           emptyDir: {}
           {{- end }}

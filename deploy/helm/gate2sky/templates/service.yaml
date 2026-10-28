@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "securegate.fullname" . }}
+  name: {{ include "gate2sky.fullname" . }}
   labels:
-    {{- include "securegate.labels" . | nindent 4 }}
+    {{- include "gate2sky.labels" . | nindent 4 }}
 spec:
   type: ClusterIP
   selector:
-    {{- include "securegate.selectorLabels" . | nindent 4 }}
+    {{- include "gate2sky.selectorLabels" . | nindent 4 }}
   ports:
     - name: http
       port: 8080
@@ -20,9 +20,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "securegate.fullname" . }}-ssh
+  name: {{ include "gate2sky.fullname" . }}-ssh
   labels:
-    {{- include "securegate.labels" . | nindent 4 }}
+    {{- include "gate2sky.labels" . | nindent 4 }}
   {{- with .Values.sshService.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -36,7 +36,7 @@ spec:
   externalTrafficPolicy: Local
   {{- end }}
   selector:
-    {{- include "securegate.selectorLabels" . | nindent 4 }}
+    {{- include "gate2sky.selectorLabels" . | nindent 4 }}
   ports:
     - name: ssh
       port: {{ .Values.sshService.port }}

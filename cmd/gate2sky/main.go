@@ -1,4 +1,4 @@
-// Command securegate exposes local HTTP services on subdomains through SSH
+// Command gate2sky exposes local HTTP services on subdomains through SSH
 // remote forwarding, managed from a web dashboard.
 package main
 
@@ -15,28 +15,28 @@ import (
 // version is set at build time with -ldflags "-X main.version=...".
 var version = "dev"
 
-const usage = `securegate exposes local services on your domain through SSH tunnels.
+const usage = `gate2sky exposes local services on your domain through SSH tunnels.
 
 Usage:
-  securegate start [--detached]     run the server (in the background with --detached)
-  securegate stop                   stop a server started with --detached
-  securegate status                 show whether the server is running
-  securegate config                 set up securegate or manage subdomains, SSH keys
+  gate2sky start [--detached]     run the server (in the background with --detached)
+  gate2sky stop                   stop a server started with --detached
+  gate2sky status                 show whether the server is running
+  gate2sky config                 set up gate2sky or manage subdomains, SSH keys
                                     and users in an interactive wizard
-  securegate service --install      install and start securegate as a systemd service
-  securegate service --uninstall    stop and remove the systemd service
-  securegate service --status       show the systemd service status
-  securegate version                print the version
+  gate2sky service --install      install and start gate2sky as a systemd service
+  gate2sky service --uninstall    stop and remove the systemd service
+  gate2sky service --status       show the systemd service status
+  gate2sky version                print the version
 
-Every command accepts --config FILE. Without it, securegate uses
-$SECUREGATE_CONFIG, ./securegate.yaml or /etc/securegate/securegate.yaml,
+Every command accepts --config FILE. Without it, gate2sky uses
+$GATE2SKY_CONFIG, ./gate2sky.yaml or /etc/gate2sky/gate2sky.yaml,
 whichever exists first.
 `
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
 		if !errors.Is(err, errQuiet) {
-			fmt.Fprintln(os.Stderr, "securegate:", err)
+			fmt.Fprintln(os.Stderr, "gate2sky:", err)
 		}
 		os.Exit(1)
 	}
@@ -63,7 +63,7 @@ func run(args []string, out io.Writer) error {
 	case "service":
 		return cmdService(args, out)
 	case "version", "--version", "-version":
-		fmt.Fprintln(out, "securegate", version)
+		fmt.Fprintln(out, "gate2sky", version)
 		return nil
 	case "help", "--help", "-help", "-h":
 		fmt.Fprint(out, usage)
@@ -74,31 +74,31 @@ func run(args []string, out io.Writer) error {
 
 // newFlags returns a flag set with the --config flag every command takes.
 func newFlags(name string) (*flag.FlagSet, *string) {
-	fs := flag.NewFlagSet("securegate "+name, flag.ContinueOnError)
+	fs := flag.NewFlagSet("gate2sky "+name, flag.ContinueOnError)
 	path := fs.String("config", "", "path to the configuration file")
 	return fs, path
 }
 
-const systemConfigPath = "/etc/securegate/securegate.yaml"
+const systemConfigPath = "/etc/gate2sky/gate2sky.yaml"
 
 // configPath resolves the configuration file to use.
 func configPath(flagValue string) string {
 	if flagValue != "" {
 		return flagValue
 	}
-	if p := os.Getenv("SECUREGATE_CONFIG"); p != "" {
+	if p := os.Getenv("GATE2SKY_CONFIG"); p != "" {
 		return p
 	}
-	for _, p := range []string{"securegate.yaml", systemConfigPath} {
+	for _, p := range []string{"gate2sky.yaml", systemConfigPath} {
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
 	}
-	// Nothing yet: `securegate config` creates it here.
+	// Nothing yet: `gate2sky config` creates it here.
 	if runtime.GOOS == "linux" && os.Geteuid() == 0 {
 		return systemConfigPath
 	}
-	return "securegate.yaml"
+	return "gate2sky.yaml"
 }
 
 func absPath(p string) string {

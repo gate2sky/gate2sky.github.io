@@ -20,8 +20,8 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 
-	"github.com/jgermade/securegate/internal/config"
-	"github.com/jgermade/securegate/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/config"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
 )
 
 // provider is an OAuth 2.0 identity provider.
@@ -69,7 +69,7 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user *stor
 	}
 	if !s.cfg.EmailAllowed(user.Email) {
 		s.log.Info("sign-in denied", "method", method, "email", user.Email)
-		return fmt.Sprintf("The account %s is not allowed to use this securegate.", user.Email), false
+		return fmt.Sprintf("The account %s is not allowed to use this gate2sky.", user.Email), false
 	}
 	token, sess, err := s.store.CreateSession(r.Context(), user.ID, s.cfg.Auth.SessionTTL)
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	// Check before creating an account for someone who may not sign in.
 	if !s.cfg.EmailAllowed(id.Email) {
 		s.log.Info("sign-in denied", "method", p.ID(), "email", id.Email)
-		s.pageError(w, r, http.StatusForbidden, fmt.Sprintf("The account %s is not allowed to use this securegate.", id.Email))
+		s.pageError(w, r, http.StatusForbidden, fmt.Sprintf("The account %s is not allowed to use this gate2sky.", id.Email))
 		return
 	}
 	user, err := s.store.LoginOAuth(r.Context(), *id)
@@ -293,7 +293,7 @@ func (g *githubProvider) get(ctx context.Context, client *http.Client, path stri
 
 // oidcProvider signs users in with any OpenID Connect provider (Google,
 // GitLab, Microsoft Entra ID, Keycloak, Authentik, ...). Discovery runs on
-// first use, so securegate starts even if the provider is down.
+// first use, so gate2sky starts even if the provider is down.
 type oidcProvider struct {
 	cfg         config.ProviderConfig
 	redirectURL string

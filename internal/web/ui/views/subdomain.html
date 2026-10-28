@@ -33,7 +33,7 @@
   }
   await load()
   $: name !== loaded && load()
-  $: document.title = `${name} · securegate`
+  $: document.title = `${name} · gate2sky`
 
   $attached(() => {
     const timer = setInterval(() => document.hidden || load(), 5000)

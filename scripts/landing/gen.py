@@ -31,7 +31,7 @@ def stars(n, w, h):
 tpl = open(sys.argv[1]).read()
 tpl = tpl.replace("@@HERO@@", hero.hero())
 tpl = tpl.replace("@@BRAND@@", hero.brand())
-# How it works: the gate at your machine, the tube, securegate's gate.
+# How it works: the gate at your machine, the tube, gate2sky's gate.
 tpl = tpl.replace("@@FLOW_STRANDS_W@@", hero.flow_strands(360, 150, 184))
 tpl = tpl.replace("@@FLOW_GATES_W@@", hero.gate("home", (262, 150), 0, 0.58) + "\n          " + hero.gate("web", (490, 150), 0, 1.05))
 tpl = tpl.replace("@@FLOW_STRANDS_T@@", hero.flow_strands(160, 258, 144, 90))

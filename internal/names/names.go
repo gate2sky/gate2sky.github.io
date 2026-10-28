@@ -13,9 +13,9 @@ var label = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 // commonly carry special meaning (mail, ACME, ...).
 var builtin = []string{
 	"_acme-challenge", "admin", "api", "app", "assets", "auth", "cdn", "dashboard",
-	"docs", "ftp", "imap", "login", "mail", "mx", "ns", "ns1", "ns2", "oauth",
-	"pop", "pop3", "root", "securegate", "smtp", "sso", "ssh", "static",
-	"status", "support", "webmail", "www",
+	"docs", "ftp", "gate2sky", "imap", "login", "mail", "mx", "ns", "ns1", "ns2",
+	"oauth", "pop", "pop3", "root", "smtp", "sso", "ssh", "static", "status",
+	"support", "webmail", "www",
 }
 
 var (

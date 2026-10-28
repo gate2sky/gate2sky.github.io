@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/jgermade/securegate/internal/tunnel"
+	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
 )
 
 // clientConn is one authenticated SSH connection.
@@ -259,7 +259,7 @@ func (c *clientConn) handleChannels(chans <-chan ssh.NewChannel) {
 		if nch.ChannelType() != "session" {
 			// Notably direct-tcpip (ssh -L): clients must never reach the
 			// server's own network.
-			nch.Reject(ssh.Prohibited, "securegate only supports remote forwarding (ssh -R)")
+			nch.Reject(ssh.Prohibited, "gate2sky only supports remote forwarding (ssh -R)")
 			continue
 		}
 		ch, reqs, err := nch.Accept()
@@ -280,12 +280,12 @@ func (c *clientConn) handleSession(ch ssh.Channel, reqs <-chan *ssh.Request) {
 			req.Reply(true, nil)
 		case "shell", "exec":
 			req.Reply(true, nil)
-			welcome := fmt.Sprintf("securegate: connected with key %s\r\n", c.fingerprint)
+			welcome := fmt.Sprintf("gate2sky: connected with key %s\r\n", c.fingerprint)
 			if req.Type == "exec" {
-				welcome += "securegate: commands are not supported; manage your subdomains at " + c.srv.cfg.DashboardURL("/") + "\r\n"
+				welcome += "gate2sky: commands are not supported; manage your subdomains at " + c.srv.cfg.DashboardURL("/") + "\r\n"
 			}
 			if pty {
-				welcome += "securegate: press Ctrl-C to close the connection\r\n"
+				welcome += "gate2sky: press Ctrl-C to close the connection\r\n"
 			}
 			c.console.Attach(ch, welcome)
 			go c.readInput(ch, pty)

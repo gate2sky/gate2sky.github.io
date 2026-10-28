@@ -15,10 +15,10 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/jgermade/securegate/internal/config"
-	"github.com/jgermade/securegate/internal/names"
-	"github.com/jgermade/securegate/internal/store"
-	"github.com/jgermade/securegate/internal/tunnel"
+	"github.com/gate2sky/gate2sky.github.io/internal/config"
+	"github.com/gate2sky/gate2sky.github.io/internal/names"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
 )
 
 // Error is a problem the caller can fix. Its message is safe to show.

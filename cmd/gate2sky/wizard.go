@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/jgermade/securegate/internal/wizard"
+	"github.com/gate2sky/gate2sky.github.io/internal/wizard"
 )
 
 func runWizard(path string, accessible bool) error {

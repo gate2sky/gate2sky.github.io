@@ -49,7 +49,7 @@ jobs:
       - name: Compiles for every platform
         run: |
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
-            GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/securegate
+            GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/gate2sky
           done
       - name: Version
         id: version
@@ -59,7 +59,7 @@ jobs:
             version="$(cat VERSION)-dev+$(git rev-parse --short HEAD)"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Building securegate $version"
+          echo "Building gate2sky $version"
 
   # The four targets pages/setup.sh installs. Pure Go (the SQLite driver too),
   # so every one is a static binary cross-compiled here.
@@ -76,21 +76,21 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Build securegate-${{ matrix.target }}.tar.gz
+      - name: Build gate2sky-${{ matrix.target }}.tar.gz
         run: |
           set -euo pipefail
           target=${{ matrix.target }}
-          mkdir -p "dist/securegate-$target"
+          mkdir -p "dist/gate2sky-$target"
           CGO_ENABLED=0 GOOS=${target%-*} GOARCH=${target#*-} go build -trimpath \
             -ldflags "-s -w -X main.version=${{ needs.test.outputs.version }}" \
-            -o "dist/securegate-$target/securegate" ./cmd/securegate
-          cp README.md "dist/securegate-$target/"
-          # The layout pages/setup.sh unpacks: securegate-<target>/securegate.
-          tar -czf "dist/securegate-$target.tar.gz" -C dist "securegate-$target"
+            -o "dist/gate2sky-$target/gate2sky" ./cmd/gate2sky
+          cp README.md "dist/gate2sky-$target/"
+          # The layout pages/setup.sh unpacks: gate2sky-<target>/gate2sky.
+          tar -czf "dist/gate2sky-$target.tar.gz" -C dist "gate2sky-$target"
       - uses: actions/upload-artifact@v4
         with:
-          name: securegate-${{ matrix.target }}
-          path: dist/securegate-${{ matrix.target }}.tar.gz
+          name: gate2sky-${{ matrix.target }}
+          path: dist/gate2sky-${{ matrix.target }}.tar.gz
           if-no-files-found: error
 
   # The one-line installer walked against builds of this tree: install,
@@ -121,8 +121,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
-      - run: docker build --build-arg VERSION=${{ needs.test.outputs.version }} -t securegate:build .
-      - run: docker run --rm securegate:build version
+      - run: docker build --build-arg VERSION=${{ needs.test.outputs.version }} -t gate2sky:build .
+      - run: docker run --rm gate2sky:build version
 
   helm:
     runs-on: ubuntu-latest
@@ -131,12 +131,12 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
       - uses: azure/setup-helm@v4
-      - run: helm lint deploy/helm/securegate
+      - run: helm lint deploy/helm/gate2sky
       - name: Render with the default values
-        run: helm template sg deploy/helm/securegate > default.yaml
+        run: helm template g2s deploy/helm/gate2sky > default.yaml
       - name: Render with a LoadBalancer for SSH, cert-manager and secrets
         run: |
-          helm template sg deploy/helm/securegate \
+          helm template g2s deploy/helm/gate2sky \
             --set domain=tunnels.example.org \
             --set traefik.ssh.enabled=false --set sshService.enabled=true \
             --set certManager.enabled=true \
@@ -149,7 +149,7 @@ jobs:
           grep -q 'kind: IngressRouteTCP' default.yaml
           ! grep -q 'kind: IngressRouteTCP' alt.yaml
           grep -q 'kind: Certificate' alt.yaml
-          grep -q "image: \"ghcr.io/jgermade/securegate:$(cat VERSION)\"" default.yaml
+          grep -q "image: \"ghcr.io/gate2sky/gate2sky:$(cat VERSION)\"" default.yaml
 
   # What Pages serves: pages/ as it is, the landing and setup.sh. Every push
   # checks it; only a release deploys it.
@@ -162,7 +162,7 @@ jobs:
       - name: The landing is self-contained and built from its template
         run: |
           set -euo pipefail
-          if grep -rInE '(src|href)="https?://' pages/ | grep -vE 'https://(github\.com|jgermade\.github\.io)/'; then
+          if grep -rInE '(src|href)="https?://' pages/ | grep -vE 'https://(github\.com|gate2sky\.github\.io)/'; then
             echo "::error::pages/ must not load anything from another host"
             exit 1
           fi

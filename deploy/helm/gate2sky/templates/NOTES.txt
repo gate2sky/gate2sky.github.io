@@ -1,4 +1,4 @@
-securegate is starting.
+gate2sky is starting.
 
   Dashboard: https://{{ .Values.domain }}
   Tunnels:   https://<name>.{{ .Values.domain }}
@@ -20,4 +20,4 @@ exposed by its Service, e.g. with the Traefik Helm chart:
 
 Manage subdomains, SSH keys and users from the dashboard, or from a shell:
 
-  kubectl -n {{ .Release.Namespace }} exec -it deploy/{{ include "securegate.fullname" . }} -- securegate config
+  kubectl -n {{ .Release.Namespace }} exec -it deploy/{{ include "gate2sky.fullname" . }} -- gate2sky config

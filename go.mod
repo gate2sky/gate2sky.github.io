@@ -1,4 +1,4 @@
-module github.com/jgermade/securegate
+module github.com/gate2sky/gate2sky.github.io
 
 go 1.26.0
 

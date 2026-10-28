@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jgermade/securegate/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
 )
 
 func TestPickGrant(t *testing.T) {

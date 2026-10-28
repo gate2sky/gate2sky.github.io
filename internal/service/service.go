@@ -1,4 +1,4 @@
-// Package service installs securegate as a systemd service.
+// Package service installs gate2sky as a systemd service.
 package service
 
 import (
@@ -15,14 +15,14 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/jgermade/securegate/internal/config"
+	"github.com/gate2sky/gate2sky.github.io/internal/config"
 )
 
 const (
-	name       = "securegate"
-	unitPath   = "/etc/systemd/system/securegate.service"
-	binaryPath = "/usr/local/bin/securegate"
-	userName   = "securegate"
+	name       = "gate2sky"
+	unitPath   = "/etc/systemd/system/gate2sky.service"
+	binaryPath = "/usr/local/bin/gate2sky"
+	userName   = "gate2sky"
 )
 
 // Options configure Install and Uninstall.
@@ -36,8 +36,8 @@ type Options struct {
 }
 
 var unitTemplate = template.Must(template.New("unit").Parse(`[Unit]
-Description=securegate SSH tunnel server
-Documentation=https://github.com/jgermade/securegate
+Description=gate2sky SSH tunnel server
+Documentation=https://github.com/gate2sky/gate2sky.github.io
 After=network-online.target
 Wants=network-online.target
 
@@ -107,10 +107,10 @@ func dataDir(opts Options) string {
 
 func supported() error {
 	if runtime.GOOS != "linux" {
-		return fmt.Errorf("service installation supports systemd on Linux only; on %s run `securegate start --detached`", runtime.GOOS)
+		return fmt.Errorf("service installation supports systemd on Linux only; on %s run `gate2sky start --detached`", runtime.GOOS)
 	}
 	if _, err := os.Stat("/run/systemd/system"); err != nil {
-		return errors.New("systemd is not running on this machine; run `securegate start --detached` instead")
+		return errors.New("systemd is not running on this machine; run `gate2sky start --detached` instead")
 	}
 	return nil
 }
@@ -198,10 +198,10 @@ func Install(opts Options) error {
 		return err
 	}
 	if !opts.DryRun {
-		fmt.Fprintf(opts.Out, "\nsecuregate is running as a service.\n"+
-			"  status:  systemctl status securegate\n"+
-			"  logs:    journalctl -u securegate -f\n"+
-			"  manage:  sudo securegate config\n")
+		fmt.Fprintf(opts.Out, "\ngate2sky is running as a service.\n"+
+			"  status:  systemctl status gate2sky\n"+
+			"  logs:    journalctl -u gate2sky -f\n"+
+			"  manage:  sudo gate2sky config\n")
 	}
 	return nil
 }
@@ -216,7 +216,7 @@ func Uninstall(opts Options) error {
 			return errors.New("removing the service needs root: run it with sudo")
 		}
 		if _, err := os.Stat(unitPath); err != nil {
-			return errors.New("the securegate service is not installed")
+			return errors.New("the gate2sky service is not installed")
 		}
 	}
 	err := execute(opts, []step{
@@ -230,7 +230,7 @@ func Uninstall(opts Options) error {
 	return err
 }
 
-// Status shows `systemctl status securegate`.
+// Status shows `systemctl status gate2sky`.
 func Status(out io.Writer) error {
 	if err := supported(); err != nil {
 		return err
@@ -274,7 +274,7 @@ func createUser(home string) func() error {
 	return func() error {
 		if path, err := exec.LookPath("useradd"); err == nil {
 			return command(path, "--system", "--user-group", "--home-dir", home, "--no-create-home",
-				"--shell", "/usr/sbin/nologin", "--comment", "securegate", userName)()
+				"--shell", "/usr/sbin/nologin", "--comment", "gate2sky", userName)()
 		}
 		if path, err := exec.LookPath("adduser"); err == nil { // BusyBox (Alpine)
 			if err := command("addgroup", "-S", userName)(); err != nil {

@@ -1,17 +1,17 @@
 #!/bin/sh
-# Install, update, configure or uninstall securegate on Linux and macOS.
+# Install, update, configure or uninstall gate2sky on Linux and macOS.
 #
-#   curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh
-#   curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh -s -- reinstall
-#   curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh -s -- uninstall
+#   curl -fsSL https://gate2sky.github.io/setup.sh | sh
+#   curl -fsSL https://gate2sky.github.io/setup.sh | sh -s -- reinstall
+#   curl -fsSL https://gate2sky.github.io/setup.sh | sh -s -- uninstall
 #
 # With no command and a terminal to ask on, it asks what to do: install, and —
-# when it finds securegate already there — update, reinstall, configure or
+# when it finds gate2sky already there — update, reinstall, configure or
 # uninstall. With nobody to ask it installs.
 #
 # One binary, from a GitHub release, into /usr/local/bin (or --dir). After a
-# first install it offers `securegate config`, the setup wizard, and on Linux
-# with systemd `securegate service --install`. An update restarts the service.
+# first install it offers `gate2sky config`, the setup wizard, and on Linux
+# with systemd `gate2sky service --install`. An update restarts the service.
 # `uninstall` keeps the configuration and data unless `--purge` says otherwise.
 #
 # Everything is a function and the last line calls `main`, so a download that
@@ -19,14 +19,14 @@
 
 set -eu
 
-REPO="jgermade/securegate"
-SETUP_URL="https://jgermade.github.io/securegate/setup.sh"
-UNIT="/etc/systemd/system/securegate.service"
+REPO="gate2sky/gate2sky.github.io"
+SETUP_URL="https://gate2sky.github.io/setup.sh"
+UNIT="/etc/systemd/system/gate2sky.service"
 TMP=""
 
 usage() {
 	cat <<EOF
-securegate setup: install, update, configure or uninstall securegate.
+gate2sky setup: install, update, configure or uninstall gate2sky.
 
 Usage:
   curl -fsSL $SETUP_URL | sh -s -- [command] [options]
@@ -36,20 +36,20 @@ Commands:
   install      Install the latest release, or update to it. Does nothing when
                that version is already there.
   reinstall    Download and replace the binary, even if it is the same version.
-  configure    Run the setup wizard (securegate config).
+  configure    Run the setup wizard (gate2sky config).
   uninstall    Stop and remove the service and the binary. The configuration
                and data are kept unless --purge.
   help         Show this text.
 
 With no command, the script asks which of these to do, offering the last ones
-only when it finds securegate installed. With no terminal to ask on it installs.
+only when it finds gate2sky installed. With no terminal to ask on it installs.
 
 Options:
   --dir DIR        Where the binary goes. Default: /usr/local/bin
-                   (or SECUREGATE_INSTALL_DIR)
+                   (or GATE2SKY_INSTALL_DIR)
   --version TAG    A release tag, such as v0.2.0. Default: the latest one.
-                   (or SECUREGATE_VERSION)
-  --config FILE    The configuration file. Default: /etc/securegate/securegate.yaml
+                   (or GATE2SKY_VERSION)
+  --config FILE    The configuration file. Default: /etc/gate2sky/gate2sky.yaml
   --no-service     Do not offer to install or restart the systemd service.
   --purge          With uninstall: also delete the configuration, the data
                    directory (subdomains, keys, users) and the service user.
@@ -57,16 +57,16 @@ Options:
   -h, --help       Show this text.
 
 Environment:
-  SECUREGATE_DOWNLOAD_URL   A directory holding securegate-<os>-<arch>.tar.gz
+  GATE2SKY_DOWNLOAD_URL   A directory holding gate2sky-<os>-<arch>.tar.gz
                             and SHA256SUMS, used instead of GitHub: a mirror,
                             or file:// for a build of your own.
 EOF
 }
 
 say() { printf '%s\n' "$*"; }
-warn() { printf 'securegate setup: warning: %s\n' "$*" >&2; }
+warn() { printf 'gate2sky setup: warning: %s\n' "$*" >&2; }
 die() {
-	printf 'securegate setup: error: %s\n' "$*" >&2
+	printf 'gate2sky setup: error: %s\n' "$*" >&2
 	exit 1
 }
 need() { command -v "$1" >/dev/null 2>&1; }
@@ -104,12 +104,12 @@ detect_target() {
 	case "$os" in
 	Linux) os=linux ;;
 	Darwin) os=darwin ;;
-	*) die "securegate is built for Linux and macOS, and this is $os" ;;
+	*) die "gate2sky is built for Linux and macOS, and this is $os" ;;
 	esac
 	case "$arch" in
 	x86_64 | amd64) arch=amd64 ;;
 	arm64 | aarch64) arch=arm64 ;;
-	*) die "there is no securegate build for $arch: build it from source (https://github.com/$REPO)" ;;
+	*) die "there is no gate2sky build for $arch: build it from source (https://github.com/$REPO)" ;;
 	esac
 	# A shell under Rosetta says x86_64 on Apple Silicon, and the native build
 	# is the one worth running there.
@@ -121,12 +121,12 @@ detect_target() {
 }
 
 # Sets TAG and BASE: which release, and where its files are. With
-# SECUREGATE_DOWNLOAD_URL there is no tag to ask GitHub about, and the version
+# GATE2SKY_DOWNLOAD_URL there is no tag to ask GitHub about, and the version
 # is whatever the downloaded binary says it is.
 resolve_release() {
-	if [ -n "${SECUREGATE_DOWNLOAD_URL:-}" ]; then
+	if [ -n "${GATE2SKY_DOWNLOAD_URL:-}" ]; then
 		TAG=""
-		BASE=${SECUREGATE_DOWNLOAD_URL%/}
+		BASE=${GATE2SKY_DOWNLOAD_URL%/}
 		return
 	fi
 	if [ -n "$VERSION" ]; then
@@ -143,13 +143,13 @@ resolve_release() {
 		TAG=${latest##*/}
 		case "$TAG" in
 		v[0-9]*) ;;
-		*) die "GitHub has no release of securegate to install yet" ;;
+		*) die "GitHub has no release of gate2sky to install yet" ;;
 		esac
 	fi
 	BASE="https://github.com/$REPO/releases/download/$TAG"
 }
 
-# "0.2.0" for a securegate binary, or nothing.
+# "0.2.0" for a gate2sky binary, or nothing.
 version_of() {
 	"$1" --version </dev/null 2>/dev/null | awk '{ print $2; exit }'
 }
@@ -174,7 +174,7 @@ expected_sum() {
 }
 
 service_installed() { [ -f "$UNIT" ]; }
-service_active() { need systemctl && systemctl is-active --quiet securegate 2>/dev/null; }
+service_active() { need systemctl && systemctl is-active --quiet gate2sky 2>/dev/null; }
 has_systemd() { [ "$(uname -s)" = Linux ] && [ -d /run/systemd/system ] && need systemctl; }
 
 # Yes or no from a person; with nobody to ask, the default given.
@@ -220,13 +220,13 @@ first_run() {
 		else
 			say ""
 			say "Next, create the configuration with the setup wizard:"
-			say "  sudo securegate config"
+			say "  sudo gate2sky config"
 			return 0
 		fi
 	fi
 	[ -f "$CONFIG" ] || return 0
 	if [ "$SERVICE" = 1 ] && has_systemd && ! service_installed; then
-		if ask "Run securegate as a system service, started at boot?" y; then
+		if ask "Run gate2sky as a system service, started at boot?" y; then
 			as_root "$BIN" service --install --config "$CONFIG"
 			return 0
 		fi
@@ -234,31 +234,31 @@ first_run() {
 	if ! service_installed; then
 		say ""
 		say "Start it with:"
-		say "  sudo securegate start --detached     (sudo securegate stop to stop it)"
+		say "  sudo gate2sky start --detached     (sudo gate2sky stop to stop it)"
 	fi
 }
 
 # After an update: the running service keeps the old binary until restarted.
 restart_running() {
 	if [ "$SERVICE" = 1 ] && service_active; then
-		say "Restarting the securegate service..."
-		as_root systemctl restart securegate
+		say "Restarting the gate2sky service..."
+		as_root systemctl restart gate2sky
 		say "The service runs $1 now."
 	elif "$BIN" status --config "$CONFIG" >/dev/null 2>&1; then
-		say "securegate is running: restart it to use $1:"
-		say "  sudo securegate stop && sudo securegate start --detached"
+		say "gate2sky is running: restart it to use $1:"
+		say "  sudo gate2sky stop && sudo gate2sky start --detached"
 	fi
 }
 
 already_installed() {
-	say "securegate $1 is already installed at $BIN."
+	say "gate2sky $1 is already installed at $BIN."
 	say "To download it again: curl -fsSL $SETUP_URL | sh -s -- reinstall"
 }
 
-install_securegate() {
+install_gate2sky() {
 	force=$1
-	need curl || die "curl is needed to download securegate"
-	need tar || die "tar is needed to unpack securegate"
+	need curl || die "curl is needed to download gate2sky"
+	need tar || die "tar is needed to unpack gate2sky"
 	detect_target
 	resolve_release
 
@@ -270,14 +270,14 @@ install_securegate() {
 		return
 	fi
 
-	TMP=$(mktemp -d "${TMPDIR:-/tmp}/securegate-setup.XXXXXX")
-	asset="securegate-$TARGET.tar.gz"
-	say "Downloading securegate ${TAG:+$TAG }for $TARGET..."
+	TMP=$(mktemp -d "${TMPDIR:-/tmp}/gate2sky-setup.XXXXXX")
+	asset="gate2sky-$TARGET.tar.gz"
+	say "Downloading gate2sky ${TAG:+$TAG }for $TARGET..."
 	if ! fetch "$BASE/$asset" "$TMP/$asset"; then
 		die "could not download $BASE/$asset.
 ${TAG:+Release $TAG may have no build for $TARGET: see https://github.com/$REPO/releases/tag/$TAG
 }To build it from source instead:
-  go install github.com/$REPO/cmd/securegate@latest"
+  go install github.com/$REPO/cmd/gate2sky@latest"
 	fi
 
 	want=$(expected_sum "$asset")
@@ -286,13 +286,13 @@ ${TAG:+Release $TAG may have no build for $TARGET: see https://github.com/$REPO/
 	[ "$got" = "$want" ] || die "$asset does not match its checksum (expected $want, got $got)"
 
 	tar -xzf "$TMP/$asset" -C "$TMP" || die "could not unpack $asset"
-	new="$TMP/securegate-$TARGET/securegate"
-	[ -f "$new" ] || die "$asset has no securegate binary in it"
+	new="$TMP/gate2sky-$TARGET/gate2sky"
+	[ -f "$new" ] || die "$asset has no gate2sky binary in it"
 	chmod 755 "$new"
 	# Run before it replaces anything: a binary this system cannot run must
 	# not take the place of one that works.
 	if ! "$new" --version </dev/null >"$TMP/version" 2>"$TMP/error"; then
-		die "the downloaded securegate does not run on this system:
+		die "the downloaded gate2sky does not run on this system:
 $(cat "$TMP/error")"
 	fi
 	version=$(awk '{ print $2; exit }' "$TMP/version")
@@ -306,44 +306,44 @@ $(cat "$TMP/error")"
 	# Copied beside the old one and renamed over it: nobody ever runs half a
 	# binary, and a server already running keeps the file it started from.
 	# shellcheck disable=SC2016 # $1..$3 are the inner shell's arguments
-	if ! maybe_root "$DIR" sh -c 'cp "$1" "$2/.securegate.$3" && mv -f "$2/.securegate.$3" "$2/securegate"' \
+	if ! maybe_root "$DIR" sh -c 'cp "$1" "$2/.gate2sky.$3" && mv -f "$2/.gate2sky.$3" "$2/gate2sky"' \
 		sh "$new" "$DIR" "$$"; then
-		maybe_root "$DIR" rm -f "$DIR/.securegate.$$"
+		maybe_root "$DIR" rm -f "$DIR/.gate2sky.$$"
 		die "could not write $BIN"
 	fi
 
 	if [ -z "$current" ]; then
-		say "Installed securegate $version at $BIN."
+		say "Installed gate2sky $version at $BIN."
 		case ":${PATH:-}:" in
 		*":$DIR:"*) ;;
 		*) warn "$DIR is not on your PATH" ;;
 		esac
 		first_run
 	elif [ "$current" = "$version" ]; then
-		say "Reinstalled securegate $version at $BIN."
+		say "Reinstalled gate2sky $version at $BIN."
 		restart_running "$version"
 	else
-		say "Updated securegate from $current to $version at $BIN."
+		say "Updated gate2sky from $current to $version at $BIN."
 		restart_running "$version"
 	fi
 }
 
-configure_securegate() {
-	[ -x "$BIN" ] || die "securegate is not installed in $DIR: install it first"
+configure_gate2sky() {
+	[ -x "$BIN" ] || die "gate2sky is not installed in $DIR: install it first"
 	run_wizard || exit 1
 	if [ "$SERVICE" = 1 ] && service_active; then
 		if ask "Restart the service to apply the settings?" y; then
-			as_root systemctl restart securegate
+			as_root systemctl restart gate2sky
 		fi
 	elif [ "$SERVICE" = 1 ] && has_systemd && ! service_installed && [ -f "$CONFIG" ]; then
-		if ask "Run securegate as a system service, started at boot?" y; then
+		if ask "Run gate2sky as a system service, started at boot?" y; then
 			as_root "$BIN" service --install --config "$CONFIG"
 		fi
 	fi
 }
 
 # The data directory named in the configuration, resolved against its
-# directory as securegate does. Nothing when it can't be told.
+# directory as gate2sky does. Nothing when it can't be told.
 data_dir() {
 	[ -f "$CONFIG" ] || return 0
 	if [ -r "$CONFIG" ]; then
@@ -363,12 +363,12 @@ data_dir() {
 	esac
 }
 
-uninstall_securegate() {
+uninstall_gate2sky() {
 	if service_installed; then
 		if [ -x "$BIN" ]; then
 			as_root "$BIN" service --uninstall
 		else
-			as_root systemctl disable --now securegate || true
+			as_root systemctl disable --now gate2sky || true
 			as_root rm -f "$UNIT"
 			as_root systemctl daemon-reload || true
 		fi
@@ -380,7 +380,7 @@ uninstall_securegate() {
 		maybe_root "$DIR" rm -f "$BIN" || die "could not remove $BIN"
 		say "Removed $BIN."
 	else
-		say "securegate is not installed in $DIR."
+		say "gate2sky is not installed in $DIR."
 	fi
 
 	data=$(data_dir)
@@ -399,10 +399,10 @@ uninstall_securegate() {
 		[ -z "$data" ] || die "the data directory is $data, which --purge will not delete"
 		;;
 	esac
-	say "--purge deletes securegate's configuration and data: subdomains, SSH keys, users, certificates."
+	say "--purge deletes gate2sky's configuration and data: subdomains, SSH keys, users, certificates."
 	[ ! -f "$CONFIG" ] || say "  $CONFIG"
 	[ -z "$data" ] || [ ! -d "$data" ] || say "  $data ($(as_root du -sh "$data" 2>/dev/null | awk '{ print $1 }'))"
-	if id securegate >/dev/null 2>&1; then say "  the securegate system user"; fi
+	if id gate2sky >/dev/null 2>&1; then say "  the gate2sky system user"; fi
 	if ! confirm "Delete them?"; then
 		say "Nothing deleted."
 		return
@@ -416,17 +416,17 @@ uninstall_securegate() {
 		as_root rm -f "$CONFIG" "$base.env"
 		say "Deleted $CONFIG."
 		dir=$(dirname "$CONFIG")
-		if [ "$(basename "$dir")" = securegate ]; then
+		if [ "$(basename "$dir")" = gate2sky ]; then
 			as_root rmdir "$dir" 2>/dev/null || true
 		fi
 	fi
-	if id securegate >/dev/null 2>&1 && need userdel; then
-		as_root userdel securegate 2>/dev/null && say "Deleted the securegate user."
+	if id gate2sky >/dev/null 2>&1 && need userdel; then
+		as_root userdel gate2sky 2>/dev/null && say "Deleted the gate2sky user."
 	fi
 }
 
 # No command was typed: ask what to do, offering the other options only when
-# securegate is installed. The answer becomes COMMAND.
+# gate2sky is installed. The answer becomes COMMAND.
 choose_command() {
 	if ! has_tty; then
 		say "There is no terminal to ask on, so: install. (--help for the commands.)"
@@ -438,7 +438,7 @@ choose_command() {
 	if [ -n "$current" ]; then
 		state=""
 		if service_active; then state=" — running as a service"; fi
-		say "securegate $current is installed at $BIN$state."
+		say "gate2sky $current is installed at $BIN$state."
 		say ""
 		say "  1) Update to the latest release"
 		say "  2) Reinstall $current"
@@ -446,7 +446,7 @@ choose_command() {
 		say "  4) Uninstall — keeps the configuration and data"
 		say "  5) Quit"
 	else
-		say "securegate opens a gate from your machine to the web: an encrypted"
+		say "gate2sky opens a gate from your machine to the web: an encrypted"
 		say "SSH tunnel per subdomain, managed from a web dashboard."
 		say ""
 		say "  1) Install the latest release"
@@ -486,9 +486,9 @@ choose_command() {
 main() {
 	COMMAND=install
 	EXPLICIT=0
-	DIR=${SECUREGATE_INSTALL_DIR:-}
-	VERSION=${SECUREGATE_VERSION:-}
-	CONFIG=/etc/securegate/securegate.yaml
+	DIR=${GATE2SKY_INSTALL_DIR:-}
+	VERSION=${GATE2SKY_VERSION:-}
+	CONFIG=/etc/gate2sky/gate2sky.yaml
 	SERVICE=1
 	PURGE=0
 	YES=0
@@ -546,7 +546,7 @@ main() {
 	*) DIR="$(pwd)/$DIR" ;;
 	esac
 	DIR=${DIR%/}
-	BIN="$DIR/securegate"
+	BIN="$DIR/gate2sky"
 	case "$CONFIG" in
 	/*) ;;
 	*) CONFIG="$(pwd)/$CONFIG" ;;
@@ -558,10 +558,10 @@ main() {
 	trap 'exit 143' TERM
 
 	case "$COMMAND" in
-	install) install_securegate 0 ;;
-	reinstall) install_securegate 1 ;;
-	configure) configure_securegate ;;
-	uninstall) uninstall_securegate ;;
+	install) install_gate2sky 0 ;;
+	reinstall) install_gate2sky 1 ;;
+	configure) configure_gate2sky ;;
+	uninstall) uninstall_gate2sky ;;
 	esac
 }
 

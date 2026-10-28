@@ -22,7 +22,7 @@
   <div class="wrap topbar-inner">
     <a class="brand" href="/">
       <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="currentColor" opacity=".18"/><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11.5V10a3 3 0 0 1 6 0v1.5M8.5 11.5h7v5h-7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-      securegate
+      gate2sky
     </a>
     <nav class="nav" :if="app.user">
       <a href="/" :class.active="section === 'subdomains'">Subdomains</a>
@@ -42,7 +42,7 @@
   <section :if="app.error" class="card error-page">
     <h1>{{ app.error.status }} · {{ app.error.title }}</h1>
     <p>{{ app.error.message }}</p>
-    <p><a href="/">← Back to securegate</a></p>
+    <p><a href="/">← Back to gate2sky</a></p>
   </section>
   <Login :elseif="!app.user" />
   <Subdomains :elseif="current.page === 'subdomains' || current.page === 'login'" />
@@ -52,8 +52,8 @@
   <section :else class="card error-page">
     <h1>404 · Not Found</h1>
     <p>There is no page here.</p>
-    <p><a href="/">← Back to securegate</a></p>
+    <p><a href="/">← Back to gate2sky</a></p>
   </section>
 </main>
 
-<footer class="wrap footer">securegate · SSH tunnels on *.{{ app.domain }}</footer>
+<footer class="wrap footer">gate2sky · SSH tunnels on *.{{ app.domain }}</footer>

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>securegate — open a gate to the web</title>
-<meta name="description" content="securegate exposes local services on your own domain through encrypted SSH tunnels: a subdomain per service, SSH keys per subdomain, passkey sign-in and a live dashboard. One line to install.">
-<meta property="og:title" content="securegate — open a gate to the web">
+<title>gate2sky — open a gate to the web</title>
+<meta name="description" content="gate2sky exposes local services on your own domain through encrypted SSH tunnels: a subdomain per service, SSH keys per subdomain, passkey sign-in and a live dashboard. One line to install.">
+<meta property="og:title" content="gate2sky — open a gate to the web">
 <meta property="og:description" content="Encrypted SSH tunnels from your machine to your own domain, with a dashboard, passkeys and per-subdomain keys.">
-<meta property="og:url" content="https://jgermade.github.io/securegate/">
+<meta property="og:url" content="https://gate2sky.github.io/">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#05070d">
 <meta name="color-scheme" content="dark light">
@@ -19,7 +19,7 @@
     const root = document.documentElement
     const system = matchMedia("(prefers-color-scheme: dark)")
     let pick = "auto"
-    try { pick = localStorage.getItem("securegate.theme") || "auto" } catch {}
+    try { pick = localStorage.getItem("gate2sky.theme") || "auto" } catch {}
     if (!["auto", "light", "dark"].includes(pick)) pick = "auto"
     const apply = () => {
       const dark = root.dataset.pick === "auto" ? system.matches : root.dataset.pick === "dark"
@@ -29,9 +29,9 @@
     root.dataset.pick = pick
     apply()
     system.addEventListener?.("change", apply)
-    window.securegateTheme = which => {
+    window.gate2skyTheme = which => {
       root.dataset.pick = which
-      try { localStorage.setItem("securegate.theme", which) } catch {}
+      try { localStorage.setItem("gate2sky.theme", which) } catch {}
       apply()
     }
   })()
@@ -470,19 +470,19 @@ footer .name b { color: var(--fg); }
 
 <header>
   <div class="wrap bar">
-    <a class="brand" href="#top" aria-label="securegate home">
+    <a class="brand" href="#top" aria-label="gate2sky home">
       <svg viewBox="0 0 40 40" aria-hidden="true">
         <path d="M11 26 L29 14" stroke="#ffa23a" stroke-width="2.4" stroke-linecap="round"/>
         <g transform="translate(9 27.5) rotate(-34)"><ellipse rx="4.6" ry="9.5" fill="url(#horizon)"/><ellipse rx="4.6" ry="9.5" fill="none" stroke="url(#metal)" stroke-width="3"/></g>
         <g transform="translate(31 12.5) rotate(-34)"><ellipse rx="4.6" ry="9.5" fill="url(#horizon)"/><ellipse rx="4.6" ry="9.5" fill="none" stroke="url(#metal)" stroke-width="3"/></g>
       </svg>
-      securegate
+      gate2sky
     </a>
     <nav aria-label="Sections">
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
       <a href="#install">Install</a>
-      <a class="gh" href="https://github.com/jgermade/securegate" aria-label="securegate on GitHub">
+      <a class="gh" href="https://github.com/gate2sky/gate2sky.github.io" aria-label="gate2sky on GitHub">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         <span>GitHub</span>
       </a>
@@ -621,15 +621,15 @@ footer .name b { color: var(--fg); }
       <h1>Open a <span class="glow">gate</span> to the web.</h1>
       <p class="lede">Expose any local service on your own domain through an encrypted SSH tunnel. A subdomain per service, keys per subdomain, passkeys to sign in.</p>
       <div class="install">
-        <code><span class="p">$ </span>curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh</code>
-        <button class="copy" type="button" data-copy="curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh" aria-label="Copy the install command">
+        <code><span class="p">$ </span>curl -fsSL https://gate2sky.github.io/setup.sh | sh</code>
+        <button class="copy" type="button" data-copy="curl -fsSL https://gate2sky.github.io/setup.sh | sh" aria-label="Copy the install command">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span>
         </button>
       </div>
       <div class="cta">
         <a href="#how">How it works ↓</a>
         <a href="./setup.sh">Read the script</a>
-        <a href="https://github.com/jgermade/securegate">Source on GitHub ↗</a>
+        <a href="https://github.com/gate2sky/gate2sky.github.io">Source on GitHub ↗</a>
       </div>
     </div>
   </div>
@@ -643,7 +643,7 @@ footer .name b { color: var(--fg); }
       </div>
       <div class="flow">
         <!-- Wide drawing, from 760px. -->
-        <svg class="wide" viewBox="0 0 960 300" role="img" aria-label="Your machine connects to securegate with ssh -R through an encrypted tunnel; visitors reach https://myapp.gate.example.com and their requests travel through the gate to localhost:3000.">
+        <svg class="wide" viewBox="0 0 960 300" role="img" aria-label="Your machine connects to gate2sky with ssh -R through an encrypted tunnel; visitors reach https://myapp.gate.example.com and their requests travel through the gate to localhost:3000.">
           <path id="route-w" d="M236 150 H724" fill="none"/>
           <!-- your machine -->
           <rect class="panel" x="40" y="66" width="196" height="132" rx="12"/>
@@ -694,7 +694,7 @@ footer .name b { color: var(--fg); }
           <ellipse class="ring-edge" rx="26" ry="64"/>
           <circle class="lamp" style="--i:0" cx="0" cy="-58" r="3.4"/><circle class="lamp" style="--i:1" cx="-12.9" cy="-45.7" r="3.4"/><circle class="lamp" style="--i:2" cx="12.9" cy="-45.7" r="3.4"/>
         </g>
-          <text class="cap" x="490" y="256" text-anchor="middle">securegate</text>
+          <text class="cap" x="490" y="256" text-anchor="middle">gate2sky</text>
           <!-- the visitor's browser -->
           <rect class="panel" x="724" y="66" width="208" height="160" rx="12"/>
           <circle class="dot" cx="742" cy="84" r="4"/><circle class="dot" cx="756" cy="84" r="4"/><circle class="dot" cx="770" cy="84" r="4"/>
@@ -707,7 +707,7 @@ footer .name b { color: var(--fg); }
         </svg>
 
         <!-- Tall drawing, for phones. -->
-        <svg class="tall" viewBox="0 0 320 660" role="img" aria-label="Your machine connects to securegate with ssh -R through an encrypted tunnel; visitors reach https://myapp.gate.example.com and their requests travel through the gate to localhost:3000.">
+        <svg class="tall" viewBox="0 0 320 660" role="img" aria-label="Your machine connects to gate2sky with ssh -R through an encrypted tunnel; visitors reach https://myapp.gate.example.com and their requests travel through the gate to localhost:3000.">
           <path id="route-t" d="M160 156 V560" fill="none"/>
           <rect class="panel" x="62" y="14" width="196" height="122" rx="12"/>
           <rect class="screen" x="74" y="26" width="172" height="98" rx="6"/>
@@ -766,9 +766,9 @@ footer .name b { color: var(--fg); }
         <h2>Dial the gate.</h2>
         <p>The subdomain goes in front of the port. Every request is logged as it passes.</p>
       </div>
-      <div class="term" role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, securegate answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive.">
+      <div class="term" role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2sky answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive.">
         <div class="tbar" aria-hidden="true"><i></i><i></i><i></i></div>
-<pre aria-hidden="true"><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">securegate: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+<pre aria-hidden="true"><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2sky: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
       </div>
     </div>
   </section>
@@ -822,7 +822,7 @@ footer .name b { color: var(--fg); }
             <rect class="menu-sel fillc" x="24" y="31" width="26" height="6" rx="2" opacity=".35"/>
             <path d="M26 34h20M26 43h16M26 52h0" stroke-width="2"/>
           </svg>
-          <div><h3>A wizard in the terminal</h3><p><code>securegate config</code>: set up, add keys and users without the browser.</p></div>
+          <div><h3>A wizard in the terminal</h3><p><code>gate2sky config</code>: set up, add keys and users without the browser.</p></div>
         </div>
       </div>
     </div>
@@ -846,9 +846,9 @@ footer .name b { color: var(--fg); }
         </div>
         <div class="panes">
           <div class="pane p-line">
-            <div class="code"><button class="copy" type="button" data-copy="curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh" aria-label="Copy"><span>Copy</span></button>
-<pre><span class="p">$ </span>curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh</pre></div>
-            <p class="hint">Linux and macOS. It installs the binary, opens the setup wizard and, with systemd, runs securegate as a service. Run it again to update, reconfigure or uninstall.</p>
+            <div class="code"><button class="copy" type="button" data-copy="curl -fsSL https://gate2sky.github.io/setup.sh | sh" aria-label="Copy"><span>Copy</span></button>
+<pre><span class="p">$ </span>curl -fsSL https://gate2sky.github.io/setup.sh | sh</pre></div>
+            <p class="hint">Linux and macOS. It installs the binary, opens the setup wizard and, with systemd, runs gate2sky as a service. Run it again to update, reconfigure or uninstall.</p>
             <div class="cmds">
               <div><code>… | sh</code><span>install, or update</span></div>
               <div><code>… | sh -s -- reinstall</code><span>same version, again</span></div>
@@ -857,24 +857,24 @@ footer .name b { color: var(--fg); }
             </div>
           </div>
           <div class="pane p-docker">
-            <div class="code"><button class="copy" type="button" data-copy="docker volume create securegate
-docker run -it --rm -v securegate:/data ghcr.io/jgermade/securegate config
-docker run -d --name securegate --restart unless-stopped -v securegate:/data -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/jgermade/securegate" aria-label="Copy"><span>Copy</span></button>
+            <div class="code"><button class="copy" type="button" data-copy="docker volume create gate2sky
+docker run -it --rm -v gate2sky:/data ghcr.io/gate2sky/gate2sky config
+docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2sky/gate2sky" aria-label="Copy"><span>Copy</span></button>
 <pre><span class="c"># configuration and state live in the volume</span>
-<span class="p">$ </span>docker volume create securegate
-<span class="p">$ </span>docker run -it --rm -v securegate:/data ghcr.io/jgermade/securegate config
-<span class="p">$ </span>docker run -d --name securegate --restart unless-stopped -v securegate:/data \
-    -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/jgermade/securegate</pre></div>
-            <p class="hint">Choose Let's Encrypt in the wizard: securegate gets a certificate for each subdomain on its own. Manage it later with <code>docker exec -it securegate securegate config</code>.</p>
+<span class="p">$ </span>docker volume create gate2sky
+<span class="p">$ </span>docker run -it --rm -v gate2sky:/data ghcr.io/gate2sky/gate2sky config
+<span class="p">$ </span>docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data \
+    -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2sky/gate2sky</pre></div>
+            <p class="hint">Choose Let's Encrypt in the wizard: gate2sky gets a certificate for each subdomain on its own. Manage it later with <code>docker exec -it gate2sky gate2sky config</code>.</p>
           </div>
           <div class="pane p-k8s">
-            <div class="code"><button class="copy" type="button" data-copy="git clone https://github.com/jgermade/securegate && cd securegate
-helm install securegate deploy/helm/securegate --set domain=gate.example.com --set traefik.tls.certResolver=letsencrypt-dns" aria-label="Copy"><span>Copy</span></button>
-<pre><span class="p">$ </span>git clone https://github.com/jgermade/securegate &amp;&amp; cd securegate
-<span class="p">$ </span>helm install securegate deploy/helm/securegate \
+            <div class="code"><button class="copy" type="button" data-copy="git clone https://github.com/gate2sky/gate2sky.github.io && cd gate2sky.github.io
+helm install gate2sky deploy/helm/gate2sky --set domain=gate.example.com --set traefik.tls.certResolver=letsencrypt-dns" aria-label="Copy"><span>Copy</span></button>
+<pre><span class="p">$ </span>git clone https://github.com/gate2sky/gate2sky.github.io &amp;&amp; cd gate2sky.github.io
+<span class="p">$ </span>helm install gate2sky deploy/helm/gate2sky \
     --set domain=gate.example.com \
     --set traefik.tls.certResolver=letsencrypt-dns</pre></div>
-            <p class="hint">An IngressRoute for the dashboard and every subdomain, SSH over a Traefik TCP entry point with the PROXY protocol. See the <a href="https://github.com/jgermade/securegate/tree/main/deploy/helm/securegate">chart</a>.</p>
+            <p class="hint">An IngressRoute for the dashboard and every subdomain, SSH over a Traefik TCP entry point with the PROXY protocol. See the <a href="https://github.com/gate2sky/gate2sky.github.io/tree/main/deploy/helm/gate2sky">chart</a>.</p>
           </div>
         </div>
       </div>
@@ -885,7 +885,7 @@ helm install securegate deploy/helm/securegate --set domain=gate.example.com --s
 <footer>
   <div class="wrap">
     <div class="name"><b>secure</b> channel + <b>gate</b>: two gates, one encrypted link between them.</div>
-    <div><a href="https://github.com/jgermade/securegate">github.com/jgermade/securegate</a> · <a href="./setup.sh">setup.sh</a> · <a href="https://github.com/jgermade/securegate/releases">releases</a></div>
+    <div><a href="https://github.com/gate2sky/gate2sky.github.io">github.com/gate2sky/gate2sky.github.io</a> · <a href="./setup.sh">setup.sh</a> · <a href="https://github.com/gate2sky/gate2sky.github.io/releases">releases</a></div>
   </div>
 </footer>
 
@@ -915,7 +915,7 @@ helm install securegate deploy/helm/securegate --set domain=gate.example.com --s
     const order = ["auto", "light", "dark"]
     document.querySelector(".theme")?.addEventListener("click", () => {
       const now = document.documentElement.dataset.pick
-      window.securegateTheme(order[(order.indexOf(now) + 1) % order.length])
+      window.gate2skyTheme(order[(order.indexOf(now) + 1) % order.length])
     })
     // CSS animations stop through the media query; SMIL ones need telling.
     const still = matchMedia("(prefers-reduced-motion: reduce)")
