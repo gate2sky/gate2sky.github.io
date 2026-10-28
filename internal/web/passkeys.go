@@ -13,7 +13,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 
-	"github.com/jgermade/securegate/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
 )
 
 const passkeyCeremonyTTL = 5 * time.Minute

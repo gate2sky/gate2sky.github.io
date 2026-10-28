@@ -122,11 +122,11 @@ func (s *settings) load(d *doc) {
 
 // defaultDataDir picks where data lives for a configuration file at path.
 func defaultDataDir(path string) string {
-	if d := os.Getenv("SECUREGATE_DATA_DIR"); d != "" {
+	if d := os.Getenv("GATE2SKY_DATA_DIR"); d != "" {
 		return d
 	}
 	if abs, err := filepath.Abs(path); err == nil && strings.HasPrefix(abs, "/etc/") {
-		return "/var/lib/securegate"
+		return "/var/lib/gate2sky"
 	}
 	return "data"
 }
@@ -157,7 +157,7 @@ func (s *settings) fillDefaults() {
 	}
 	if s.EmailFrom == "" {
 		if u, err := url.Parse(s.PublicURL); err == nil && u.Hostname() != "" {
-			s.EmailFrom = "securegate <no-reply@" + u.Hostname() + ">"
+			s.EmailFrom = "gate2sky <no-reply@" + u.Hostname() + ">"
 		}
 	}
 	if s.ACMEEmail == "" {

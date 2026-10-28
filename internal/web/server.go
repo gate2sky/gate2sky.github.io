@@ -19,11 +19,11 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 
-	"github.com/jgermade/securegate/internal/config"
-	"github.com/jgermade/securegate/internal/mail"
-	"github.com/jgermade/securegate/internal/manage"
-	"github.com/jgermade/securegate/internal/store"
-	"github.com/jgermade/securegate/internal/tunnel"
+	"github.com/gate2sky/gate2sky.github.io/internal/config"
+	"github.com/gate2sky/gate2sky.github.io/internal/mail"
+	"github.com/gate2sky/gate2sky.github.io/internal/manage"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
 )
 
 //go:embed templates ui
@@ -101,16 +101,16 @@ func New(o Options) (*Server, error) {
 		prefix = "__Host-"
 	}
 	s.cookies = cookieNames{
-		session:    prefix + "securegate",
-		oauth:      prefix + "securegate-oauth",
-		access:     prefix + "securegate-access",
-		emailLogin: prefix + "securegate-email",
-		passkey:    prefix + "securegate-passkey",
+		session:    prefix + "gate2sky",
+		oauth:      prefix + "gate2sky-oauth",
+		access:     prefix + "gate2sky-access",
+		emailLogin: prefix + "gate2sky-email",
+		passkey:    prefix + "gate2sky-passkey",
 	}
 	if s.cfg.PasskeysEnabled() {
 		wa, err := webauthn.New(&webauthn.Config{
 			RPID:          s.cfg.Domain(),
-			RPDisplayName: "securegate",
+			RPDisplayName: "gate2sky",
 			// Tunnel subdomains may claim this RP ID too, so assertions
 			// are only accepted from the dashboard's exact origin.
 			RPOrigins: []string{s.cfg.DashboardURL("")},

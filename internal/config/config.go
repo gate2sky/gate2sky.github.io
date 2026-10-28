@@ -1,4 +1,4 @@
-// Package config loads and validates the securegate configuration file.
+// Package config loads and validates the gate2sky configuration file.
 package config
 
 import (
@@ -47,7 +47,7 @@ type HTTPConfig struct {
 	Listen string    `yaml:"listen"`
 	TLS    TLSConfig `yaml:"tls"`
 	// TrustProxyHeaders keeps incoming X-Forwarded-For headers. Enable it
-	// only when securegate runs behind a reverse proxy you control.
+	// only when gate2sky runs behind a reverse proxy you control.
 	TrustProxyHeaders bool `yaml:"trust_proxy_headers"`
 }
 
@@ -60,7 +60,7 @@ type TLSConfig struct {
 	ACME     ACMEConfig `yaml:"acme"`
 }
 
-// Enabled reports whether securegate terminates TLS itself.
+// Enabled reports whether gate2sky terminates TLS itself.
 func (t TLSConfig) Enabled() bool { return t.ACME.Enabled || t.CertFile != "" }
 
 type ACMEConfig struct {
@@ -85,7 +85,7 @@ type SSHConfig struct {
 }
 
 type AdminConfig struct {
-	// Socket is the Unix socket `securegate config` and `securegate status`
+	// Socket is the Unix socket `gate2sky config` and `gate2sky status`
 	// use to manage the running server. Defaults to <data_dir>/admin.sock.
 	Socket string `yaml:"socket"`
 }
@@ -108,7 +108,7 @@ type AuthConfig struct {
 }
 
 type EmailConfig struct {
-	// From is the sender, e.g. "securegate <no-reply@gate.example.com>".
+	// From is the sender, e.g. "gate2sky <no-reply@gate.example.com>".
 	From    string        `yaml:"from"`
 	CodeTTL time.Duration `yaml:"code_ttl"`
 	SMTP    SMTPConfig    `yaml:"smtp"`
@@ -450,7 +450,7 @@ func (c *Config) IsAdmin(email string) bool {
 }
 
 // EmailAllowed reports whether a user with this (verified) email may sign
-// in and keep using securegate.
+// in and keep using gate2sky.
 func (c *Config) EmailAllowed(email string) bool {
 	email = strings.ToLower(email)
 	if email == "" {

@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/jgermade/securegate/internal/admin"
-	"github.com/jgermade/securegate/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/admin"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
 )
 
 // serveAdmin starts the admin socket and returns a client for it.

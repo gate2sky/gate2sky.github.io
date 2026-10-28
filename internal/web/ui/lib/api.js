@@ -25,7 +25,7 @@ export const api = async (method, path, body) => {
       credentials: "same-origin",
     })
   } catch {
-    throw new ApiError(0, { error: "securegate can't be reached. Check your connection and try again." })
+    throw new ApiError(0, { error: "gate2sky can't be reached. Check your connection and try again." })
   }
   if (response.status === 204) return null
   const data = await response.json().catch(() => null)

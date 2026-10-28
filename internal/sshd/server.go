@@ -14,15 +14,15 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/jgermade/securegate/internal/config"
-	"github.com/jgermade/securegate/internal/names"
-	"github.com/jgermade/securegate/internal/store"
-	"github.com/jgermade/securegate/internal/tunnel"
+	"github.com/gate2sky/gate2sky.github.io/internal/config"
+	"github.com/gate2sky/gate2sky.github.io/internal/names"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
 )
 
 const (
-	extFingerprint = "securegate-fingerprint"
-	extPublicKey   = "securegate-public-key"
+	extFingerprint = "gate2sky-fingerprint"
+	extPublicKey   = "gate2sky-public-key"
 
 	handshakeTimeout = 30 * time.Second
 )
@@ -55,7 +55,7 @@ func New(cfg *config.Config, st *store.Store, reg *tunnel.Registry, hostKey ssh.
 		conns:    map[*clientConn]struct{}{},
 	}
 	s.sshCfg = &ssh.ServerConfig{
-		ServerVersion:               "SSH-2.0-securegate",
+		ServerVersion:               "SSH-2.0-gate2sky",
 		MaxAuthTries:                6,
 		PublicKeyCallback:           s.authenticate,
 		KeyboardInteractiveCallback: s.explainUnknownKey,
@@ -74,7 +74,7 @@ func (s *Server) explainUnknownKey(meta ssh.ConnMetadata, _ ssh.KeyboardInteract
 		return nil, errNoKey
 	}
 	return nil, &ssh.BannerError{Err: errNoKey, Message: fmt.Sprintf(
-		"securegate: none of your SSH keys is registered.\r\n"+
+		"gate2sky: none of your SSH keys is registered.\r\n"+
 			"Add your public key (e.g. ~/.ssh/id_ed25519.pub) to a subdomain at\r\n  %s\r\nthen try again.\r\n",
 		s.cfg.DashboardURL("/"))}
 }

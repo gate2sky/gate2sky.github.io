@@ -23,9 +23,9 @@ import (
 	proxyproto "github.com/pires/go-proxyproto"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/jgermade/securegate/internal/admin"
-	"github.com/jgermade/securegate/internal/config"
-	"github.com/jgermade/securegate/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/admin"
+	"github.com/gate2sky/gate2sky.github.io/internal/config"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
 )
 
 func freePort(t *testing.T) string {
@@ -141,7 +141,7 @@ auth:
 	if err := <-done; err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "securegate.pid")); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, "gate2sky.pid")); err == nil {
 		t.Error("PID file left behind")
 	}
 	if _, err := os.Stat(cfg.Admin.Socket); err == nil {

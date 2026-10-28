@@ -2,5 +2,5 @@
 data/
 deploy/
 *.db
-securegate.yaml
-/securegate
+gate2sky.yaml
+/gate2sky

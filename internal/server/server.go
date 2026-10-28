@@ -1,4 +1,4 @@
-// Package server wires securegate together and runs its listeners.
+// Package server wires gate2sky together and runs its listeners.
 package server
 
 import (
@@ -25,15 +25,15 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/jgermade/securegate/internal/admin"
-	"github.com/jgermade/securegate/internal/config"
-	"github.com/jgermade/securegate/internal/mail"
-	"github.com/jgermade/securegate/internal/manage"
-	"github.com/jgermade/securegate/internal/names"
-	"github.com/jgermade/securegate/internal/sshd"
-	"github.com/jgermade/securegate/internal/store"
-	"github.com/jgermade/securegate/internal/tunnel"
-	"github.com/jgermade/securegate/internal/web"
+	"github.com/gate2sky/gate2sky.github.io/internal/admin"
+	"github.com/gate2sky/gate2sky.github.io/internal/config"
+	"github.com/gate2sky/gate2sky.github.io/internal/mail"
+	"github.com/gate2sky/gate2sky.github.io/internal/manage"
+	"github.com/gate2sky/gate2sky.github.io/internal/names"
+	"github.com/gate2sky/gate2sky.github.io/internal/sshd"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
+	"github.com/gate2sky/gate2sky.github.io/internal/web"
 )
 
 // Options customize a Server, mostly for tests.
@@ -45,7 +45,7 @@ type Options struct {
 	HTTPClient *http.Client
 }
 
-// Server is a configured securegate instance.
+// Server is a configured gate2sky instance.
 type Server struct {
 	cfg      *config.Config
 	log      *slog.Logger
@@ -66,7 +66,7 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 	}
 	s := &Server{cfg: cfg, log: log, version: opts.Version, registry: tunnel.NewRegistry()}
 	var err error
-	if s.store, err = store.Open(filepath.Join(cfg.DataDir, "securegate.db")); err != nil {
+	if s.store, err = store.Open(filepath.Join(cfg.DataDir, "gate2sky.db")); err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 	secret, err := loadOrCreateSecret(filepath.Join(cfg.DataDir, "secret.key"))
@@ -224,7 +224,7 @@ func (s *Server) Run(ctx context.Context) error {
 	for _, p := range cfg.Auth.Providers {
 		methods = append(methods, p.ID)
 	}
-	log.Info("securegate started",
+	log.Info("gate2sky started",
 		"version", s.version,
 		"dashboard", cfg.DashboardURL("/"),
 		"tunnels", cfg.TunnelURL("*"),
@@ -259,7 +259,7 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 // PIDFile is where a running server writes its process ID.
-func PIDFile(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "securegate.pid") }
+func PIDFile(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "gate2sky.pid") }
 
 // RunningPID returns the PID of a server running on this data directory,
 // or 0.
@@ -276,10 +276,10 @@ func RunningPID(cfg *config.Config) int {
 }
 
 func writePIDFile(dataDir string) (string, error) {
-	path := filepath.Join(dataDir, "securegate.pid")
+	path := filepath.Join(dataDir, "gate2sky.pid")
 	if b, err := os.ReadFile(path); err == nil {
 		if pid, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && pid != os.Getpid() && processAlive(pid) {
-			return "", fmt.Errorf("securegate is already running with PID %d (%s)", pid, path)
+			return "", fmt.Errorf("gate2sky is already running with PID %d (%s)", pid, path)
 		}
 	}
 	return path, os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o644)
@@ -304,7 +304,7 @@ func hostPolicy(cfg *config.Config, st *store.Store) autocert.HostPolicy {
 		}
 		name, ok := strings.CutSuffix(host, "."+cfg.Domain())
 		if !ok || strings.Contains(name, ".") {
-			return fmt.Errorf("acme: host %q is not served by securegate", host)
+			return fmt.Errorf("acme: host %q is not served by gate2sky", host)
 		}
 		if _, err := st.SubdomainByName(ctx, name); err != nil {
 			return fmt.Errorf("acme: subdomain %q is not registered", name)
@@ -373,7 +373,7 @@ func loadOrCreateHostKey(path string) (ssh.Signer, error) {
 	if err != nil {
 		return nil, err
 	}
-	block, err := ssh.MarshalPrivateKey(priv, "securegate host key")
+	block, err := ssh.MarshalPrivateKey(priv, "gate2sky host key")
 	if err != nil {
 		return nil, err
 	}

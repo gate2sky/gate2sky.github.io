@@ -6,7 +6,7 @@
   const { api } = await import("@ui/lib/api.js")
   const { supported, signIn, autofillAvailable, problem } = await import("@ui/lib/passkeys.js")
 
-  document.title = "Sign in · securegate"
+  document.title = "Sign in · gate2sky"
 
   // Where to go afterwards: what the address asked for, or this page.
   const rd = app.path === "/login" ? query("rd") || "/" : app.path + app.search

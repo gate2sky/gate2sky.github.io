@@ -1,5 +1,5 @@
 // Package admin exposes management operations on a local Unix socket, for
-// `securegate config` and `securegate status`. Access is controlled by the
+// `gate2sky config` and `gate2sky status`. Access is controlled by the
 // socket's file permissions: only the service user and root can connect.
 package admin
 
@@ -15,10 +15,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jgermade/securegate/internal/api"
-	"github.com/jgermade/securegate/internal/config"
-	"github.com/jgermade/securegate/internal/manage"
-	"github.com/jgermade/securegate/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/api"
+	"github.com/gate2sky/gate2sky.github.io/internal/config"
+	"github.com/gate2sky/gate2sky.github.io/internal/manage"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
 )
 
 // Status describes the running server.
@@ -100,7 +100,7 @@ func (h *Handler) Serve(ctx context.Context) error {
 	// another server is answering on it.
 	if c, err := net.DialTimeout("unix", path, time.Second); err == nil {
 		c.Close()
-		return fmt.Errorf("admin socket %s is in use: is securegate already running?", path)
+		return fmt.Errorf("admin socket %s is in use: is gate2sky already running?", path)
 	}
 	os.Remove(path)
 	ln, err := net.Listen("unix", path)

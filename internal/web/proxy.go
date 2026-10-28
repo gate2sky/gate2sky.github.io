@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jgermade/securegate/internal/store"
-	"github.com/jgermade/securegate/internal/tunnel"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
+	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
 )
 
 // authPath is reserved on every tunnel host: it receives the hand-off token
 // from the dashboard and turns it into an access cookie for that host.
-const authPath = "/__securegate/auth"
+const authPath = "/__gate2sky/auth"
 
 const (
 	handoffTTL   = 2 * time.Minute
@@ -137,7 +137,7 @@ func (s *Server) serveTunnel(w http.ResponseWriter, r *http.Request, name string
 		}
 	}
 
-	// The service behind the tunnel must never see securegate's cookies.
+	// The service behind the tunnel must never see gate2sky's cookies.
 	stripCookies(r, s.cookies.access, s.cookies.session, s.cookies.oauth, s.cookies.emailLogin, s.cookies.passkey)
 	t.CountRequest()
 	ctx := tunnel.WithOrigin(r.Context(), r.RemoteAddr)
@@ -223,7 +223,7 @@ func (s *Server) handleTunnelAuth(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.cfg.TunnelURL(name)+authPath+"?"+q.Encode(), http.StatusFound)
 }
 
-// parseTunnelURL accepts only URLs of tunnels on this securegate.
+// parseTunnelURL accepts only URLs of tunnels on this gate2sky.
 func (s *Server) parseTunnelURL(raw string) (string, *url.URL, bool) {
 	u, err := url.Parse(raw)
 	if err != nil || u.User != nil || u.Scheme != s.cfg.Scheme() {

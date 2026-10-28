@@ -1,6 +1,6 @@
-# securegate configuration.
+# gate2sky configuration.
 #
-# `securegate config` writes this file for you with an interactive wizard.
+# `gate2sky config` writes this file for you with an interactive wizard.
 # ${VAR} in values is replaced with environment variables, and relative
 # paths are relative to this file's directory.
 
@@ -10,17 +10,17 @@
 public_url: https://gate.example.com
 
 # SQLite database, SSH host key, signing key and certificates live here.
-data_dir: /var/lib/securegate
+data_dir: /var/lib/gate2sky
 
 http:
   listen: ":80"
   # Remove the tls block when a reverse proxy (Traefik, Caddy, nginx...)
-  # terminates TLS in front of securegate, and keep public_url on https.
+  # terminates TLS in front of gate2sky, and keep public_url on https.
   tls:
     listen: ":443"
     # Either a wildcard certificate for gate.example.com and *.gate.example.com:
-    # cert_file: /etc/securegate/fullchain.pem
-    # key_file: /etc/securegate/privkey.pem
+    # cert_file: /etc/gate2sky/fullchain.pem
+    # key_file: /etc/gate2sky/privkey.pem
     # ...or certificates from Let's Encrypt, issued on demand for the
     # dashboard and every registered subdomain:
     acme:
@@ -49,13 +49,13 @@ auth:
 
   # Sign in with a one-time code sent by email. Users can then add passkeys.
   email:
-    from: "securegate <no-reply@gate.example.com>"
+    from: "gate2sky <no-reply@gate.example.com>"
     code_ttl: 10m
     smtp:
       host: smtp.example.com
       port: 587
       tls: starttls   # starttls, tls (port 465) or none (local relay only)
-      username: securegate
+      username: gate2sky
       password: ${SMTP_PASSWORD}
     # For local development only: write the codes to the log instead.
     # log_only: true
@@ -81,8 +81,8 @@ auth:
   #     client_secret: ${GOOGLE_CLIENT_SECRET}
 
 # admin:
-#   # Unix socket used by `securegate config` and `securegate status`.
-#   socket: /var/lib/securegate/admin.sock
+#   # Unix socket used by `gate2sky config` and `gate2sky status`.
+#   socket: /var/lib/gate2sky/admin.sock
 
 limits:
   subdomains_per_user: 10

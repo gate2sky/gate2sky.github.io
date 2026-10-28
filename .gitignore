@@ -1,6 +1,6 @@
-/securegate
+/gate2sky
 /data/
-/securegate.yaml
+/gate2sky.yaml
 *.db
 *.db-shm
 *.db-wal

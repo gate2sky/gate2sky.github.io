@@ -56,15 +56,15 @@ func TestLocalPath(t *testing.T) {
 
 func TestStripCookies(t *testing.T) {
 	r := httptest.NewRequest("GET", "/", nil)
-	r.Header.Add("Cookie", "a=1; securegate-access=secret; b=\"2\"; securegate=session")
-	r.Header.Add("Cookie", "securegate-access=again")
-	stripCookies(r, "securegate-access", "securegate")
+	r.Header.Add("Cookie", "a=1; gate2sky-access=secret; b=\"2\"; gate2sky=session")
+	r.Header.Add("Cookie", "gate2sky-access=again")
+	stripCookies(r, "gate2sky-access", "gate2sky")
 	if got := r.Header.Get("Cookie"); got != `a=1; b="2"` {
 		t.Errorf("Cookie = %q", got)
 	}
 	r = httptest.NewRequest("GET", "/", nil)
-	r.Header.Set("Cookie", "securegate-access=x")
-	stripCookies(r, "securegate-access")
+	r.Header.Set("Cookie", "gate2sky-access=x")
+	stripCookies(r, "gate2sky-access")
 	if _, ok := r.Header["Cookie"]; ok {
 		t.Error("empty Cookie header left behind")
 	}
