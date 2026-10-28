@@ -262,6 +262,11 @@ Linux and macOS (amd64, arm64) with `SHA256SUMS`, publishes the Docker image
 and deploys [`pages/`](pages/) — the landing and `setup.sh` — to GitHub Pages
 (enable it once in Settings → Pages → Source: GitHub Actions).
 
+The landing is built from [`scripts/landing`](scripts/landing): edit
+`template.html` (or the drawings in `hero.py`, whose geometry is computed),
+then run `python3 scripts/landing/gen.py scripts/landing/template.html
+pages/index.html`. CI checks that the two agree.
+
 ## Roadmap
 
 - TCP tunnels on dedicated ports.

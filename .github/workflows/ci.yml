@@ -61,12 +61,17 @@ jobs:
         run: shellcheck -s sh pages/setup.sh && shellcheck scripts/setup-check.sh
       - name: Walk the installer against this tree
         run: scripts/setup-check.sh
-      - name: The landing is self-contained
+      - name: The landing is self-contained and built from its template
         run: |
           if grep -rInE '(src|href)="https?://' pages/ | grep -vE 'https://(github\.com|jgermade\.github\.io)/'; then
             echo "pages/ must not load anything from another host"
             exit 1
           fi
+          python3 scripts/landing/gen.py scripts/landing/template.html "$RUNNER_TEMP/index.html"
+          cmp "$RUNNER_TEMP/index.html" pages/index.html || {
+            echo "pages/index.html is out of date: run python3 scripts/landing/gen.py scripts/landing/template.html pages/index.html"
+            exit 1
+          }
 
   docker:
     runs-on: ubuntu-latest
