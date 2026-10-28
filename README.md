@@ -278,9 +278,11 @@ The landing is built from [`scripts/landing`](scripts/landing): edit
 `template.html` (or the drawings in `hero.py`, whose geometry is computed),
 then run `python3 scripts/landing/gen.py scripts/landing/template.html
 pages/index.html`. Build checks that the two agree. The icon is
-[`pages/favicon.svg`](pages/favicon.svg); after changing it, `node
-scripts/landing/icons.js` renders `favicon.ico` and `apple-touch-icon.png`
-from it.
+[`pages/favicon.svg`](pages/favicon.svg), the same file as the dashboard's
+[`internal/web/ui/logo.svg`](internal/web/ui/logo.svg) (the landing's header
+inlines it); after changing it, copy it to both and run `node
+scripts/landing/icons.js`, which renders `favicon.ico` and
+`apple-touch-icon.png` from it.
 
 ## Roadmap
 

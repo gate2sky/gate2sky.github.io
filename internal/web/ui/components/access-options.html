@@ -1,13 +1,13 @@
 <script :setup="{ model = 'public', name = 'access', disabled = false }">
-  // Who can open a subdomain, as three radios. The choice goes back up
+  // Who can open a subdomain, as three option cards over radios. The choice goes back up
   // through `:model`, and as a `pick` event for a parent that saves it.
   //
   //   <AccessOptions :model="access" />
   //   <AccessOptions :model="sub.access" @pick="save($event.detail)" />
   const OPTIONS = [
-    { value: "public", label: "Public", hint: "anyone with the URL" },
-    { value: "users", label: "Signed-in users", hint: "anyone who can sign in to this gate2sky" },
-    { value: "private", label: "Private", hint: "only the owner, after signing in" },
+    { value: "public", label: "Public", hint: "Anyone with the URL", tone: "blue" },
+    { value: "users", label: "Signed-in users", hint: "Anyone who can sign in to this gate2sky", tone: "orange" },
+    { value: "private", label: "Private", hint: "Only the owner, after signing in", tone: "pink" },
   ]
   const pick = value => {
     $updateModel(value)
@@ -15,8 +15,14 @@
   }
 </script>
 
-<label class="radio" :each="option in OPTIONS" :key="option.value">
+<label class="radio" :class="'tone-' + option.tone" :each="option in OPTIONS" :key="option.value">
   <input type="radio" :name="name" :value="option.value" :checked="model === option.value" :disabled="disabled"
          @change="pick(option.value)">
-  <span><strong>{{ option.label }}</strong> <span class="muted">— {{ option.hint }}</span></span>
+  <span class="radio-icon" aria-hidden="true">
+    <svg :if="option.value === 'public'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg>
+    <svg :elseif="option.value === 'users'" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-6 6.5-6s5.9 2.4 6.5 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2 .7 3.3 2.9 3.5 6"/></svg>
+    <svg :else viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+  </span>
+  <span class="radio-text"><strong>{{ option.label }}</strong> <span class="muted">{{ option.hint }}</span></span>
+  <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
 </label>

@@ -66,23 +66,23 @@
 
 <section class="card">
   <h2>Profile</h2>
-  <dl class="stats">
-    <div><dt>Email</dt><dd>{{ app.user.email }}</dd></div>
-    <div :if="app.user.name"><dt>Name</dt><dd>{{ app.user.name }}</dd></div>
-    <div><dt>Member since</dt><dd>{{ date(app.user.created_at) }}</dd></div>
+  <dl class="stats stats-3">
+    <div class="tone-blue"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Email</dt><dd>{{ app.user.email }}</dd></div>
+    <div :if="app.user.name" class="tone-purple"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg>Name</dt><dd>{{ app.user.name }}</dd></div>
+    <div class="tone-green"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Member since</dt><dd>{{ date(app.user.created_at) }}</dd></div>
   </dl>
 </section>
 
 <section :if="app.passkeys" class="card">
-  <div class="card-head"><h2>Passkeys</h2><span class="muted">{{ passkeys.length }}</span></div>
+  <div class="card-head"><h2>Passkeys</h2><span class="count">{{ passkeys.length }}</span></div>
   <p class="muted">Sign in without email codes. Each device or password manager has its own passkey.</p>
   <div :if="passkeys.length" class="table-wrap">
     <table class="table">
-      <thead><tr><th>Name</th><th>Added</th><th>Last used</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th class="hide-narrow">Added</th><th>Last used</th><th></th></tr></thead>
       <tbody>
         <tr :each="passkey in passkeys" :key="passkey.id">
           <td>{{ passkey.name }}</td>
-          <td>{{ ago(passkey.created_at) }}</td>
+          <td class="hide-narrow">{{ ago(passkey.created_at) }}</td>
           <td>{{ ago(passkey.last_used_at) }}</td>
           <td class="right"><button type="button" class="link danger" @click="removePasskey(passkey)">Remove</button></td>
         </tr>

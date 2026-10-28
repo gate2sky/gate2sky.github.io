@@ -3,6 +3,8 @@ facing each other across an encrypted link. Requests leave the globe as
 plain text, cross the link scrambled, and reach the house as plain text
 again; responses go back the same way."""
 import math
+import os
+import re
 
 ANG = math.radians(27)          # the link's slope
 CX, CY = 244, 212               # the link's middle
@@ -31,19 +33,15 @@ DOOR = (HOUSE[0] + 13.5, HOUSE[1] + 22)
 
 
 def gate(name, at, rot=math.degrees(ANG), scale=1.0):
-    """A gate: a ring, its glowing surface and three lamps; nothing more."""
+    """A gate, as in the logo: a halo, an opening lit from its center, ripples
+    crossing it and a bright ring; nothing more."""
     x, y = at
-    lamps = []
-    for i, t in enumerate((-90, -128, -52)):
-        r = math.radians(t)
-        lamps.append(f'<circle class="lamp" style="--i:{i}" cx="{f(21 * math.cos(r))}" cy="{f(58 * math.sin(r))}" r="3.4"/>')
     size = f" scale({f(scale)})" if scale != 1 else ""
     return f'''<g class="gate gate-{name}" transform="translate({f(x)} {f(y)}) rotate({f(rot)}){size}">
-          <ellipse class="horizon" rx="17" ry="52"/>
-          <ellipse class="shimmer" rx="17" ry="52"/>
-          <ellipse class="ring" rx="21" ry="58"/>
-          <ellipse class="ring-edge" rx="26" ry="64"/>
-          {"".join(lamps)}
+          <ellipse class="halo" rx="26" ry="64"/>
+          <ellipse class="horizon" rx="18" ry="54"/>
+          <ellipse class="shimmer" rx="18" ry="54"/>
+          <ellipse class="ring" rx="18" ry="54"/>
         </g>'''
 
 
@@ -111,14 +109,18 @@ def hero():
     return f'''<svg class="duo" viewBox="0 40 480 360" role="img" aria-label="Two gates linked by an encrypted tunnel: one on the internet, one at home. Requests reach the first gate in plain text, cross the link scrambled, and arrive home readable again; responses travel back the same way.">
         <defs>
           <clipPath id="link-clip"><rect x="-74" y="-15" width="148" height="30" rx="15"/></clipPath>
+          <clipPath id="earth-clip"><circle r="34"/></clipPath>
         </defs>
 
         <!-- the internet: a globe, visitors circling it -->
         <g class="globe" transform="translate({f(gx)} {f(gy)})">
+          <circle class="aura" r="40"/>
           <circle class="sphere" r="34"/>
-          <ellipse class="meridian m1" rx="34" ry="34"/>
-          <ellipse class="meridian m2" rx="17" ry="34"/>
-          <path class="parallel" d="M-34 0H34M-29.4 -17H29.4M-29.4 17H29.4"/>
+          <g clip-path="url(#earth-clip)">
+            <ellipse class="meridian m1" rx="15" ry="34"/>
+            <ellipse class="meridian m2" rx="15" ry="34"/>
+            <path class="parallel" d="M-34 0H34M-34 -15.5H34M-34 15.5H34"/>
+          </g>
           <circle class="visitor" r="3.2"><animateMotion dur="7s" repeatCount="indefinite" path="M-48 0a48 18 -20 1 0 96 0a48 18 -20 1 0 -96 0"/></circle>
           <circle class="visitor" r="2.6"><animateMotion dur="7s" begin="-2.4s" repeatCount="indefinite" path="M-48 0a48 18 -20 1 0 96 0a48 18 -20 1 0 -96 0"/></circle>
           <circle class="visitor" r="2.2"><animateMotion dur="7s" begin="-4.7s" repeatCount="indefinite" path="M-48 0a48 18 -20 1 0 96 0a48 18 -20 1 0 -96 0"/></circle>
@@ -129,10 +131,12 @@ def hero():
         <path class="wire" d="{seg1}"/>
         <path class="wire" d="{seg3}"/>
 
-        <!-- the link: a tube with two strands twisting through it -->
+        <!-- the link: a beam of energy with two strands twisting through it -->
         <g transform="translate({f(CX)} {f(CY)}) rotate({deg})">
+          <path class="beam-haze" d="M-74 0H74"/>
           <path class="tube" d="M-74 0H74"/>
-          <path class="tube-edge" d="M-74 -15H74M-74 15H74"/>
+          <path class="tube-glow" d="M-74 0H74"/>
+          <path class="beam-core" d="M-74 0H74"/>
           <g clip-path="url(#link-clip)">
             <g class="twist">
               <path class="strand s1" d="{strand(0)}"/>
@@ -152,6 +156,7 @@ def hero():
 
         <!-- home -->
         <g class="house" transform="translate({f(hx)} {f(hy)})">
+          <circle class="hearth" cx="-13" cy="5" r="18"/>
           <path class="fill" d="M-32 -12 L0 -38 L32 -12 V34 H-32 Z"/>
           <path class="roof" d="M-40 -6 L0 -40 L40 -6"/>
           <path class="walls" d="M-32 -12 V34 H32 V-12"/>
@@ -173,12 +178,15 @@ def hero():
 
 
 def brand():
-    """The logo: two small gates and the link between them."""
-    return '''<svg viewBox="0 0 40 40" aria-hidden="true">
-        <path d="M11 26 L29 14" stroke="#ffa23a" stroke-width="2.4" stroke-linecap="round"/>
-        <g transform="translate(9 27.5) rotate(-34)"><ellipse rx="4.6" ry="9.5" fill="url(#horizon)"/><ellipse rx="4.6" ry="9.5" fill="none" stroke="url(#metal)" stroke-width="3"/></g>
-        <g transform="translate(31 12.5) rotate(-34)"><ellipse rx="4.6" ry="9.5" fill="url(#horizon)"/><ellipse rx="4.6" ry="9.5" fill="none" stroke="url(#metal)" stroke-width="3"/></g>
-      </svg>'''
+    """The logo, inline: pages/favicon.svg, the same file as the dashboard's
+    logo, with its ids prefixed so they cannot clash with the page's."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../pages/favicon.svg")
+    svg = open(path).read()
+    svg = re.sub(r"<!--.*?-->\s*", "", svg, flags=re.S)
+    svg = re.sub(r'id="([\w-]+)"', r'id="logo-\1"', svg)
+    svg = re.sub(r"url\(#([\w-]+)\)", r"url(#logo-\1)", svg)
+    svg = svg.replace('xmlns="http://www.w3.org/2000/svg" ', "").replace("<svg ", '<svg aria-hidden="true" ', 1)
+    return svg.strip()
 
 
 def flow_strands(cx, cy, length, rot=0):

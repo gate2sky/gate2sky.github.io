@@ -130,13 +130,13 @@
   <section class="card">
     <h2>Connection</h2>
     <div :if="sub.tunnel">
-      <dl class="stats">
-        <div><dt>Client</dt><dd>{{ sub.tunnel.client_addr }}</dd></div>
-        <div><dt>SSH key</dt><dd>{{ sub.tunnel.key_name }}</dd></div>
-        <div><dt>Connected</dt><dd>{{ ago(sub.tunnel.created_at) }}</dd></div>
-        <div><dt>Requests</dt><dd>{{ sub.tunnel.requests }}</dd></div>
-        <div><dt>Traffic in / out</dt><dd>{{ bytes(sub.tunnel.bytes_in) }} / {{ bytes(sub.tunnel.bytes_out) }}</dd></div>
-        <div><dt>Open streams</dt><dd>{{ sub.tunnel.active_conns }}</dd></div>
+      <dl class="stats stats-3">
+        <div class="tone-blue"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg>Client</dt><dd>{{ sub.tunnel.client_addr }}</dd></div>
+        <div class="tone-purple"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M21 12v2"/></svg>SSH key</dt><dd>{{ sub.tunnel.key_name }}</dd></div>
+        <div class="tone-green"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Connected</dt><dd>{{ ago(sub.tunnel.created_at) }}</dd></div>
+        <div class="tone-orange"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6"/></svg>Requests</dt><dd>{{ sub.tunnel.requests }}</dd></div>
+        <div class="tone-teal"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 20V4M4 8l4-4 4 4M16 4v16M12 16l4 4 4-4"/></svg>Traffic in / out</dt><dd>{{ bytes(sub.tunnel.bytes_in) }} / {{ bytes(sub.tunnel.bytes_out) }}</dd></div>
+        <div class="tone-pink"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg>Open streams</dt><dd>{{ sub.tunnel.active_conns }}</dd></div>
       </dl>
       <button type="button" class="button button-secondary" @click="disconnect">Disconnect</button>
       <p class="muted">To connect again later, or from another machine with an authorized key:</p>
@@ -156,17 +156,17 @@
   </section>
 
   <section class="card">
-    <div class="card-head"><h2>SSH keys</h2><span class="muted">{{ sub.key_list.length }} of {{ app.limits.keys }}</span></div>
+    <div class="card-head"><h2>SSH keys</h2><span class="count">{{ sub.key_list.length }} of {{ app.limits.keys }}</span></div>
     <p class="muted">Only these keys can open the tunnel for {{ sub.name }}.{{ app.domain }}.</p>
     <div :if="sub.key_list.length" class="table-wrap">
       <table class="table">
-        <thead><tr><th>Name</th><th>Fingerprint</th><th>Added</th><th>Last used</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Fingerprint</th><th class="hide-narrow">Added</th><th class="hide-narrow">Last used</th><th></th></tr></thead>
         <tbody>
           <tr :each="key in sub.key_list" :key="key.id">
             <td>{{ key.name }} <div class="muted small">{{ key.type }}</div></td>
             <td><code class="small">{{ key.fingerprint }}</code></td>
-            <td>{{ ago(key.created_at) }}</td>
-            <td>{{ ago(key.last_used_at) }}</td>
+            <td class="hide-narrow">{{ ago(key.created_at) }}</td>
+            <td class="hide-narrow">{{ ago(key.last_used_at) }}</td>
             <td class="right"><button type="button" class="link danger" @click="removeKey(key)">Remove</button></td>
           </tr>
         </tbody>

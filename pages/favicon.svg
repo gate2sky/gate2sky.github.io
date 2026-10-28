@@ -1,24 +1,53 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
-  <!-- A gate, its link, and the internet at the other end. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- gate2sky: a glowing gate, the energy channel it opens, and the
+       internet at the other end. -->
   <defs>
-    <radialGradient id="h">
-      <stop offset="0" stop-color="#bff4ff"/>
-      <stop offset=".6" stop-color="#2a9dff"/>
-      <stop offset="1" stop-color="#2346d6"/>
+    <radialGradient id="portal" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".35" stop-color="#b8f6ff"/>
+      <stop offset=".75" stop-color="#2fd0ff"/>
+      <stop offset="1" stop-color="#0a84ff"/>
     </radialGradient>
-    <radialGradient id="s" cx=".36" cy=".32" r=".8">
-      <stop offset="0" stop-color="#bff4ff"/>
-      <stop offset=".55" stop-color="#2a9dff"/>
-      <stop offset="1" stop-color="#2346d6"/>
+    <!-- Lighter at the gate, where the energy comes from. -->
+    <linearGradient id="beam" gradientUnits="userSpaceOnUse" x1="19" y1="44.5" x2="32" y2="32.5">
+      <stop offset="0" stop-color="#fff8d6"/>
+      <stop offset=".35" stop-color="#ffd84d"/>
+      <stop offset="1" stop-color="#ff8a1f"/>
+    </linearGradient>
+    <radialGradient id="globe" cx=".35" cy=".3" r=".8">
+      <stop offset="0" stop-color="#a8e4ff"/>
+      <stop offset=".5" stop-color="#2a9dff"/>
+      <stop offset="1" stop-color="#1650d8"/>
     </radialGradient>
+    <clipPath id="earth"><circle cx="42" cy="22" r="13.5"/></clipPath>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.4"/>
+    </filter>
+    <filter id="haze" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3.4"/>
+    </filter>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation=".7"/>
+    </filter>
   </defs>
-  <path d="M11 26 L29 14" stroke="#ffa23a" stroke-width="3.2" stroke-linecap="round"/>
-  <g transform="translate(9 27.5) rotate(-34)">
-    <ellipse rx="5.4" ry="10.5" fill="url(#h)" stroke="#48526b" stroke-width="2.6"/>
+  <rect width="64" height="64" rx="14.5" fill="#121a33"/>
+
+  <!-- The channel, with its glow. -->
+  <path d="M19 44.5 32 32.5" stroke="url(#beam)" stroke-width="11" stroke-linecap="round" opacity=".5" filter="url(#haze)"/>
+  <path d="M19 44.5 32 32.5" stroke="url(#beam)" stroke-width="5" stroke-linecap="round" filter="url(#soft)"/>
+
+  <!-- The globe, larger than the gate. -->
+  <circle cx="42" cy="22" r="14.5" fill="#2a9dff" opacity=".45" filter="url(#glow)"/>
+  <circle cx="42" cy="22" r="13.5" fill="url(#globe)"/>
+  <g fill="none" stroke="#e6faff" stroke-width="1.5" opacity=".9" clip-path="url(#earth)">
+    <ellipse cx="42" cy="22" rx="5.9" ry="13.5"/>
+    <path d="M28.5 22h27M30 15.8h24M30 28.2h24"/>
   </g>
-  <circle cx="30.5" cy="11.5" r="8.6" fill="url(#s)"/>
-  <g fill="none" stroke="#e6faff" stroke-width="1.2" opacity=".9">
-    <ellipse cx="30.5" cy="11.5" rx="3.78" ry="8.6"/>
-    <path d="M21.9 11.5h17.2M22.82 7.63h15.36M22.82 15.37h15.36"/>
+
+  <!-- The gate: a ring around a glowing opening. -->
+  <g transform="translate(16 46.5) rotate(-38)">
+    <ellipse rx="7.6" ry="12.4" fill="#2fd0ff" opacity=".7" filter="url(#glow)"/>
+    <ellipse rx="6" ry="10.8" fill="url(#portal)"/>
+    <ellipse rx="6" ry="10.8" fill="none" stroke="#dffaff" stroke-width="2.4"/>
   </g>
 </svg>
