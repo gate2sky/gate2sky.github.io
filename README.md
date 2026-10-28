@@ -254,18 +254,27 @@ signing in with email codes, a software WebAuthn authenticator and a fake
 OpenID Connect provider, and the configuration wizard against a live admin
 socket.
 
-### Releases and the landing
+### Builds and releases
 
-Run the **Release** workflow from the Actions tab, choosing patch, minor or
-major. It tags the version, attaches `securegate-<os>-<arch>.tar.gz` for
-Linux and macOS (amd64, arm64) with `SHA256SUMS`, publishes the Docker image
-and deploys [`pages/`](pages/) — the landing and `setup.sh` — to GitHub Pages
-(enable it once in Settings → Pages → Source: GitHub Actions).
+Two workflows:
+
+- **Build** (`.github/workflows/build.yml`) runs on every push: downloads
+  and verifies the dependencies, runs the tests, builds
+  `securegate-<os>-<arch>.tar.gz` for Linux and macOS (amd64, arm64), walks
+  the installer against this tree, builds the Docker image, renders the Helm
+  chart and checks the landing.
+- **Release** (`.github/workflows/release.yml`) is started by hand from the
+  Actions tab on the default branch, choosing `patch`, `minor` or `major`. It
+  raises [`VERSION`](VERSION) and the Helm chart's version, commits and tags
+  `vX.Y.Z`, runs Build on that commit, creates the GitHub release with the
+  binaries and `SHA256SUMS` (what `setup.sh` installs), pushes the Docker image
+  to GHCR and deploys [`pages/`](pages/) — the landing and `setup.sh` — to
+  GitHub Pages. `dry-run` builds everything and publishes nothing.
 
 The landing is built from [`scripts/landing`](scripts/landing): edit
 `template.html` (or the drawings in `hero.py`, whose geometry is computed),
 then run `python3 scripts/landing/gen.py scripts/landing/template.html
-pages/index.html`. CI checks that the two agree.
+pages/index.html`. Build checks that the two agree.
 
 ## Roadmap
 

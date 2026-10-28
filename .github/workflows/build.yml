@@ -1,0 +1,178 @@
+name: Build
+
+# Every push: dependencies, tests, the binaries the installer downloads, the
+# Docker image, the Helm chart and the landing. The release runs this same
+# workflow on the commit that raises the version, and publishes what it built.
+on:
+  push:
+    branches: ["**"]
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to build. Defaults to the caller's ref.
+        type: string
+        default: ""
+      version:
+        description: Version stamped into the binaries. Defaults to VERSION plus -dev and the commit.
+        type: string
+        default: ""
+      pages:
+        description: Upload the GitHub Pages artifact for the caller to deploy.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Dependencies
+        run: go mod download && go mod verify
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - run: go test -race ./...
+      - name: Compiles for every platform
+        run: |
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/securegate
+          done
+      - name: Version
+        id: version
+        run: |
+          version="${{ inputs.version }}"
+          if [ -z "$version" ]; then
+            version="$(cat VERSION)-dev+$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building securegate $version"
+
+  # The four targets pages/setup.sh installs. Pure Go (the SQLite driver too),
+  # so every one is a static binary cross-compiled here.
+  binary:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build securegate-${{ matrix.target }}.tar.gz
+        run: |
+          set -euo pipefail
+          target=${{ matrix.target }}
+          mkdir -p "dist/securegate-$target"
+          CGO_ENABLED=0 GOOS=${target%-*} GOARCH=${target#*-} go build -trimpath \
+            -ldflags "-s -w -X main.version=${{ needs.test.outputs.version }}" \
+            -o "dist/securegate-$target/securegate" ./cmd/securegate
+          cp README.md "dist/securegate-$target/"
+          # The layout pages/setup.sh unpacks: securegate-<target>/securegate.
+          tar -czf "dist/securegate-$target.tar.gz" -C dist "securegate-$target"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: securegate-${{ matrix.target }}
+          path: dist/securegate-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+
+  # The one-line installer walked against builds of this tree: install,
+  # update, reinstall, a bad checksum, uninstall and purge, in the sh that
+  # `curl … | sh` lands in on each system.
+  installer:
+    needs: test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: shellcheck
+        if: runner.os == 'Linux'
+        run: shellcheck -s sh pages/setup.sh && shellcheck scripts/setup-check.sh
+      - run: scripts/setup-check.sh
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - run: docker build --build-arg VERSION=${{ needs.test.outputs.version }} -t securegate:build .
+      - run: docker run --rm securegate:build version
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/securegate
+      - name: Render with the default values
+        run: helm template sg deploy/helm/securegate > default.yaml
+      - name: Render with a LoadBalancer for SSH, cert-manager and secrets
+        run: |
+          helm template sg deploy/helm/securegate \
+            --set domain=tunnels.example.org \
+            --set traefik.ssh.enabled=false --set sshService.enabled=true \
+            --set certManager.enabled=true \
+            --set secretEnv.SMTP_PASSWORD=x > alt.yaml
+      - name: Check the rendered configuration
+        run: |
+          grep -q 'proxy_protocol: true' default.yaml
+          grep -q 'proxy_protocol: false' alt.yaml
+          grep -q 'public_url: https://tunnels.example.org' alt.yaml
+          grep -q 'kind: IngressRouteTCP' default.yaml
+          ! grep -q 'kind: IngressRouteTCP' alt.yaml
+          grep -q 'kind: Certificate' alt.yaml
+          grep -q "image: \"ghcr.io/jgermade/securegate:$(cat VERSION)\"" default.yaml
+
+  # What Pages serves: pages/ as it is, the landing and setup.sh. Every push
+  # checks it; only a release deploys it.
+  pages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: The landing is self-contained and built from its template
+        run: |
+          set -euo pipefail
+          if grep -rInE '(src|href)="https?://' pages/ | grep -vE 'https://(github\.com|jgermade\.github\.io)/'; then
+            echo "::error::pages/ must not load anything from another host"
+            exit 1
+          fi
+          python3 scripts/landing/gen.py scripts/landing/template.html "$RUNNER_TEMP/index.html"
+          cmp "$RUNNER_TEMP/index.html" pages/index.html || {
+            echo "::error::pages/index.html is out of date: run python3 scripts/landing/gen.py scripts/landing/template.html pages/index.html"
+            exit 1
+          }
+          test -s pages/setup.sh
+      - uses: actions/upload-pages-artifact@v3
+        if: ${{ inputs.pages }}
+        with:
+          path: pages

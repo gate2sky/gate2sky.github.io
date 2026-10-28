@@ -1,5 +1,9 @@
 name: Release
 
+# Started by hand from the Actions tab, on the default branch: raises the
+# version, builds that commit with build.yml, publishes the GitHub release
+# with the binaries pages/setup.sh installs and the Docker image, and deploys
+# the landing to GitHub Pages.
 on:
   workflow_dispatch:
     inputs:
@@ -29,6 +33,7 @@ jobs:
     outputs:
       version: ${{ steps.bump.outputs.version }}
       tag: ${{ steps.bump.outputs.tag }}
+      sha: ${{ steps.bump.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,10 +42,12 @@ jobs:
         id: bump
         run: |
           set -euo pipefail
-          # The version lives in the tags: the newest v* tag, or 0.0.0.
-          current=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)
-          current=${current#v}
-          current=${current:-0.0.0}
+          if [ "${{ inputs.dry-run }}" != "true" ] && [ "$GITHUB_REF_NAME" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "::error::release from ${{ github.event.repository.default_branch }}, not $GITHUB_REF_NAME (or tick dry-run)"
+            exit 1
+          fi
+
+          current=$(cat VERSION)
           IFS=. read -r major minor patch <<< "$current"
           case "${{ inputs.bump }}" in
             major) major=$((major + 1)); minor=0; patch=0 ;;
@@ -49,38 +56,44 @@ jobs:
           esac
           next="$major.$minor.$patch"
           echo "$current → $next"
+          if git rev-parse -q --verify "refs/tags/v$next" >/dev/null; then
+            echo "::error::v$next already exists"
+            exit 1
+          fi
+
+          # The version lives in VERSION; the Helm chart follows it, so its
+          # default image is the one this release publishes.
+          echo "$next" > VERSION
+          sed -i -E "s/^version: .*/version: $next/; s/^appVersion: .*/appVersion: \"$next\"/" deploy/helm/securegate/Chart.yaml
+          git diff
+
           echo "version=$next" >> "$GITHUB_OUTPUT"
           echo "tag=v$next" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            echo "dry run: leaving the bump uncommitted"
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-  binaries:
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION deploy/helm/securegate/Chart.yaml
+          git commit -m "Release v$next"
+          git tag -a "v$next" -m "v$next"
+          git push origin HEAD --follow-tags
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
     needs: version
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: Build securegate-${{ matrix.target }}.tar.gz
-        run: |
-          set -euo pipefail
-          target=${{ matrix.target }}
-          mkdir -p "dist/securegate-$target"
-          CGO_ENABLED=0 GOOS=${target%-*} GOARCH=${target#*-} go build -trimpath \
-            -ldflags "-s -w -X main.version=${{ needs.version.outputs.version }}" \
-            -o "dist/securegate-$target/securegate" ./cmd/securegate
-          cp README.md "dist/securegate-$target/"
-          # The layout pages/setup.sh unpacks: securegate-<target>/securegate.
-          tar -czf "dist/securegate-$target.tar.gz" -C dist "securegate-$target"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: securegate-${{ matrix.target }}
-          path: dist/securegate-${{ matrix.target }}.tar.gz
+    uses: ./.github/workflows/build.yml
+    with:
+      # The bump is a new commit: build it, not the commit the release started from.
+      ref: ${{ needs.version.outputs.sha }}
+      version: ${{ needs.version.outputs.version }}
+      pages: true
 
   publish:
-    needs: [version, binaries]
+    needs: [version, build]
     if: ${{ !inputs.dry-run }}
     runs-on: ubuntu-latest
     steps:
@@ -98,7 +111,7 @@ jobs:
           (cd dist && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS)
           gh release create "${{ needs.version.outputs.tag }}" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
+            --verify-tag \
             --title "${{ needs.version.outputs.tag }}" \
             --generate-notes \
             dist/*.tar.gz dist/SHA256SUMS
@@ -108,6 +121,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -126,5 +141,11 @@ jobs:
             ghcr.io/${{ github.repository }}:latest
 
   pages:
-    needs: publish
-    uses: ./.github/workflows/pages.yml
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
