@@ -156,17 +156,17 @@
   </section>
 
   <section class="card">
-    <div class="card-head"><h2>SSH keys</h2><span class="muted">{{ sub.key_list.length }} of {{ app.limits.keys }}</span></div>
+    <div class="card-head"><h2>SSH keys</h2><span class="count">{{ sub.key_list.length }} of {{ app.limits.keys }}</span></div>
     <p class="muted">Only these keys can open the tunnel for {{ sub.name }}.{{ app.domain }}.</p>
     <div :if="sub.key_list.length" class="table-wrap">
       <table class="table">
-        <thead><tr><th>Name</th><th>Fingerprint</th><th>Added</th><th>Last used</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Fingerprint</th><th class="hide-narrow">Added</th><th class="hide-narrow">Last used</th><th></th></tr></thead>
         <tbody>
           <tr :each="key in sub.key_list" :key="key.id">
             <td>{{ key.name }} <div class="muted small">{{ key.type }}</div></td>
             <td><code class="small">{{ key.fingerprint }}</code></td>
-            <td>{{ ago(key.created_at) }}</td>
-            <td>{{ ago(key.last_used_at) }}</td>
+            <td class="hide-narrow">{{ ago(key.created_at) }}</td>
+            <td class="hide-narrow">{{ ago(key.last_used_at) }}</td>
             <td class="right"><button type="button" class="link danger" @click="removeKey(key)">Remove</button></td>
           </tr>
         </tbody>

@@ -54,29 +54,34 @@
 
 <div class="page-head">
   <h1>Your subdomains</h1>
-  <span class="muted">{{ subdomains.length }} of {{ app.limits.subdomains }}</span>
+  <span class="count">{{ subdomains.length }} of {{ app.limits.subdomains }}</span>
 </div>
 
 <div :if="loadError" class="flash flash-error" role="alert">{{ loadError }}</div>
 
-<div :if="subdomains.length" class="table-wrap">
-  <table class="table">
-    <thead><tr><th>Subdomain</th><th>Status</th><th>Access</th><th>SSH keys</th><th></th></tr></thead>
-    <tbody>
-      <tr :each="sub in subdomains" :key="sub.name">
-        <td>
-          <a :href="'/subdomains/' + encodeURIComponent(sub.name)"><strong>{{ sub.name }}</strong></a>
-          <div class="muted small">{{ sub.url }}</div>
-        </td>
-        <td><StatusBadge :tunnel="sub.tunnel" /> <span :if="sub.tunnel" class="muted small">{{ ago(sub.tunnel.created_at) }}</span></td>
-        <td><span class="badge" :class="'badge-' + sub.access">{{ sub.access }}</span></td>
-        <td>{{ sub.keys }}</td>
-        <td class="right"><a :href="'/subdomains/' + encodeURIComponent(sub.name)">Manage →</a></td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+<section :if="subdomains.length" class="card">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Subdomain</th><th>Status</th><th>Access</th><th class="hide-narrow">SSH keys</th><th class="hide-narrow"></th></tr></thead>
+      <tbody>
+        <tr :each="sub in subdomains" :key="sub.name">
+          <td>
+            <a class="name-cell" :href="'/subdomains/' + encodeURIComponent(sub.name)">
+              <span class="tile" :class="'tile-' + sub.access" aria-hidden="true">{{ sub.name[0] }}</span>
+              <span><strong>{{ sub.name }}</strong><span class="url muted small">{{ sub.url }}</span></span>
+            </a>
+          </td>
+          <td><StatusBadge :tunnel="sub.tunnel" /><span :if="sub.tunnel" class="muted small hide-narrow">{{ ago(sub.tunnel.created_at) }}</span></td>
+          <td><span class="badge" :class="'badge-' + sub.access">{{ sub.access }}</span></td>
+          <td class="hide-narrow">{{ sub.keys }}</td>
+          <td class="right hide-narrow"><a :href="'/subdomains/' + encodeURIComponent(sub.name)">Manage</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 <div :elseif="!loadError" class="card empty">
+  <svg class="empty-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
   <p>No subdomains yet. Register one below with your SSH public key, then connect with <code>ssh -R</code>.</p>
 </div>
 

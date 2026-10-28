@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- gate2sky: two gates and the link between them, on a night sky. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2=".35" y2="1">
+      <stop offset="0" stop-color="#0d1340"/>
+      <stop offset=".55" stop-color="#1f3cb8"/>
+      <stop offset="1" stop-color="#3f8cff"/>
+    </linearGradient>
+    <radialGradient id="horizon" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#e4fbff"/>
+      <stop offset=".3" stop-color="#7fe0ff"/>
+      <stop offset=".62" stop-color="#2a9dff"/>
+      <stop offset="1" stop-color="#1a2fa8"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".45" stop-color="#c3cce0"/>
+      <stop offset="1" stop-color="#7d89a8"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
+      <stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14.5" fill="url(#sky)"/>
+  <g fill="#fff">
+    <circle cx="13" cy="12" r="1.1" opacity=".9"/>
+    <circle cx="25" cy="7.5" r=".7" opacity=".7"/>
+    <circle cx="8" cy="25" r=".7" opacity=".6"/>
+    <circle cx="56" cy="40" r=".9" opacity=".7"/>
+    <circle cx="50" cy="54" r=".7" opacity=".5"/>
+    <circle cx="33" cy="15" r=".6" opacity=".55"/>
+  </g>
+  <path d="M19 43.5 45 20.5" stroke="#ffa23a" stroke-opacity=".35" stroke-width="7" stroke-linecap="round"/>
+  <path d="M19 43.5 45 20.5" stroke="#ffb24f" stroke-width="3.2" stroke-linecap="round"/>
+  <g transform="translate(18 44.5) rotate(-38)">
+    <ellipse rx="6.6" ry="12.6" fill="url(#horizon)"/>
+    <ellipse rx="6.6" ry="12.6" fill="none" stroke="url(#rim)" stroke-width="3.4"/>
+  </g>
+  <g transform="translate(46 19.5) rotate(-38)">
+    <ellipse rx="6.6" ry="12.6" fill="url(#horizon)"/>
+    <ellipse rx="6.6" ry="12.6" fill="none" stroke="url(#rim)" stroke-width="3.4"/>
+  </g>
+  <rect width="64" height="64" rx="14.5" fill="url(#gloss)"/>
+  <rect x=".5" y=".5" width="63" height="63" rx="14" fill="none" stroke="#fff" stroke-opacity=".18"/>
+</svg>

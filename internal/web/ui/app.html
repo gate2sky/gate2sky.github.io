@@ -21,17 +21,20 @@
 <header class="topbar">
   <div class="wrap topbar-inner">
     <a class="brand" href="/">
-      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="currentColor" opacity=".18"/><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11.5V10a3 3 0 0 1 6 0v1.5M8.5 11.5h7v5h-7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-      gate2sky
+      <img class="logo" src="/ui/logo.svg" alt="">
+      <span class="brand-name">gate2sky</span>
     </a>
     <nav class="nav" :if="app.user">
-      <a href="/" :class.active="section === 'subdomains'">Subdomains</a>
-      <a href="/admin" :if="app.user.admin" :class.active="section === 'admin'">Admin</a>
-      <a href="/account" class="who" :class.active="section === 'account'">
+      <div class="segmented">
+        <a href="/" :class.active="section === 'subdomains'">Subdomains</a>
+        <a href="/admin" :if="app.user.admin" :class.active="section === 'admin'">Admin</a>
+      </div>
+      <a href="/account" class="who" :class.active="section === 'account'" title="Account">
         <img :if="app.user.avatar_url" class="avatar" :src="app.user.avatar_url" alt="">
+        <span :else class="avatar" aria-hidden="true">{{ app.user.email[0] }}</span>
         <span>{{ app.user.email }}</span>
       </a>
-      <button type="button" class="link" @click="signOut">Sign out</button>
+      <button type="button" class="button button-plain" @click="signOut">Sign out</button>
     </nav>
   </div>
 </header>

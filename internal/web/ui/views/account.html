@@ -74,15 +74,15 @@
 </section>
 
 <section :if="app.passkeys" class="card">
-  <div class="card-head"><h2>Passkeys</h2><span class="muted">{{ passkeys.length }}</span></div>
+  <div class="card-head"><h2>Passkeys</h2><span class="count">{{ passkeys.length }}</span></div>
   <p class="muted">Sign in without email codes. Each device or password manager has its own passkey.</p>
   <div :if="passkeys.length" class="table-wrap">
     <table class="table">
-      <thead><tr><th>Name</th><th>Added</th><th>Last used</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th class="hide-narrow">Added</th><th>Last used</th><th></th></tr></thead>
       <tbody>
         <tr :each="passkey in passkeys" :key="passkey.id">
           <td>{{ passkey.name }}</td>
-          <td>{{ ago(passkey.created_at) }}</td>
+          <td class="hide-narrow">{{ ago(passkey.created_at) }}</td>
           <td>{{ ago(passkey.last_used_at) }}</td>
           <td class="right"><button type="button" class="link danger" @click="removePasskey(passkey)">Remove</button></td>
         </tr>

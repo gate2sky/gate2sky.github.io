@@ -5,9 +5,9 @@
   //   <AccessOptions :model="access" />
   //   <AccessOptions :model="sub.access" @pick="save($event.detail)" />
   const OPTIONS = [
-    { value: "public", label: "Public", hint: "anyone with the URL" },
-    { value: "users", label: "Signed-in users", hint: "anyone who can sign in to this gate2sky" },
-    { value: "private", label: "Private", hint: "only the owner, after signing in" },
+    { value: "public", label: "Public", hint: "Anyone with the URL" },
+    { value: "users", label: "Signed-in users", hint: "Anyone who can sign in to this gate2sky" },
+    { value: "private", label: "Private", hint: "Only the owner, after signing in" },
   ]
   const pick = value => {
     $updateModel(value)
@@ -18,5 +18,5 @@
 <label class="radio" :each="option in OPTIONS" :key="option.value">
   <input type="radio" :name="name" :value="option.value" :checked="model === option.value" :disabled="disabled"
          @change="pick(option.value)">
-  <span><strong>{{ option.label }}</strong> <span class="muted">— {{ option.hint }}</span></span>
+  <span><strong>{{ option.label }}</strong> <span class="muted">{{ option.hint }}</span></span>
 </label>
