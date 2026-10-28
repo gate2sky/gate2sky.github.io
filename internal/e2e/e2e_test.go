@@ -652,6 +652,20 @@ func TestDashboardManagesSubdomains(t *testing.T) {
 	if resp, body := call(t, b, "PATCH", "/api/subdomains/myapp", map[string]string{"access": "everyone"}); resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("invalid access: %d %s", resp.StatusCode, body)
 	}
+	// Renaming the key renames it on the live tunnel too.
+	keyPath := fmt.Sprintf("/api/subdomains/myapp/keys/%d", detail.KeyList[0].ID)
+	if resp, body := call(t, b, "PATCH", keyPath, map[string]string{"name": "  work laptop "}); resp.StatusCode != http.StatusOK || !strings.Contains(body, `"work laptop"`) {
+		t.Errorf("rename key: %d %s", resp.StatusCode, body)
+	}
+	if resp, body := call(t, b, "PATCH", keyPath, map[string]string{"name": " "}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("rename key to nothing: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := call(t, other, "PATCH", keyPath, map[string]string{"name": "mine"}); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("other user renames key: %d", resp.StatusCode)
+	}
+	if tun := h.registry.Get("myapp"); tun == nil || tun.Stats().KeyName != "work laptop" {
+		t.Errorf("live tunnel key name not updated")
+	}
 	if resp, _ := call(t, b, "DELETE", fmt.Sprintf("/api/subdomains/myapp/keys/%d", detail.KeyList[0].ID), nil); resp.StatusCode != http.StatusNoContent {
 		t.Errorf("remove key: %d", resp.StatusCode)
 	}

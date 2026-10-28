@@ -290,6 +290,8 @@ main.wrap { padding-top: 24px; padding-bottom: 40px; }
 .table td a strong { color: var(--fg); font-weight: 600; }
 .table td a:hover strong { color: var(--link); }
 .card > .table-wrap + * { margin-top: 14px; }
+.row-actions { white-space: nowrap; }
+.row-actions button + button { margin-left: 14px; }
 
 .name-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
 a.name-cell:hover { text-decoration: none; }
@@ -364,6 +366,9 @@ form.inline { display: inline; }
 .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .form-row input { flex: 1 1 220px; width: auto; }
 .form-row .button { flex: 1 0 auto; }
+.rename { gap: 8px; }
+.rename input[name] { flex: 1 1 140px; min-width: 0; padding-top: 5px; padding-bottom: 5px; }
+.rename .button { flex: none; padding-top: 5px; padding-bottom: 5px; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 legend { font-weight: 600; font-size: 13px; margin-bottom: 6px; padding: 0; }
 

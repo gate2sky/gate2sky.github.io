@@ -192,6 +192,26 @@ func (s *Server) handleAddKeys(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, api.KeysResult{Added: res.Added, Problems: res.Problems})
 }
 
+func (s *Server) handleRenameKey(w http.ResponseWriter, r *http.Request) {
+	d := s.loadSubdomain(w, r)
+	if d == nil {
+		return
+	}
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	var req struct {
+		Name string `json:"name"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	name, err := s.manage.RenameKey(r.Context(), d, id, req.Name, currentAuth(r).User.Email)
+	if err != nil {
+		s.fail(w, "rename key", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"name": name})
+}
+
 func (s *Server) handleDeleteKey(w http.ResponseWriter, r *http.Request) {
 	d := s.loadSubdomain(w, r)
 	if d == nil {

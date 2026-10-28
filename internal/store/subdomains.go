@@ -193,6 +193,18 @@ func (s *Store) DeleteKey(ctx context.Context, subdomainID, keyID int64) (*Key, 
 	return &k, nil
 }
 
+// RenameKey changes the name of a key on a subdomain.
+func (s *Store) RenameKey(ctx context.Context, subdomainID, keyID int64, name string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE ssh_keys SET name = ? WHERE id = ? AND subdomain_id = ?`, name, keyID, subdomainID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // TouchKey records that a key was just used to open a tunnel.
 func (s *Store) TouchKey(ctx context.Context, keyID int64) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE ssh_keys SET last_used_at = ? WHERE id = ?`, unix(s.now()), keyID)

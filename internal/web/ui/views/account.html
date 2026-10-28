@@ -40,6 +40,27 @@
     busy = false
   }
 
+  // The passkey whose name is being edited, by id, and its new name.
+  let renaming = 0
+  let newName = ""
+
+  const startRename = passkey => {
+    renaming = passkey.id
+    newName = passkey.name
+    setTimeout(() => document.querySelector('[name="rename-passkey"]')?.select())
+  }
+
+  const renamePasskey = async passkey => {
+    try {
+      const { name } = await api("PATCH", "/account/passkeys/" + passkey.id, { name: newName })
+      renaming = 0
+      toast(`Passkey renamed to "${name}".`)
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    load()
+  }
+
   const removePasskey = async passkey => {
     if (!confirm(`Remove the passkey "${passkey.name}"?`)) return
     try {
@@ -81,10 +102,21 @@
       <thead><tr><th>Name</th><th class="hide-narrow">Added</th><th>Last used</th><th></th></tr></thead>
       <tbody>
         <tr :each="passkey in passkeys" :key="passkey.id">
-          <td>{{ passkey.name }}</td>
+          <td>
+            <form :if="renaming === passkey.id" class="form-row rename" @submit.prevent="renamePasskey(passkey)">
+              <input name="rename-passkey" maxlength="64" required autocomplete="off" aria-label="New name"
+                     :value="newName" @input="newName = $event.target.value" @keydown="$event.key === 'Escape' && (renaming = 0)">
+              <button type="submit" class="button">Save</button>
+              <button type="button" class="link" @click="renaming = 0">Cancel</button>
+            </form>
+            <span :else>{{ passkey.name }}</span>
+          </td>
           <td class="hide-narrow">{{ ago(passkey.created_at) }}</td>
           <td>{{ ago(passkey.last_used_at) }}</td>
-          <td class="right"><button type="button" class="link danger" @click="removePasskey(passkey)">Remove</button></td>
+          <td class="right row-actions">
+            <button type="button" class="link" @click="startRename(passkey)">Rename</button>
+            <button type="button" class="link danger" @click="removePasskey(passkey)">Remove</button>
+          </td>
         </tr>
       </tbody>
     </table>

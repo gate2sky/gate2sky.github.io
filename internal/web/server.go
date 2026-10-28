@@ -205,6 +205,7 @@ func (s *Server) routes() http.Handler {
 	if s.webauthn != nil {
 		mux.Handle("POST /api/account/passkeys/options", user(s.handlePasskeyRegisterOptions))
 		mux.Handle("POST /api/account/passkeys", user(s.handlePasskeyRegister))
+		mux.Handle("PATCH /api/account/passkeys/{id}", user(s.handleRenamePasskey))
 		mux.Handle("DELETE /api/account/passkeys/{id}", user(s.handleDeletePasskey))
 	}
 	mux.Handle("GET /api/subdomains", user(s.handleListSubdomains))
@@ -213,6 +214,7 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("PATCH /api/subdomains/{name}", user(s.handleUpdateSubdomain))
 	mux.Handle("DELETE /api/subdomains/{name}", user(s.handleDeleteSubdomain))
 	mux.Handle("POST /api/subdomains/{name}/keys", user(s.handleAddKeys))
+	mux.Handle("PATCH /api/subdomains/{name}/keys/{id}", user(s.handleRenameKey))
 	mux.Handle("DELETE /api/subdomains/{name}/keys/{id}", user(s.handleDeleteKey))
 	mux.Handle("POST /api/subdomains/{name}/disconnect", user(s.handleDisconnect))
 

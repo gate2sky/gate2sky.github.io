@@ -177,6 +177,23 @@ func (s *Service) RemoveKey(ctx context.Context, d *store.Subdomain, keyID int64
 	return k, nil
 }
 
+// RenameKey changes the name of a key, including on the tunnel it opened.
+func (s *Service) RenameKey(ctx context.Context, d *store.Subdomain, keyID int64, name, actor string) (string, error) {
+	if name = truncate(strings.TrimSpace(name), 64); name == "" {
+		return "", Errorf("the name can't be empty")
+	}
+	err := s.store.RenameKey(ctx, d.ID, keyID, name)
+	if errors.Is(err, store.ErrNotFound) {
+		return "", Errorf("that key no longer exists")
+	}
+	if err != nil {
+		return "", err
+	}
+	s.registry.RenameKey(d.Name, keyID, name)
+	s.log.Info("ssh key renamed", "subdomain", d.Name, "key_id", keyID, "name", name, "by", actor)
+	return name, nil
+}
+
 // SetAccess changes who can reach d, including its live tunnel.
 func (s *Service) SetAccess(ctx context.Context, d *store.Subdomain, access store.Access, actor string) error {
 	if !access.Valid() {
