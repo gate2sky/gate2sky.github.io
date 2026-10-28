@@ -147,7 +147,9 @@ needed.
 ### Kubernetes with Traefik
 
 [`deploy/helm/gate2sky`](deploy/helm/gate2sky) installs gate2sky behind
-Traefik v3:
+Traefik v3. Every release publishes it to `oci://ghcr.io/gate2sky/charts`,
+so there is nothing to clone (from a clone, `deploy/helm/gate2sky` works the
+same):
 
 - an `IngressRoute` for `gate.example.com` and its subdomains (TLS from a
   Traefik resolver with a DNS-01 challenge, an existing wildcard secret, or
@@ -157,7 +159,7 @@ Traefik v3:
   Service instead.
 
 ```bash
-helm install gate2sky deploy/helm/gate2sky \
+helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky \
   --set domain=gate.example.com \
   --set traefik.tls.certResolver=letsencrypt-dns \
   --set secretEnv.SMTP_PASSWORD=... \
@@ -268,8 +270,9 @@ Two workflows:
   raises [`VERSION`](VERSION) and the Helm chart's version, commits and tags
   `vX.Y.Z`, runs Build on that commit, creates the GitHub release with the
   binaries and `SHA256SUMS` (what `setup.sh` installs), pushes the Docker image
-  to GHCR and deploys [`pages/`](pages/) — the landing and `setup.sh` — to
-  GitHub Pages. `dry-run` builds everything and publishes nothing.
+  and the Helm chart to GHCR and deploys [`pages/`](pages/) — the landing and
+  `setup.sh` — to GitHub Pages. `dry-run` builds everything and publishes
+  nothing.
 
 The landing is built from [`scripts/landing`](scripts/landing): edit
 `template.html` (or the drawings in `hero.py`, whose geometry is computed),
