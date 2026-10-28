@@ -1,0 +1,6 @@
+/securegate
+/data/
+/securegate.yaml
+*.db
+*.db-shm
+*.db-wal

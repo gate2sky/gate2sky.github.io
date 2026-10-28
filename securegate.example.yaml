@@ -1,0 +1,67 @@
+# securegate configuration. Copy to securegate.yaml and adjust.
+# ${VAR} references are replaced with environment variables.
+
+# Dashboard URL. Tunnels are served on its subdomains:
+# https://<name>.gate.example.com. Point both gate.example.com and
+# *.gate.example.com at this server in DNS.
+public_url: https://gate.example.com
+
+# SQLite database, SSH host key and signing secret live here.
+data_dir: ./data
+
+http:
+  listen: ":80"
+  # Remove the tls block when a reverse proxy (Caddy, Traefik, nginx...)
+  # terminates TLS in front of securegate, and keep public_url on https.
+  tls:
+    listen: ":443"
+    # Either a wildcard certificate for gate.example.com and *.gate.example.com:
+    # cert_file: /etc/securegate/fullchain.pem
+    # key_file: /etc/securegate/privkey.pem
+    # ...or certificates from Let's Encrypt, issued on demand for the
+    # dashboard and every registered subdomain:
+    acme:
+      enabled: true
+      email: admin@example.com
+  # Keep X-Forwarded-For from a reverse proxy you control.
+  trust_proxy_headers: false
+
+ssh:
+  listen: ":2222"
+  # What users type in `ssh -p <public_port> <public_host>`, if different
+  # from the dashboard host and the listen port (e.g. behind a NAT).
+  # public_host: gate.example.com
+  # public_port: 22
+
+auth:
+  session_ttl: 168h
+  # Who may sign in. Admins can always sign in and see the admin page.
+  admins: [you@example.com]
+  allowed_emails: []
+  allowed_domains: [example.com]
+  # allow_everyone: true   # any verified email, e.g. for a public service
+
+  providers:
+    # GitHub OAuth app: https://github.com/settings/developers
+    # Callback URL: https://gate.example.com/auth/github/callback
+    - id: github
+      type: github
+      client_id: ${GITHUB_CLIENT_ID}
+      client_secret: ${GITHUB_CLIENT_SECRET}
+
+    # Any OpenID Connect provider: Google, GitLab, Microsoft Entra ID,
+    # Keycloak, Authentik... Callback URL: https://gate.example.com/auth/<id>/callback
+    # - id: google
+    #   type: oidc
+    #   name: Google
+    #   issuer: https://accounts.google.com
+    #   client_id: ${GOOGLE_CLIENT_ID}
+    #   client_secret: ${GOOGLE_CLIENT_SECRET}
+
+limits:
+  subdomains_per_user: 10
+  keys_per_subdomain: 20
+  tunnels_per_connection: 5
+
+# Names nobody can register, on top of the built-in list (www, admin, api...).
+reserved_subdomains: []

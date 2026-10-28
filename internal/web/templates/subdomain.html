@@ -1,0 +1,101 @@
+{{define "content"}}
+{{$csrf := .Auth.Session.CSRFToken}}
+{{$domain := .Domain}}
+{{with .Page}}
+<p class="crumbs"><a href="/">← Subdomains</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{.Name}}<span class="muted">.{{$domain}}</span></h1>
+    <a href="{{tunnelURL .Name}}" target="_blank" rel="noopener noreferrer">{{tunnelURL .Name}}</a>
+  </div>
+  {{template "status" .Tunnel}}
+</div>
+{{if .NotOwner}}<div class="flash flash-info">You are managing {{.OwnerEmail}}’s subdomain as an administrator.</div>{{end}}
+
+<section class="card">
+  <h2>Connection</h2>
+  {{with .Tunnel}}
+  <dl class="stats">
+    <div><dt>Client</dt><dd>{{.ClientAddr}}</dd></div>
+    <div><dt>SSH key</dt><dd>{{.KeyName}}</dd></div>
+    <div><dt>Connected</dt><dd>{{ago .CreatedAt}}</dd></div>
+    <div><dt>Requests</dt><dd>{{.Requests}}</dd></div>
+    <div><dt>Traffic in / out</dt><dd>{{bytes .BytesIn}} / {{bytes .BytesOut}}</dd></div>
+    <div><dt>Open streams</dt><dd>{{.ActiveConns}}</dd></div>
+  </dl>
+  <form method="post" action="/subdomains/{{$.Page.Name}}/disconnect" class="inline">
+    <input type="hidden" name="csrf_token" value="{{$csrf}}">
+    <button type="submit" class="button button-secondary">Disconnect</button>
+  </form>
+  <p class="muted">To connect again later, or from another machine with an authorized key:</p>
+  {{else}}
+  <p class="muted">No client is connected. Start your service locally, then run:</p>
+  {{end}}
+  <pre class="command"><code>{{sshCommand .Name}}</code></pre>
+  <p class="muted small">Replace <code>3000</code> with your local port. Add <code>-N</code> to run without a console; use <code>autossh -M 0</code> to reconnect automatically.</p>
+</section>
+
+<section class="card">
+  <h2>Access</h2>
+  <form method="post" action="/subdomains/{{.Name}}/access" class="form">
+    <input type="hidden" name="csrf_token" value="{{$csrf}}">
+    <fieldset>
+      <legend class="sr-only">Who can open {{.Name}}.{{$domain}}</legend>
+      {{template "access-options" .Access}}
+    </fieldset>
+    <div><button type="submit" class="button">Save access</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card-head"><h2>SSH keys</h2><span class="muted">{{len .Keys}} of {{.KeyLimit}}</span></div>
+  <p class="muted">Only these keys can open the tunnel for {{.Name}}.{{$domain}}.</p>
+  {{if .Keys}}
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Name</th><th>Fingerprint</th><th>Added</th><th>Last used</th><th></th></tr></thead>
+    <tbody>
+    {{range .Keys}}
+    <tr>
+      <td>{{.Name}} <div class="muted small">{{.Type}}</div></td>
+      <td><code class="small">{{.Fingerprint}}</code></td>
+      <td>{{ago .CreatedAt}}</td>
+      <td>{{ago .LastUsedAt}}</td>
+      <td class="right">
+        <form method="post" action="/subdomains/{{$.Page.Name}}/keys/{{.ID}}/delete" class="inline">
+          <input type="hidden" name="csrf_token" value="{{$csrf}}">
+          <button type="submit" class="link danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}
+  <p class="empty-inline">No keys yet — nobody can connect.</p>
+  {{end}}
+
+  <form method="post" action="/subdomains/{{.Name}}/keys" class="form">
+    <input type="hidden" name="csrf_token" value="{{$csrf}}">
+    <label>Public keys <span class="hint">One per line: the contents of <code>~/.ssh/id_ed25519.pub</code>, or of <code>https://github.com/&lt;user&gt;.keys</code>.</span>
+      <textarea name="keys" rows="3" required spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"></textarea>
+    </label>
+    <label>Name <span class="hint">Optional. Defaults to the key comment.</span>
+      <input name="name" maxlength="64" autocomplete="off">
+    </label>
+    <div><button type="submit" class="button">Add keys</button></div>
+  </form>
+</section>
+
+<section class="card danger-zone">
+  <h2>Delete subdomain</h2>
+  <p>Closes the tunnel and removes {{.Name}}.{{$domain}} and its keys. The name becomes available to anyone.</p>
+  <form method="post" action="/subdomains/{{.Name}}/delete" class="form form-row">
+    <input type="hidden" name="csrf_token" value="{{$csrf}}">
+    <input name="confirm" required autocomplete="off" spellcheck="false" placeholder="type {{.Name}} to confirm" aria-label="Type {{.Name}} to confirm">
+    <button type="submit" class="button button-danger">Delete</button>
+  </form>
+</section>
+{{end}}
+{{end}}

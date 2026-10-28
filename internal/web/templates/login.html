@@ -1,0 +1,9 @@
+{{define "content"}}
+<section class="card login">
+  <h1>Sign in</h1>
+  <p class="muted">Publish local services on <strong>*.{{.Domain}}</strong> through SSH tunnels.</p>
+  <div class="providers">
+    {{range .Page.Providers}}<a class="button button-block" href="{{.URL}}">Continue with {{.Name}}</a>{{end}}
+  </div>
+</section>
+{{end}}

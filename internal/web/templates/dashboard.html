@@ -1,0 +1,48 @@
+{{define "content"}}
+{{$csrf := .Auth.Session.CSRFToken}}
+<div class="page-head">
+  <h1>Your subdomains</h1>
+  <span class="muted">{{len .Page.Subdomains}} of {{.Page.Limit}}</span>
+</div>
+
+{{if .Page.Subdomains}}
+<div class="table-wrap">
+<table class="table">
+  <thead><tr><th>Subdomain</th><th>Status</th><th>Access</th><th>SSH keys</th><th></th></tr></thead>
+  <tbody>
+  {{range .Page.Subdomains}}
+  <tr>
+    <td><a href="/subdomains/{{.Name}}"><strong>{{.Name}}</strong></a><div class="muted small">{{tunnelURL .Name}}</div></td>
+    <td>{{template "status" .Tunnel}}{{with .Tunnel}} <span class="muted small">{{ago .CreatedAt}}</span>{{end}}</td>
+    <td><span class="badge badge-{{.Access}}">{{.Access}}</span></td>
+    <td>{{.Keys}}</td>
+    <td class="right"><a href="/subdomains/{{.Name}}">Manage →</a></td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<div class="card empty">
+  <p>No subdomains yet. Register one below with your SSH public key, then connect with <code>ssh -R</code>.</p>
+</div>
+{{end}}
+
+<section class="card">
+  <h2>Register a subdomain</h2>
+  <form method="post" action="/subdomains" class="form">
+    <input type="hidden" name="csrf_token" value="{{$csrf}}">
+    <label>Name
+      <span class="input-suffix"><input name="name" required maxlength="63" pattern="[A-Za-z0-9]([A-Za-z0-9\-]{0,61}[A-Za-z0-9])?" placeholder="myapp" autocomplete="off" spellcheck="false"><span>.{{.Domain}}</span></span>
+    </label>
+    <fieldset>
+      <legend>Who can open it</legend>
+      {{template "access-options" "public"}}
+    </fieldset>
+    <label>SSH public keys <span class="hint">Optional, one per line. You can add more later.</span>
+      <textarea name="keys" rows="3" spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"></textarea>
+    </label>
+    <div><button type="submit" class="button">Register</button></div>
+  </form>
+</section>
+{{end}}

@@ -1,0 +1,55 @@
+{{define "content"}}
+{{$csrf := .Auth.Session.CSRFToken}}
+{{$me := .Page.Me}}
+<div class="page-head"><h1>Admin</h1></div>
+
+<section class="card">
+  <div class="card-head"><h2>Subdomains</h2><span class="muted">{{.Page.Online}} online · {{len .Page.Subdomains}} registered</span></div>
+  {{if .Page.Subdomains}}
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Subdomain</th><th>Owner</th><th>Access</th><th>Keys</th><th>Status</th><th>Requests</th></tr></thead>
+    <tbody>
+    {{range .Page.Subdomains}}
+    <tr>
+      <td><a href="/subdomains/{{.Name}}"><strong>{{.Name}}</strong></a></td>
+      <td>{{.OwnerEmail}}</td>
+      <td><span class="badge badge-{{.Access}}">{{.Access}}</span></td>
+      <td>{{.Keys}}</td>
+      <td>{{template "status" .Tunnel}}{{with .Tunnel}} <div class="muted small">{{.ClientAddr}} · {{ago .CreatedAt}}</div>{{end}}</td>
+      <td>{{with .Tunnel}}{{.Requests}}{{else}}—{{end}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}<p class="empty-inline">No subdomains registered.</p>{{end}}
+</section>
+
+<section class="card">
+  <div class="card-head"><h2>Users</h2><span class="muted">{{len .Page.Users}}</span></div>
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>User</th><th>Provider</th><th>Subdomains</th><th>Last sign-in</th><th></th></tr></thead>
+    <tbody>
+    {{range .Page.Users}}
+    <tr{{if .Disabled}} class="disabled"{{end}}>
+      <td><strong>{{.DisplayName}}</strong><div class="muted small">{{.Email}}</div></td>
+      <td>{{.Provider}}{{with .Username}} <div class="muted small">{{.}}</div>{{end}}</td>
+      <td>{{.Subdomains}}</td>
+      <td>{{ago .LastLoginAt}}</td>
+      <td class="right">
+        {{if ne .ID $me}}
+        <form method="post" action="/admin/users/{{.ID}}/{{if .Disabled}}enable{{else}}disable{{end}}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{$csrf}}">
+          <button type="submit" class="link{{if not .Disabled}} danger{{end}}">{{if .Disabled}}Enable{{else}}Disable{{end}}</button>
+        </form>
+        {{else}}<span class="muted small">you</span>{{end}}
+      </td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</section>
+{{end}}
