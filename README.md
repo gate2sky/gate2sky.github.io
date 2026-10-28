@@ -277,7 +277,10 @@ Two workflows:
 The landing is built from [`scripts/landing`](scripts/landing): edit
 `template.html` (or the drawings in `hero.py`, whose geometry is computed),
 then run `python3 scripts/landing/gen.py scripts/landing/template.html
-pages/index.html`. Build checks that the two agree.
+pages/index.html`. Build checks that the two agree. The icon is
+[`pages/favicon.svg`](pages/favicon.svg); after changing it, `node
+scripts/landing/icons.js` renders `favicon.ico` and `apple-touch-icon.png`
+from it.
 
 ## Roadmap
 

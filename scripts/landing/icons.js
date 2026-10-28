@@ -1,0 +1,51 @@
+// Renders pages/favicon.svg into the bitmaps for what does not take an SVG
+// icon: favicon.ico (16 and 32 px; older Safari, and the /favicon.ico every
+// browser asks for) and apple-touch-icon.png (180 px on the page's night, as
+// iOS fills transparency with black).
+//
+//     node scripts/landing/icons.js
+const fs = require("fs")
+const path = require("path")
+const { chromium } = require("playwright")
+
+const pages = path.join(__dirname, "../../pages")
+const svg = "data:image/svg+xml;base64," + fs.readFileSync(path.join(pages, "favicon.svg")).toString("base64")
+
+async function render(browser, size, { background = "transparent", inset = 0 } = {}) {
+  const page = await browser.newPage({ viewport: { width: size, height: size } })
+  const icon = size - 2 * inset
+  await page.setContent(`<body style="margin:0;background:${background}">
+    <img src="${svg}" width="${icon}" height="${icon}" style="display:block;margin:${inset}px">`)
+  await page.locator("img").evaluate(img => img.decode())
+  const png = await page.screenshot({ omitBackground: background === "transparent" })
+  await page.close()
+  return png
+}
+
+// An ICO that holds PNGs: a header, one 16-byte entry per image, the images.
+function ico(images) {
+  const head = Buffer.alloc(6 + 16 * images.length)
+  head.writeUInt16LE(1, 2)
+  head.writeUInt16LE(images.length, 4)
+  let offset = head.length
+  images.forEach(({ size, png }, i) => {
+    const at = 6 + 16 * i
+    head.writeUInt8(size, at)
+    head.writeUInt8(size, at + 1)
+    head.writeUInt16LE(1, at + 4)
+    head.writeUInt16LE(32, at + 6)
+    head.writeUInt32LE(png.length, at + 8)
+    head.writeUInt32LE(offset, at + 12)
+    offset += png.length
+  })
+  return Buffer.concat([head, ...images.map(image => image.png)])
+}
+
+;(async () => {
+  const browser = await chromium.launch()
+  const images = []
+  for (const size of [16, 32]) images.push({ size, png: await render(browser, size) })
+  fs.writeFileSync(path.join(pages, "favicon.ico"), ico(images))
+  fs.writeFileSync(path.join(pages, "apple-touch-icon.png"), await render(browser, 180, { background: "#05070d", inset: 26 }))
+  await browser.close()
+})()

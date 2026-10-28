@@ -172,6 +172,7 @@ jobs:
             exit 1
           }
           test -s pages/setup.sh
+          for icon in favicon.svg favicon.ico apple-touch-icon.png; do test -s "pages/$icon"; done
       - uses: actions/upload-pages-artifact@v3
         if: ${{ inputs.pages }}
         with:
