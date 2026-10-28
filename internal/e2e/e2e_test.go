@@ -23,6 +23,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/jgermade/securegate/internal/api"
 	"github.com/jgermade/securegate/internal/config"
 	"github.com/jgermade/securegate/internal/mail"
 	"github.com/jgermade/securegate/internal/server"
@@ -161,6 +162,13 @@ func (h *harness) browser(follow bool) *http.Client {
 	return c
 }
 
+// loggedIn returns a browser signed in as email.
+func (h *harness) loggedIn(email string) *http.Client {
+	c := h.browser(true)
+	h.login(c, email)
+	return c
+}
+
 // login signs the browser in through the fake provider.
 func (h *harness) login(c *http.Client, email string) {
 	h.t.Helper()
@@ -188,24 +196,6 @@ func readBody(t *testing.T, resp *http.Response) string {
 func get(t *testing.T, c *http.Client, u string) (*http.Response, string) {
 	t.Helper()
 	resp, err := c.Get(u)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return resp, readBody(t, resp)
-}
-
-var csrfRE = regexp.MustCompile(`name="csrf_token" value="([^"]+)"`)
-
-// post submits a dashboard form with the CSRF token of the given page.
-func post(t *testing.T, c *http.Client, page, action string, form url.Values) (*http.Response, string) {
-	t.Helper()
-	_, body := get(t, c, "http://"+domain+page)
-	m := csrfRE.FindStringSubmatch(body)
-	if m == nil {
-		t.Fatalf("no CSRF token on %s", page)
-	}
-	form.Set("csrf_token", m[1])
-	resp, err := c.PostForm("http://"+domain+action, form)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -482,28 +472,37 @@ func TestLogin(t *testing.T) {
 	h := newHarness(t)
 	b := h.browser(true)
 
-	// Anonymous visitors see the provider list.
-	if _, body := get(t, b, "http://"+domain+"/"); !strings.Contains(body, `href="/auth/test/login?rd=%2F">Test IdP</a>`) || !strings.Contains(body, "Email me a sign-in code") {
-		t.Fatalf("login page:\n%s", body)
+	// Anonymous visitors get the sign-in methods.
+	_, boot := page(t, b, "/")
+	if boot.User != nil || !boot.Email || !boot.Passkeys || len(boot.Providers) != 1 ||
+		boot.Providers[0].Name != "Test IdP" || boot.Providers[0].URL != "/auth/test/login" {
+		t.Fatalf("anonymous boot data: %+v", boot)
 	}
+	if resp, _ := get(t, b, "http://"+domain+"/api/subdomains"); resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("anonymous API call: %d", resp.StatusCode)
+	}
+
 	h.login(b, "alice@example.com")
-	if _, body := get(t, b, "http://"+domain+"/"); !strings.Contains(body, "Your subdomains") || strings.Contains(body, `href="/admin"`) {
-		t.Fatalf("dashboard:\n%s", body)
+	if _, boot := page(t, b, "/"); boot.User == nil || boot.User.Email != "alice@example.com" || boot.User.Admin || boot.CSRF == "" {
+		t.Fatalf("signed-in boot data: %+v", boot)
 	}
 
 	admin := h.browser(true)
 	h.login(admin, "admin@example.com")
-	if resp, _ := get(t, admin, "http://"+domain+"/admin"); resp.StatusCode != http.StatusOK {
-		t.Errorf("admin page: %d", resp.StatusCode)
+	if resp, boot := page(t, admin, "/admin"); resp.StatusCode != http.StatusOK || !boot.User.Admin {
+		t.Errorf("admin page: %d %+v", resp.StatusCode, boot.User)
 	}
 	if resp, _ := get(t, b, "http://"+domain+"/admin"); resp.StatusCode != http.StatusNotFound {
 		t.Errorf("admin page for non-admin: %d", resp.StatusCode)
+	}
+	if resp, _ := get(t, b, "http://"+domain+"/api/admin/users"); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("admin API for non-admin: %d", resp.StatusCode)
 	}
 
 	// Accounts outside the allow list are refused.
 	h.idp.SetUser("mallory@evil.test")
 	resp, body := get(t, h.browser(true), "http://"+domain+"/auth/test/login")
-	if resp.StatusCode != http.StatusForbidden || !strings.Contains(body, "not allowed") {
+	if boot := parseBoot(t, body); resp.StatusCode != http.StatusForbidden || boot.Error == nil || !strings.Contains(boot.Error.Message, "not allowed") {
 		t.Errorf("disallowed login: %d\n%s", resp.StatusCode, body)
 	}
 
@@ -514,9 +513,60 @@ func TestLogin(t *testing.T) {
 	}
 
 	// Signing out ends the session.
-	post(t, b, "/", "/logout", url.Values{})
-	if _, body := get(t, b, "http://"+domain+"/"); !strings.Contains(body, "Email me a sign-in code") {
+	if resp, _ := call(t, b, "POST", "/api/logout", nil); resp.StatusCode != http.StatusNoContent {
+		t.Errorf("logout: %d", resp.StatusCode)
+	}
+	if _, boot := page(t, b, "/"); boot.User != nil {
 		t.Error("still signed in after logout")
+	}
+
+	// Unknown pages are a 404 the app shows.
+	if resp, boot := page(t, b, "/nope"); resp.StatusCode != http.StatusNotFound || boot.Error == nil || boot.Error.Status != 404 {
+		t.Errorf("unknown page: %d %+v", resp.StatusCode, boot.Error)
+	}
+}
+
+func TestPageSecurity(t *testing.T) {
+	h := newHarness(t)
+	b := h.browser(true)
+
+	// Each page carries a fresh nonce, and the CSP admits scripts by it
+	// and from the dashboard itself, never eval.
+	nonces := map[string]bool{}
+	for range 2 {
+		resp, body := get(t, b, "http://"+domain+"/")
+		policy := resp.Header.Get("Content-Security-Policy")
+		m := regexp.MustCompile(`script-src 'self' 'nonce-([A-Za-z0-9_-]{24})';`).FindStringSubmatch(policy)
+		if m == nil || strings.Contains(policy, "unsafe") {
+			t.Fatalf("CSP %q", policy)
+		}
+		if !strings.Contains(body, `<script type="module" nonce="`+m[1]+`">`) {
+			t.Fatalf("the page's script does not carry the CSP's nonce:\n%s", body)
+		}
+		nonces[m[1]] = true
+	}
+	if len(nonces) != 2 {
+		t.Error("the nonce did not change between responses")
+	}
+
+	// The app's files are revalidated by ETag.
+	resp, _ := get(t, b, "http://"+domain+"/ui/app.html")
+	etag := resp.Header.Get("ETag")
+	if resp.StatusCode != http.StatusOK || etag == "" || resp.Header.Get("Cache-Control") != "no-cache" {
+		t.Fatalf("app.html: %d %q %q", resp.StatusCode, etag, resp.Header.Get("Cache-Control"))
+	}
+	req, _ := http.NewRequest("GET", "http://"+domain+"/ui/app.html", nil)
+	req.Header.Set("If-None-Match", etag)
+	if resp, err := b.Do(req); err != nil || resp.StatusCode != http.StatusNotModified {
+		t.Errorf("revalidation: %v %v", resp.StatusCode, err)
+	}
+	for _, f := range []string{"/ui/vendor/jq79.js", "/ui/lib/store.js", "/ui/views/login.html", "/ui/app.css"} {
+		if resp, _ := get(t, b, "http://"+domain+f); resp.StatusCode != http.StatusOK {
+			t.Errorf("%s: %d", f, resp.StatusCode)
+		}
+	}
+	if resp, _ := get(t, b, "http://"+domain+"/ui/nope.js"); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("missing file: %d", resp.StatusCode)
 	}
 }
 
@@ -527,68 +577,99 @@ func TestDashboardManagesSubdomains(t *testing.T) {
 	key := newSigner(t)
 	pub := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key.PublicKey()))) + " alice@laptop"
 
-	resp, body := post(t, b, "/", "/subdomains", url.Values{"name": {"MyApp"}, "access": {"private"}, "keys": {pub}})
-	if resp.StatusCode != http.StatusOK || resp.Request.URL.Path != "/subdomains/myapp" || !strings.Contains(body, "alice@laptop") {
-		t.Fatalf("create: %d %s\n%s", resp.StatusCode, resp.Request.URL, body)
+	resp, body := call(t, b, "POST", "/api/subdomains", map[string]string{"name": "MyApp", "access": "private", "keys": pub})
+	created := decode[struct {
+		Subdomain api.Subdomain  `json:"subdomain"`
+		Keys      api.KeysResult `json:"keys"`
+	}](t, body)
+	if resp.StatusCode != http.StatusCreated || created.Subdomain.Name != "myapp" || created.Subdomain.Keys != 1 || created.Keys.Added != 1 {
+		t.Fatalf("create: %d %s", resp.StatusCode, body)
 	}
 	d, err := h.store.SubdomainByName(context.Background(), "myapp")
 	if err != nil || d.Access != store.AccessPrivate || d.Keys != 1 {
 		t.Fatalf("stored subdomain %+v, %v", d, err)
 	}
+	_, body = call(t, b, "GET", "/api/subdomains/myapp", nil)
+	detail := decode[struct {
+		api.SubdomainDetail
+		SSHCommand string `json:"ssh_command"`
+		Mine       bool   `json:"mine"`
+	}](t, body)
+	if len(detail.KeyList) != 1 || detail.KeyList[0].Name != "alice@laptop" || !detail.Mine || !strings.Contains(detail.SSHCommand, "-R myapp:80:localhost:3000") {
+		t.Fatalf("detail: %s", body)
+	}
 
 	// Reserved and taken names are refused.
-	_, body = post(t, b, "/", "/subdomains", url.Values{"name": {"www"}})
-	if !strings.Contains(body, "reserved") {
-		t.Errorf("reserved name accepted:\n%s", body)
+	if resp, body := call(t, b, "POST", "/api/subdomains", map[string]string{"name": "www"}); resp.StatusCode != http.StatusBadRequest || !strings.Contains(body, "reserved") {
+		t.Errorf("reserved name: %d %s", resp.StatusCode, body)
 	}
 	other := h.browser(true)
 	h.login(other, "bob@example.com")
-	_, body = post(t, other, "/", "/subdomains", url.Values{"name": {"myapp"}})
-	if !strings.Contains(body, "already taken") {
-		t.Error("taken name accepted")
+	if _, body := call(t, other, "POST", "/api/subdomains", map[string]string{"name": "myapp"}); !strings.Contains(body, "already taken") {
+		t.Errorf("taken name accepted: %s", body)
 	}
 	// Other users can't see or change it.
-	if resp, _ := get(t, other, "http://"+domain+"/subdomains/myapp"); resp.StatusCode != http.StatusNotFound {
+	if resp, _ := call(t, other, "GET", "/api/subdomains/myapp", nil); resp.StatusCode != http.StatusNotFound {
 		t.Errorf("other user sees subdomain: %d", resp.StatusCode)
 	}
-
-	// Forms need the CSRF token and a same-origin Origin.
-	resp, _ = b.PostForm("http://"+domain+"/subdomains/myapp/access", url.Values{"access": {"public"}})
-	if resp.StatusCode != http.StatusForbidden {
-		t.Errorf("POST without CSRF token: %d", resp.StatusCode)
-	}
-	_, page := get(t, b, "http://"+domain+"/subdomains/myapp")
-	req, _ := http.NewRequest("POST", "http://"+domain+"/subdomains/myapp/access",
-		strings.NewReader(url.Values{"access": {"public"}, "csrf_token": {csrfRE.FindStringSubmatch(page)[1]}}.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Origin", "http://evil.gate.test")
-	if resp, _ := b.Do(req); resp.StatusCode != http.StatusForbidden {
-		t.Errorf("cross-origin POST: %d", resp.StatusCode)
+	if resp, _ := call(t, other, "PATCH", "/api/subdomains/myapp", map[string]string{"access": "public"}); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("other user changes subdomain: %d", resp.StatusCode)
 	}
 
-	// Connect, then change access live and remove the key.
+	// Changes need the CSRF token and a same-origin Origin.
+	_, boot := page(t, b, "/")
+	if resp, _ := send(t, b, "PATCH", "/api/subdomains/myapp", map[string]string{"access": "public"}, ""); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("PATCH without CSRF token: %d", resp.StatusCode)
+	}
+	if resp, _ := send(t, b, "PATCH", "/api/subdomains/myapp", map[string]string{"access": "public"}, "wrong"); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("PATCH with a wrong CSRF token: %d", resp.StatusCode)
+	}
+	if resp, _ := sendFrom(t, b, "http://evil."+domain, "PATCH", "/api/subdomains/myapp", map[string]string{"access": "public"}, boot.CSRF); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("cross-origin PATCH: %d", resp.StatusCode)
+	}
+	if d, _ := h.store.SubdomainByName(context.Background(), "myapp"); d.Access != store.AccessPrivate {
+		t.Fatal("a refused request changed the access")
+	}
+
+	// Connect: the list shows the tunnel. Then change access live and
+	// remove the key.
 	c, err := h.dial(key, "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
 	c.forward(t, "myapp", 80, backend(t))
-	post(t, b, "/subdomains/myapp", "/subdomains/myapp/access", url.Values{"access": {"public"}})
+	_, body = call(t, b, "GET", "/api/subdomains", nil)
+	list := decode[[]api.Subdomain](t, body)
+	if len(list) != 1 || list[0].Tunnel == nil || list[0].Tunnel.KeyName != "alice@laptop" {
+		t.Fatalf("list while connected: %s", body)
+	}
+	if resp, body := call(t, b, "PATCH", "/api/subdomains/myapp", map[string]string{"access": "public"}); resp.StatusCode != http.StatusOK || decode[api.Subdomain](t, body).Access != store.AccessPublic {
+		t.Fatalf("set access: %d %s", resp.StatusCode, body)
+	}
 	if resp, _ := get(t, h.browser(false), "http://myapp."+domain+"/"); resp.StatusCode != http.StatusOK {
 		t.Errorf("public after change: %d", resp.StatusCode)
 	}
-	keys, _ := h.store.KeysBySubdomain(context.Background(), d.ID)
-	post(t, b, "/subdomains/myapp", fmt.Sprintf("/subdomains/myapp/keys/%d/delete", keys[0].ID), url.Values{})
+	if resp, body := call(t, b, "PATCH", "/api/subdomains/myapp", map[string]string{"access": "everyone"}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("invalid access: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := call(t, b, "DELETE", fmt.Sprintf("/api/subdomains/myapp/keys/%d", detail.KeyList[0].ID), nil); resp.StatusCode != http.StatusNoContent {
+		t.Errorf("remove key: %d", resp.StatusCode)
+	}
 	waitFor(t, func() bool { return h.registry.Get("myapp") == nil })
 	if _, err := h.dial(key, "alice"); err == nil {
 		t.Error("removed key can still connect")
 	}
 
-	// Deleting needs the name typed in.
-	post(t, b, "/subdomains/myapp", "/subdomains/myapp/delete", url.Values{"confirm": {"nope"}})
-	if _, err := h.store.SubdomainByName(context.Background(), "myapp"); err != nil {
-		t.Fatal("deleted without confirmation")
+	// Add a key back, then delete the subdomain.
+	if resp, body := call(t, b, "POST", "/api/subdomains/myapp/keys", map[string]string{"keys": pub + "\nnot a key"}); resp.StatusCode != http.StatusBadRequest || !strings.Contains(body, "Line 2") {
+		t.Errorf("add a bad key: %d %s", resp.StatusCode, body)
 	}
-	post(t, b, "/subdomains/myapp", "/subdomains/myapp/delete", url.Values{"confirm": {"myapp"}})
+	if resp, body := call(t, b, "POST", "/api/subdomains/myapp/keys", map[string]string{"keys": pub, "name": "again"}); resp.StatusCode != http.StatusOK || decode[api.KeysResult](t, body).Added != 1 {
+		t.Errorf("add keys: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := call(t, b, "DELETE", "/api/subdomains/myapp", nil); resp.StatusCode != http.StatusNoContent {
+		t.Errorf("delete: %d", resp.StatusCode)
+	}
 	if _, err := h.store.SubdomainByName(context.Background(), "myapp"); err == nil {
 		t.Fatal("not deleted")
 	}
@@ -669,7 +750,7 @@ func TestProtectedTunnels(t *testing.T) {
 	}
 
 	// Signing out of the dashboard also revokes tunnel access.
-	post(t, owner, "/", "/logout", url.Values{})
+	call(t, owner, "POST", "/api/logout", nil)
 	noFollow = h.browser(false)
 	noFollow.Jar = owner.Jar
 	if resp, _ := get(t, noFollow, "http://secret."+domain+"/"); resp.StatusCode != http.StatusFound {
@@ -683,9 +764,24 @@ func TestDisableUserClosesTunnels(t *testing.T) {
 	c, _ := h.dial(key, "alice")
 	c.forward(t, "demo", 80, backend(t))
 
-	admin := h.browser(true)
-	h.login(admin, "admin@example.com")
-	post(t, admin, "/admin", fmt.Sprintf("/admin/users/%d/disable", alice.ID), url.Values{})
+	// Only administrators may, and not on themselves.
+	if resp, _ := call(t, h.loggedIn("bob@example.com"), "PATCH", fmt.Sprintf("/api/admin/users/%d", alice.ID), map[string]bool{"disabled": true}); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("non-admin disables a user: %d", resp.StatusCode)
+	}
+	admin := h.loggedIn("admin@example.com")
+	_, body := call(t, admin, "GET", "/api/admin/users", nil)
+	var me int64
+	for _, u := range decode[[]api.User](t, body) {
+		if u.Email == "admin@example.com" {
+			me = u.ID
+		}
+	}
+	if resp, _ := call(t, admin, "PATCH", fmt.Sprintf("/api/admin/users/%d", me), map[string]bool{"disabled": true}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("admin disables themselves: %d", resp.StatusCode)
+	}
+	if resp, _ := call(t, admin, "PATCH", fmt.Sprintf("/api/admin/users/%d", alice.ID), map[string]bool{"disabled": true}); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("disable: %d", resp.StatusCode)
+	}
 	waitFor(t, func() bool { return h.registry.Get("demo") == nil })
 	if _, err := h.dial(key, "alice"); err == nil {
 		t.Error("disabled user's key still connects")

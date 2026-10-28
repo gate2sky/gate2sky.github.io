@@ -9,8 +9,8 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -132,40 +132,25 @@ func (a *softAuthenticator) get(t *testing.T, options []byte, origin string) []b
 	return out
 }
 
-var csrfMetaRE = regexp.MustCompile(`name="csrf-token" content="([^"]+)"`)
-
-// postJSON sends a fetch()-style request from a dashboard page.
+// postJSON sends a fetch()-style POST from a dashboard page.
 func postJSON(t *testing.T, c *http.Client, path string, body []byte, csrf string) (*http.Response, []byte) {
 	t.Helper()
 	if body == nil {
 		body = []byte("{}")
 	}
-	req, _ := http.NewRequest("POST", "http://"+domain+path, bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", "http://"+domain)
-	if csrf != "" {
-		req.Header.Set("X-CSRF-Token", csrf)
-	}
-	resp, err := c.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return resp, []byte(readBody(t, resp))
+	resp, out := send(t, c, "POST", path, body, csrf)
+	return resp, []byte(out)
 }
 
 func (h *harness) registerPasskey(c *http.Client, a *softAuthenticator) {
 	h.t.Helper()
-	_, page := get(h.t, c, "http://"+domain+"/account")
-	m := csrfMetaRE.FindStringSubmatch(page)
-	if m == nil {
-		h.t.Fatalf("no CSRF meta tag on /account:\n%s", page)
-	}
-	resp, opts := postJSON(h.t, c, "/account/passkeys/options", nil, m[1])
+	_, boot := page(h.t, c, "/account")
+	resp, opts := postJSON(h.t, c, "/api/account/passkeys/options", nil, boot.CSRF)
 	if resp.StatusCode != http.StatusOK {
 		h.t.Fatalf("registration options: %d %s", resp.StatusCode, opts)
 	}
-	resp, body := postJSON(h.t, c, "/account/passkeys?name=Test+key", a.create(h.t, opts, "http://"+domain), m[1])
-	if resp.StatusCode != http.StatusOK {
+	resp, body := postJSON(h.t, c, "/api/account/passkeys?name=Test+key", a.create(h.t, opts, "http://"+domain), boot.CSRF)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `"name":"Test key"`) {
 		h.t.Fatalf("register passkey: %d %s", resp.StatusCode, body)
 	}
 }
@@ -178,8 +163,12 @@ func TestPasskeys(t *testing.T) {
 	b := h.browser(true)
 	h.emailLogin(b, "alice@example.com", "/")
 	h.registerPasskey(b, a)
-	if _, page := get(t, b, "http://"+domain+"/account"); !strings.Contains(page, "Test key") || strings.Contains(page, "Sign in faster next time") {
-		t.Fatalf("account page after registering:\n%s", page)
+	if _, body := call(t, b, "GET", "/api/account", nil); !strings.Contains(body, `"name":"Test key"`) {
+		t.Fatalf("account after registering: %s", body)
+	}
+	// With a passkey, signing in no longer suggests adding one.
+	if next := h.emailLogin(h.browser(true), "alice@example.com", "/x"); next != "/x" {
+		t.Errorf("after login with a passkey the app goes to %q", next)
 	}
 	if a.rpID != domain {
 		t.Errorf("RP ID = %q, want %q", a.rpID, domain)
@@ -187,31 +176,31 @@ func TestPasskeys(t *testing.T) {
 
 	// Sign in with it from a new browser, without typing an email.
 	fresh := h.browser(true)
-	resp, opts := postJSON(t, fresh, "/login/passkey/options?rd=/account", nil, "")
+	resp, opts := postJSON(t, fresh, "/api/login/passkey/options?rd=/account", nil, "")
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("login options: %d %s", resp.StatusCode, opts)
 	}
 	assertion := a.get(t, opts, "http://"+domain)
-	resp, body := postJSON(t, fresh, "/login/passkey", assertion, "")
+	resp, body := postJSON(t, fresh, "/api/login/passkey", assertion, "")
 	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `"redirect":"/account"`) {
 		t.Fatalf("passkey login: %d %s", resp.StatusCode, body)
 	}
-	if _, page := get(t, fresh, "http://"+domain+"/"); !strings.Contains(page, "alice@example.com") {
+	if _, boot := page(t, fresh, "/"); boot.User == nil || boot.User.Email != "alice@example.com" {
 		t.Fatal("not signed in after passkey login")
 	}
 
 	// The same assertion can't be replayed, even with a fresh ceremony.
 	replay := h.browser(true)
-	postJSON(t, replay, "/login/passkey/options", nil, "")
-	if resp, _ := postJSON(t, replay, "/login/passkey", assertion, ""); resp.StatusCode == http.StatusOK {
+	postJSON(t, replay, "/api/login/passkey/options", nil, "")
+	if resp, _ := postJSON(t, replay, "/api/login/passkey", assertion, ""); resp.StatusCode == http.StatusOK {
 		t.Error("replayed assertion accepted")
 	}
 
 	// Assertions made for a tunnel page (which may claim the same RP ID)
 	// are refused.
 	evil := h.browser(true)
-	_, opts = postJSON(t, evil, "/login/passkey/options", nil, "")
-	if resp, _ := postJSON(t, evil, "/login/passkey", a.get(t, opts, "http://evil."+domain), ""); resp.StatusCode == http.StatusOK {
+	_, opts = postJSON(t, evil, "/api/login/passkey/options", nil, "")
+	if resp, _ := postJSON(t, evil, "/api/login/passkey", a.get(t, opts, "http://evil."+domain), ""); resp.StatusCode == http.StatusOK {
 		t.Error("assertion for a tunnel origin accepted")
 	}
 
@@ -219,13 +208,13 @@ func TestPasskeys(t *testing.T) {
 	stranger := newSoftAuthenticator(t)
 	stranger.rpID, stranger.userHandle = domain, []byte("nobody")
 	s := h.browser(true)
-	_, opts = postJSON(t, s, "/login/passkey/options", nil, "")
-	if resp, _ := postJSON(t, s, "/login/passkey", stranger.get(t, opts, "http://"+domain), ""); resp.StatusCode != http.StatusUnauthorized {
+	_, opts = postJSON(t, s, "/api/login/passkey/options", nil, "")
+	if resp, _ := postJSON(t, s, "/api/login/passkey", stranger.get(t, opts, "http://"+domain), ""); resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("unknown passkey: %d", resp.StatusCode)
 	}
 
 	// Registering needs the CSRF token.
-	if resp, _ := postJSON(t, b, "/account/passkeys/options", nil, ""); resp.StatusCode != http.StatusForbidden {
+	if resp, _ := postJSON(t, b, "/api/account/passkeys/options", nil, ""); resp.StatusCode != http.StatusForbidden {
 		t.Errorf("registration without CSRF token: %d", resp.StatusCode)
 	}
 
@@ -233,24 +222,42 @@ func TestPasskeys(t *testing.T) {
 	u, _ := h.store.UserByEmail(t.Context(), "alice@example.com")
 	h.store.SetUserDisabled(t.Context(), u.ID, true)
 	d := h.browser(true)
-	_, opts = postJSON(t, d, "/login/passkey/options", nil, "")
-	if resp, _ := postJSON(t, d, "/login/passkey", a.get(t, opts, "http://"+domain), ""); resp.StatusCode != http.StatusForbidden {
+	_, opts = postJSON(t, d, "/api/login/passkey/options", nil, "")
+	if resp, _ := postJSON(t, d, "/api/login/passkey", a.get(t, opts, "http://"+domain), ""); resp.StatusCode != http.StatusForbidden {
 		t.Errorf("disabled user's passkey: %d", resp.StatusCode)
 	}
 
+	// Removing one. (Disabling ended Alice's sessions: sign in again.)
+	h.store.SetUserDisabled(t.Context(), u.ID, false)
+	b = h.loggedIn("alice@example.com")
+	_, account := call(t, b, "GET", "/api/account", nil)
+	id := decode[struct {
+		Passkeys []struct {
+			ID int64 `json:"id"`
+		} `json:"passkeys"`
+	}](t, account).Passkeys[0].ID
+	other := h.loggedIn("bob@example.com")
+	if resp, _ := call(t, other, "DELETE", fmt.Sprintf("/api/account/passkeys/%d", id), nil); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("another user removes the passkey: %d", resp.StatusCode)
+	}
+	if resp, _ := call(t, b, "DELETE", fmt.Sprintf("/api/account/passkeys/%d", id), nil); resp.StatusCode != http.StatusNoContent {
+		t.Errorf("remove passkey: %d", resp.StatusCode)
+	}
+	if _, body := call(t, b, "GET", "/api/account", nil); body != `{"passkeys":[]}`+"\n" {
+		t.Errorf("account after removing: %s", body)
+	}
 }
 
 func TestPasskeysCanBeDisabled(t *testing.T) {
 	h := newHarness(t, "  disable_passkeys: true")
 	b := h.browser(true)
-	if _, page := get(t, b, "http://"+domain+"/login"); strings.Contains(page, "passkey") {
-		t.Error("login page offers passkeys")
+	if _, boot := page(t, b, "/login"); boot.Passkeys {
+		t.Error("the sign-in page offers passkeys")
 	}
-	if resp, _ := postJSON(t, b, "/login/passkey/options", nil, ""); resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusMethodNotAllowed {
+	if resp, _ := postJSON(t, b, "/api/login/passkey/options", nil, ""); resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("passkey endpoint: %d", resp.StatusCode)
 	}
-	resp, page := h.emailLogin(b, "alice@example.com", "/")
-	if resp.Request.URL.Path != "/" || strings.Contains(page, "Sign in faster") {
-		t.Errorf("without passkeys, login should not suggest one (landed on %s)", resp.Request.URL)
+	if next := h.emailLogin(b, "alice@example.com", "/"); next != "/" {
+		t.Errorf("without passkeys, login should not suggest one (the app goes to %q)", next)
 	}
 }

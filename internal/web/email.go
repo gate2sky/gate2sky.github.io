@@ -151,19 +151,25 @@ func sixDigits() string {
 // or not the address may sign in, so it reveals nothing about accounts,
 // and addresses that may not sign in get no email at all.
 func (s *Server) handleEmailLogin(w http.ResponseWriter, r *http.Request) {
-	rd := localPath(r.PostFormValue("rd"))
-	addr, err := mail.ParseAddress(strings.TrimSpace(r.PostFormValue("email")))
+	var req struct {
+		Email    string `json:"email"`
+		Redirect string `json:"rd"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	addr, err := mail.ParseAddress(strings.TrimSpace(req.Email))
 	if err != nil || addr.Name != "" {
-		s.renderLogin(w, r, http.StatusBadRequest, rd, "Enter a valid email address.")
+		jsonError(w, http.StatusBadRequest, "Enter a valid email address.")
 		return
 	}
 	email := store.NormalizeEmail(addr.Address)
 	if !s.codes.byIP.allow(s.clientIP(r)) || !s.codes.byEmail.allow(email) {
-		s.renderLogin(w, r, http.StatusTooManyRequests, rd, "Too many codes requested. Wait a few minutes and try again.")
+		jsonError(w, http.StatusTooManyRequests, "Too many codes requested. Wait a few minutes and try again.")
 		return
 	}
 
-	flow := emailFlow{ID: randomString(16), Email: email, Redirect: rd}
+	flow := emailFlow{ID: randomString(16), Email: email, Redirect: localPath(req.Redirect)}
 	ttl := s.cfg.Auth.Email.CodeTTL
 	if s.mayUseEmail(r.Context(), email) {
 		code := sixDigits()
@@ -188,7 +194,14 @@ func (s *Server) handleEmailLogin(w http.ResponseWriter, r *http.Request) {
 		s.log.Info("sign-in code not sent: address may not sign in", "email", email, "ip", s.clientIP(r))
 	}
 	s.setCookie(w, s.cookies.emailLogin, s.signer.sign("email-login", flow, ttl), time.Now().Add(ttl))
-	http.Redirect(w, r, "/login/code", http.StatusSeeOther)
+	writeJSON(w, http.StatusOK, map[string]string{"email": email})
+}
+
+// handleEmailCancel forgets the code this browser is waiting for, to ask
+// for one at another address.
+func (s *Server) handleEmailCancel(w http.ResponseWriter, r *http.Request) {
+	s.clearCookie(w, s.cookies.emailLogin)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // mayUseEmail reports whether a code should be sent to email.
@@ -212,45 +225,37 @@ func (s *Server) emailFlow(r *http.Request) (*emailFlow, bool) {
 	return &f, true
 }
 
-type codePage struct {
-	Email string
-	Error string
-}
-
-func (s *Server) handleCodePage(w http.ResponseWriter, r *http.Request) {
-	f, ok := s.emailFlow(r)
-	if !ok {
-		http.Redirect(w, r, "/login", http.StatusFound)
-		return
-	}
-	s.render(w, r, http.StatusOK, "login_code", "Enter your code", codePage{Email: f.Email})
-}
-
 func (s *Server) handleCodeLogin(w http.ResponseWriter, r *http.Request) {
-	f, ok := s.emailFlow(r)
-	if !ok {
-		s.renderLogin(w, r, http.StatusBadRequest, "/", "Your sign-in attempt expired. Ask for a new code.")
+	var req struct {
+		Code string `json:"code"`
+	}
+	if !decode(w, r, &req) {
 		return
 	}
-	code := strings.Join(strings.Fields(r.PostFormValue("code")), "")
+	f, ok := s.emailFlow(r)
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, apiError{Error: "Your sign-in attempt expired. Ask for a new code.", Expired: true})
+		return
+	}
+	code := strings.Join(strings.Fields(req.Code), "")
 	switch s.codes.check(f.ID, code) {
 	case codeWrong:
-		s.render(w, r, http.StatusUnauthorized, "login_code", "Enter your code", codePage{Email: f.Email, Error: "That code is not right. Check the email and try again."})
+		jsonError(w, http.StatusUnauthorized, "That code is not right. Check the email and try again.")
 		return
 	case codeExpired:
 		s.clearCookie(w, s.cookies.emailLogin)
-		s.renderLogin(w, r, http.StatusUnauthorized, f.Redirect, "That code has expired or was tried too many times. Ask for a new one.")
+		writeJSON(w, http.StatusUnauthorized, apiError{Error: "That code has expired or was tried too many times. Ask for a new one.", Expired: true})
 		return
 	}
 	s.clearCookie(w, s.cookies.emailLogin)
 	user, err := s.store.EnsureUser(r.Context(), f.Email)
 	if err != nil {
-		s.internalError(w, r, "load user", err)
+		s.internalError(w, "load user", err)
 		return
 	}
 	if msg, ok := s.startSession(w, r, user, "email"); !ok {
-		s.renderError(w, r, http.StatusForbidden, msg)
+		jsonError(w, http.StatusForbidden, msg)
 		return
 	}
-	http.Redirect(w, r, s.afterLogin(r, user, f.Redirect), http.StatusSeeOther)
+	writeJSON(w, http.StatusOK, map[string]string{"redirect": s.afterLogin(r, user, f.Redirect)})
 }

@@ -1,0 +1,59 @@
+<script :setup>
+  // The page: the top bar, and the view the path names. Signed out, every
+  // path shows the sign-in form, which comes back to that path.
+  const { app, route } = await import("@ui/lib/store.js")
+  const { api } = await import("@ui/lib/api.js")
+  const Login = await import("@ui/views/login.html")
+  const Subdomains = await import("@ui/views/subdomains.html")
+  const Subdomain = await import("@ui/views/subdomain.html")
+  const Account = await import("@ui/views/account.html")
+  const Admin = await import("@ui/views/admin.html")
+
+  $: current = route(app.path) || { page: "missing" }
+  $: section = current.page === "subdomain" ? "subdomains" : current.page
+
+  const signOut = async () => {
+    await api("POST", "/logout").catch(() => {})
+    location.assign("/login")
+  }
+</script>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="/">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="currentColor" opacity=".18"/><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 11.5V10a3 3 0 0 1 6 0v1.5M8.5 11.5h7v5h-7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      securegate
+    </a>
+    <nav class="nav" :if="app.user">
+      <a href="/" :class.active="section === 'subdomains'">Subdomains</a>
+      <a href="/admin" :if="app.user.admin" :class.active="section === 'admin'">Admin</a>
+      <a href="/account" class="who" :class.active="section === 'account'">
+        <img :if="app.user.avatar_url" class="avatar" :src="app.user.avatar_url" alt="">
+        <span>{{ app.user.email }}</span>
+      </a>
+      <button type="button" class="link" @click="signOut">Sign out</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div :if="app.toast" class="flash toast" :class="'flash-' + app.toast.kind" role="status">{{ app.toast.text }}</div>
+
+  <section :if="app.error" class="card error-page">
+    <h1>{{ app.error.status }} · {{ app.error.title }}</h1>
+    <p>{{ app.error.message }}</p>
+    <p><a href="/">← Back to securegate</a></p>
+  </section>
+  <Login :elseif="!app.user" />
+  <Subdomains :elseif="current.page === 'subdomains' || current.page === 'login'" />
+  <Subdomain :elseif="current.page === 'subdomain'" :name="current.name" />
+  <Account :elseif="current.page === 'account'" />
+  <Admin :elseif="current.page === 'admin' && app.user.admin" />
+  <section :else class="card error-page">
+    <h1>404 · Not Found</h1>
+    <p>There is no page here.</p>
+    <p><a href="/">← Back to securegate</a></p>
+  </section>
+</main>
+
+<footer class="wrap footer">securegate · SSH tunnels on *.{{ app.domain }}</footer>

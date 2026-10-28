@@ -138,7 +138,7 @@ func (s *Server) serveTunnel(w http.ResponseWriter, r *http.Request, name string
 	}
 
 	// The service behind the tunnel must never see securegate's cookies.
-	stripCookies(r, s.cookies.access, s.cookies.session, s.cookies.oauth, s.cookies.flash)
+	stripCookies(r, s.cookies.access, s.cookies.session, s.cookies.oauth, s.cookies.emailLogin, s.cookies.passkey)
 	t.CountRequest()
 	ctx := tunnel.WithOrigin(r.Context(), r.RemoteAddr)
 	ctx = context.WithValue(ctx, proxyCtxKey{}, &proxyCtx{tunnel: t, start: time.Now()})
@@ -196,7 +196,7 @@ func (s *Server) handleTunnelAuth(w http.ResponseWriter, r *http.Request) {
 	rd := r.URL.Query().Get("rd")
 	name, target, ok := s.parseTunnelURL(rd)
 	if !ok {
-		s.renderError(w, r, http.StatusBadRequest, "Invalid tunnel address.")
+		s.pageError(w, r, http.StatusBadRequest, "Invalid tunnel address.")
 		return
 	}
 	a := currentAuth(r)
@@ -206,15 +206,16 @@ func (s *Server) handleTunnelAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := s.store.SubdomainByName(r.Context(), name)
 	if errors.Is(err, store.ErrNotFound) {
-		s.renderError(w, r, http.StatusNotFound, s.cfg.TunnelHost(name)+" is not registered.")
+		s.pageError(w, r, http.StatusNotFound, s.cfg.TunnelHost(name)+" is not registered.")
 		return
 	}
 	if err != nil {
-		s.internalError(w, r, "load subdomain", err)
+		s.log.Error("load subdomain", "err", err)
+		s.pageError(w, r, http.StatusInternalServerError, msgInternal)
 		return
 	}
 	if !canAccess(d.Access, d.UserID, a.User) {
-		s.renderError(w, r, http.StatusForbidden, a.User.Email+" does not have access to "+s.cfg.TunnelHost(name)+".")
+		s.pageError(w, r, http.StatusForbidden, a.User.Email+" does not have access to "+s.cfg.TunnelHost(name)+".")
 		return
 	}
 	token := s.signer.sign("handoff", handoff{Host: name, SessionID: a.Session.ID, Nonce: randomString(16)}, handoffTTL)
@@ -265,7 +266,7 @@ func (s *Server) handleTunnelAuthCallback(w http.ResponseWriter, r *http.Request
 // renderTunnelError writes a self-contained error page on a tunnel host.
 func (s *Server) renderTunnelError(w http.ResponseWriter, status int, title, msg string) {
 	var buf bytes.Buffer
-	err := s.pages["tunnel_error"].Execute(&buf, struct {
+	err := s.tunnelErr.Execute(&buf, struct {
 		Status       int
 		Title, Msg   string
 		DashboardURL string

@@ -1,0 +1,200 @@
+<script :setup="{ name }">
+  // One subdomain: its connection, who can open it, its SSH keys, and the
+  // way to delete it.
+  const { app, go, toast } = await import("@ui/lib/store.js")
+  const { api } = await import("@ui/lib/api.js")
+  const { ago, bytes, plural } = await import("@ui/lib/format.js")
+  const AccessOptions = await import("@ui/components/access-options.html")
+  const StatusBadge = await import("@ui/components/status-badge.html")
+  const CopyText = await import("@ui/components/copy-text.html")
+
+  let sub = null
+  let missing = false
+  // The name `sub` describes, to load again when the page shows another.
+  let loaded = ""
+
+  const path = () => "/subdomains/" + encodeURIComponent(name)
+
+  const load = async () => {
+    const asked = name
+    try {
+      const detail = await api("GET", "/subdomains/" + encodeURIComponent(asked))
+      if (asked !== name) return
+      sub = detail
+      missing = false
+    } catch (e) {
+      if (asked !== name) return
+      if (e.status === 404) {
+        sub = null
+        missing = true
+      } else toast(e.message, "error")
+    }
+    loaded = asked
+  }
+  await load()
+  $: name !== loaded && load()
+  $: document.title = `${name} · securegate`
+
+  $attached(() => {
+    const timer = setInterval(() => document.hidden || load(), 5000)
+    const off = $detached(() => {
+      clearInterval(timer)
+      off()
+    })
+  })
+
+  const setAccess = async access => {
+    try {
+      sub.access = (await api("PATCH", path(), { access })).access
+      toast(`Access set to ${access}.`)
+    } catch (e) {
+      toast(e.message, "error")
+      load()
+    }
+  }
+
+  const disconnect = async () => {
+    try {
+      await api("POST", path() + "/disconnect")
+      toast("Disconnected.")
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    load()
+  }
+
+  let newKeys = ""
+  let keyName = ""
+  let busy = false
+  let keyError = ""
+
+  const addKeys = async () => {
+    busy = true
+    keyError = ""
+    try {
+      const result = await api("POST", path() + "/keys", { keys: newKeys, name: keyName })
+      const problems = result.problems || []
+      if (problems.length) keyError = `Added ${plural(result.added, "key")}, but: ${problems.join("; ")}.`
+      else toast(`Added ${plural(result.added, "key")}.`)
+      if (result.added) {
+        newKeys = ""
+        keyName = ""
+      }
+      await load()
+    } catch (e) {
+      keyError = e.message
+    }
+    busy = false
+  }
+
+  const removeKey = async key => {
+    if (!confirm(`Remove the key "${key.name}"? Whoever uses it can no longer open this tunnel.`)) return
+    try {
+      await api("DELETE", `${path()}/keys/${key.id}`)
+      toast(`Removed the key "${key.name}".`)
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    load()
+  }
+
+  let confirmName = ""
+  const remove = async () => {
+    try {
+      await api("DELETE", path())
+      toast(`Deleted ${name}.${app.domain}.`)
+      go("/")
+    } catch (e) {
+      toast(e.message, "error")
+    }
+  }
+</script>
+
+<p class="crumbs"><a href="/">← Subdomains</a></p>
+
+<section :if="missing" class="card error-page">
+  <h1>Subdomain not found</h1>
+  <p><strong>{{ name }}.{{ app.domain }}</strong> is not registered, or is not yours.</p>
+</section>
+
+<div :elseif="sub">
+  <div class="page-head">
+    <div>
+      <h1>{{ sub.name }}<span class="muted">.{{ app.domain }}</span></h1>
+      <a :href="sub.url" target="_blank" rel="noopener noreferrer">{{ sub.url }}</a>
+    </div>
+    <StatusBadge :tunnel="sub.tunnel" />
+  </div>
+  <div :if="!sub.mine" class="flash flash-info">You are managing {{ sub.owner }}’s subdomain as an administrator.</div>
+
+  <section class="card">
+    <h2>Connection</h2>
+    <div :if="sub.tunnel">
+      <dl class="stats">
+        <div><dt>Client</dt><dd>{{ sub.tunnel.client_addr }}</dd></div>
+        <div><dt>SSH key</dt><dd>{{ sub.tunnel.key_name }}</dd></div>
+        <div><dt>Connected</dt><dd>{{ ago(sub.tunnel.created_at) }}</dd></div>
+        <div><dt>Requests</dt><dd>{{ sub.tunnel.requests }}</dd></div>
+        <div><dt>Traffic in / out</dt><dd>{{ bytes(sub.tunnel.bytes_in) }} / {{ bytes(sub.tunnel.bytes_out) }}</dd></div>
+        <div><dt>Open streams</dt><dd>{{ sub.tunnel.active_conns }}</dd></div>
+      </dl>
+      <button type="button" class="button button-secondary" @click="disconnect">Disconnect</button>
+      <p class="muted">To connect again later, or from another machine with an authorized key:</p>
+    </div>
+    <p :else class="muted">No client is connected. Start your service locally, then run:</p>
+    <CopyText :command="sub.ssh_command" />
+    <p class="muted small">Replace <code>3000</code> with your local port. Add <code>-N</code> to run without a console;
+      use <code>autossh -M 0</code> to reconnect automatically.</p>
+  </section>
+
+  <section class="card">
+    <h2>Access</h2>
+    <fieldset>
+      <legend class="sr-only">Who can open {{ sub.name }}.{{ app.domain }}</legend>
+      <AccessOptions :model="sub.access" @pick="setAccess($event.detail)" />
+    </fieldset>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>SSH keys</h2><span class="muted">{{ sub.key_list.length }} of {{ app.limits.keys }}</span></div>
+    <p class="muted">Only these keys can open the tunnel for {{ sub.name }}.{{ app.domain }}.</p>
+    <div :if="sub.key_list.length" class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Name</th><th>Fingerprint</th><th>Added</th><th>Last used</th><th></th></tr></thead>
+        <tbody>
+          <tr :each="key in sub.key_list" :key="key.id">
+            <td>{{ key.name }} <div class="muted small">{{ key.type }}</div></td>
+            <td><code class="small">{{ key.fingerprint }}</code></td>
+            <td>{{ ago(key.created_at) }}</td>
+            <td>{{ ago(key.last_used_at) }}</td>
+            <td class="right"><button type="button" class="link danger" @click="removeKey(key)">Remove</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p :else class="empty-inline">No keys yet — nobody can connect.</p>
+
+    <div :if="keyError" class="flash flash-error" role="alert">{{ keyError }}</div>
+    <form class="form" @submit.prevent="addKeys">
+      <label>Public keys
+        <span class="hint">One per line: the contents of <code>~/.ssh/id_ed25519.pub</code>, or of <code>https://github.com/&lt;user&gt;.keys</code>.</span>
+        <textarea name="keys" rows="3" required spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"
+                  :value="newKeys" @input="newKeys = $event.target.value"></textarea>
+      </label>
+      <label>Name <span class="hint">Optional. Defaults to the key comment.</span>
+        <input name="name" maxlength="64" autocomplete="off" :value="keyName" @input="keyName = $event.target.value">
+      </label>
+      <div><button type="submit" class="button" :disabled="busy">Add keys</button></div>
+    </form>
+  </section>
+
+  <section class="card danger-zone">
+    <h2>Delete subdomain</h2>
+    <p>Closes the tunnel and removes {{ sub.name }}.{{ app.domain }} and its keys. The name becomes available to anyone.</p>
+    <form class="form form-row" @submit.prevent="remove">
+      <input name="confirm" required autocomplete="off" spellcheck="false" :placeholder="'type ' + sub.name + ' to confirm'"
+             :aria-label="'Type ' + sub.name + ' to confirm'" :value="confirmName" @input="confirmName = $event.target.value">
+      <button type="submit" class="button button-danger" :disabled="confirmName !== sub.name">Delete</button>
+    </form>
+  </section>
+</div>

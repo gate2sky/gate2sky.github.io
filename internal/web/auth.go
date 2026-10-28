@@ -61,32 +61,6 @@ func (s *Server) provider(id string) provider {
 	return nil
 }
 
-func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
-	rd := localPath(r.URL.Query().Get("rd"))
-	if currentAuth(r) != nil {
-		http.Redirect(w, r, rd, http.StatusFound)
-		return
-	}
-	s.renderLogin(w, r, http.StatusOK, rd, "")
-}
-
-type loginPage struct {
-	RD        string
-	Email     bool
-	Providers []loginButton
-	Error     string
-}
-
-type loginButton struct{ URL, Name string }
-
-func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int, rd, errMsg string) {
-	page := loginPage{RD: rd, Email: s.cfg.Auth.Email.Enabled(), Error: errMsg}
-	for _, p := range s.providers {
-		page.Providers = append(page.Providers, loginButton{"/auth/" + p.ID() + "/login?rd=" + url.QueryEscape(rd), p.Name()})
-	}
-	s.render(w, r, status, "login", "Sign in", page)
-}
-
 // startSession signs user in on this browser. It returns a message for
 // the user when they may not sign in.
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user *store.User, method string) (string, bool) {
@@ -100,7 +74,7 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user *stor
 	token, sess, err := s.store.CreateSession(r.Context(), user.ID, s.cfg.Auth.SessionTTL)
 	if err != nil {
 		s.log.Error("create session", "err", err)
-		return "Something went wrong. Please try again.", false
+		return msgInternal, false
 	}
 	s.log.Info("signed in", "method", method, "email", user.Email, "user_id", user.ID, "ip", s.clientIP(r))
 	s.setCookie(w, s.cookies.session, token, sess.ExpiresAt)
@@ -123,7 +97,7 @@ func (s *Server) afterLogin(r *http.Request, user *store.User, rd string) string
 func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) {
 	p := s.provider(r.PathValue("provider"))
 	if p == nil {
-		s.renderError(w, r, http.StatusNotFound, "Unknown sign-in provider.")
+		s.pageError(w, r, http.StatusNotFound, "Unknown sign-in provider.")
 		return
 	}
 	flow := oauthFlow{
@@ -136,7 +110,7 @@ func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) {
 	authURL, err := p.AuthCodeURL(r.Context(), flow.State, flow.Nonce, flow.Verifier)
 	if err != nil {
 		s.log.Error("start oauth login", "provider", p.ID(), "err", err)
-		s.renderError(w, r, http.StatusBadGateway, p.Name()+" is not reachable right now. Please try again later.")
+		s.pageError(w, r, http.StatusBadGateway, p.Name()+" is not reachable right now. Please try again later.")
 		return
 	}
 	s.setCookie(w, s.cookies.oauth, s.signer.sign("oauth", flow, oauthFlowTTL), time.Now().Add(oauthFlowTTL))
@@ -146,19 +120,19 @@ func (s *Server) handleOAuthLogin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	p := s.provider(r.PathValue("provider"))
 	if p == nil {
-		s.renderError(w, r, http.StatusNotFound, "Unknown sign-in provider.")
+		s.pageError(w, r, http.StatusNotFound, "Unknown sign-in provider.")
 		return
 	}
 	var flow oauthFlow
 	c, err := r.Cookie(s.cookies.oauth)
 	if err != nil || s.signer.verify("oauth", c.Value, &flow) != nil {
-		s.renderError(w, r, http.StatusBadRequest, "Your sign-in attempt expired. Please try again.")
+		s.pageError(w, r, http.StatusBadRequest, "Your sign-in attempt expired. Please try again.")
 		return
 	}
 	s.clearCookie(w, s.cookies.oauth)
 	q := r.URL.Query()
 	if flow.Provider != p.ID() || subtle.ConstantTimeCompare([]byte(q.Get("state")), []byte(flow.State)) != 1 {
-		s.renderError(w, r, http.StatusBadRequest, "Sign-in state mismatch. Please try again.")
+		s.pageError(w, r, http.StatusBadRequest, "Sign-in state mismatch. Please try again.")
 		return
 	}
 	if e := q.Get("error"); e != "" {
@@ -166,14 +140,14 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		if msg == "" {
 			msg = e
 		}
-		s.renderError(w, r, http.StatusForbidden, p.Name()+" did not sign you in: "+msg)
+		s.pageError(w, r, http.StatusForbidden, p.Name()+" did not sign you in: "+msg)
 		return
 	}
 
 	id, err := p.Identify(r.Context(), q.Get("code"), flow.Nonce, flow.Verifier)
 	if err != nil {
 		s.log.Warn("oauth callback", "provider", p.ID(), "err", err)
-		s.renderError(w, r, http.StatusForbidden, "Sign-in with "+p.Name()+" failed: "+err.Error())
+		s.pageError(w, r, http.StatusForbidden, "Sign-in with "+p.Name()+" failed: "+err.Error())
 		return
 	}
 	if !strings.HasPrefix(id.AvatarURL, "https://") {
@@ -182,16 +156,17 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	// Check before creating an account for someone who may not sign in.
 	if !s.cfg.EmailAllowed(id.Email) {
 		s.log.Info("sign-in denied", "method", p.ID(), "email", id.Email)
-		s.renderError(w, r, http.StatusForbidden, fmt.Sprintf("The account %s is not allowed to use this securegate.", id.Email))
+		s.pageError(w, r, http.StatusForbidden, fmt.Sprintf("The account %s is not allowed to use this securegate.", id.Email))
 		return
 	}
 	user, err := s.store.LoginOAuth(r.Context(), *id)
 	if err != nil {
-		s.internalError(w, r, "save user", err)
+		s.log.Error("save user", "err", err)
+		s.pageError(w, r, http.StatusInternalServerError, msgInternal)
 		return
 	}
 	if msg, ok := s.startSession(w, r, user, p.ID()); !ok {
-		s.renderError(w, r, http.StatusForbidden, msg)
+		s.pageError(w, r, http.StatusForbidden, msg)
 		return
 	}
 	http.Redirect(w, r, s.afterLogin(r, user, flow.Redirect), http.StatusFound)
@@ -202,7 +177,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("delete session", "err", err)
 	}
 	s.clearCookie(w, s.cookies.session)
-	http.Redirect(w, r, "/", http.StatusFound)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // githubProvider signs users in with GitHub (or GitHub Enterprise Server).

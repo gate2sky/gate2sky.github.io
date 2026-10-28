@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>securegate</title>
+<link rel="stylesheet" href="/ui/app.css">
+<link rel="icon" href="/ui/favicon.svg" type="image/svg+xml">
+<script type="application/json" id="boot">{{.Boot}}</script>
+</head>
+<body>
+<div id="app"></div>
+<noscript><p class="wrap">The securegate dashboard needs JavaScript.</p></noscript>
+<!-- The nonce is new on every response and the CSP names it: jq79 finds it
+     here and builds each component's functions as scripts that carry it,
+     so the page never needs eval. -->
+<script type="importmap" nonce="{{.Nonce}}">{ "imports": { "@ui/": "/ui/" } }</script>
+<script type="module" nonce="{{.Nonce}}">
+  import { C79 } from "@ui/vendor/jq79.js"
+  await C79.safeEval({ nonce: true })
+  C79.fetch("/ui/app.html").mount("#app")
+</script>
+</body>
+</html>

@@ -145,18 +145,18 @@ func randomID() string {
 
 // Stats is a snapshot of a tunnel for display.
 type Stats struct {
-	ID            string
-	Subdomain     string
-	OwnerID       int64
-	Access        store.Access
-	KeyName       string
-	ClientAddr    string
-	ClientVersion string
-	CreatedAt     time.Time
-	Requests      int64
-	BytesIn       int64
-	BytesOut      int64
-	ActiveConns   int64
+	ID            string       `json:"id"`
+	Subdomain     string       `json:"subdomain"`
+	OwnerID       int64        `json:"owner_id"`
+	Access        store.Access `json:"access"`
+	KeyName       string       `json:"key_name"`
+	ClientAddr    string       `json:"client_addr"`
+	ClientVersion string       `json:"client_version"`
+	CreatedAt     time.Time    `json:"created_at"`
+	Requests      int64        `json:"requests"`
+	BytesIn       int64        `json:"bytes_in"`
+	BytesOut      int64        `json:"bytes_out"`
+	ActiveConns   int64        `json:"active_conns"`
 }
 
 // Stats returns a snapshot of the tunnel.

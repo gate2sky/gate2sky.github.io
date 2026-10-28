@@ -15,10 +15,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jgermade/securegate/internal/api"
 	"github.com/jgermade/securegate/internal/config"
 	"github.com/jgermade/securegate/internal/manage"
 	"github.com/jgermade/securegate/internal/store"
-	"github.com/jgermade/securegate/internal/tunnel"
 )
 
 // Status describes the running server.
@@ -33,46 +33,14 @@ type Status struct {
 	Users         int       `json:"users"`
 }
 
-// Subdomain is a registered subdomain and its live tunnel, if any.
-type Subdomain struct {
-	Name      string        `json:"name"`
-	URL       string        `json:"url"`
-	Owner     string        `json:"owner"`
-	Access    store.Access  `json:"access"`
-	Keys      int           `json:"keys"`
-	CreatedAt time.Time     `json:"created_at"`
-	Tunnel    *tunnel.Stats `json:"tunnel,omitempty"`
-}
-
-// Key is an SSH key authorized on a subdomain.
-type Key struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	Type        string    `json:"type"`
-	Fingerprint string    `json:"fingerprint"`
-	CreatedAt   time.Time `json:"created_at"`
-	LastUsedAt  time.Time `json:"last_used_at"`
-}
-
-// SubdomainDetail is a subdomain with its keys.
-type SubdomainDetail struct {
-	Subdomain
-	KeyList []Key `json:"key_list"`
-}
-
-// User is an account.
-type User struct {
-	ID          int64     `json:"id"`
-	Email       string    `json:"email"`
-	Name        string    `json:"name"`
-	Disabled    bool      `json:"disabled"`
-	Admin       bool      `json:"admin"`
-	Allowed     bool      `json:"allowed"`
-	Subdomains  int       `json:"subdomains"`
-	Passkeys    int       `json:"passkeys"`
-	Providers   string    `json:"providers"`
-	LastLoginAt time.Time `json:"last_login_at"`
-}
+// The shapes the socket answers with are the dashboard API's.
+type (
+	Subdomain       = api.Subdomain
+	Key             = api.Key
+	SubdomainDetail = api.SubdomainDetail
+	User            = api.User
+	KeysResult      = api.KeysResult
+)
 
 // CreateSubdomainRequest registers a subdomain for Owner (created if new).
 type CreateSubdomainRequest struct {
@@ -86,12 +54,6 @@ type CreateSubdomainRequest struct {
 type KeysRequest struct {
 	Keys string `json:"keys"`
 	Name string `json:"name"`
-}
-
-// KeysResult reports added keys.
-type KeysResult struct {
-	Added    int      `json:"added"`
-	Problems []string `json:"problems,omitempty"`
 }
 
 const actor = "local admin"
@@ -215,15 +177,7 @@ func (h *Handler) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) subdomain(d *store.Subdomain) Subdomain {
-	return Subdomain{
-		Name:      d.Name,
-		URL:       h.cfg.TunnelURL(d.Name),
-		Owner:     d.OwnerEmail,
-		Access:    d.Access,
-		Keys:      d.Keys,
-		CreatedAt: d.CreatedAt,
-		Tunnel:    h.manage.Tunnel(d.Name),
-	}
+	return api.NewSubdomain(h.cfg, d, h.manage.Tunnel(d.Name))
 }
 
 func (h *Handler) listSubdomains(w http.ResponseWriter, r *http.Request) {
@@ -258,11 +212,7 @@ func (h *Handler) getSubdomain(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, err)
 		return
 	}
-	out := SubdomainDetail{Subdomain: h.subdomain(d), KeyList: []Key{}}
-	for _, k := range keys {
-		out.KeyList = append(out.KeyList, Key{ID: k.ID, Name: k.Name, Type: k.Type(), Fingerprint: k.Fingerprint, CreatedAt: k.CreatedAt, LastUsedAt: k.LastUsedAt})
-	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, SubdomainDetail{Subdomain: h.subdomain(d), KeyList: api.NewKeys(keys)})
 }
 
 func (h *Handler) createSubdomain(w http.ResponseWriter, r *http.Request) {
@@ -297,7 +247,7 @@ func (h *Handler) createSubdomain(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, struct {
 		Subdomain Subdomain  `json:"subdomain"`
 		Keys      KeysResult `json:"keys"`
-	}{h.subdomain(d), KeysResult{res.Added, res.Problems}})
+	}{h.subdomain(d), KeysResult{Added: res.Added, Problems: res.Problems}})
 }
 
 func (h *Handler) setAccess(w http.ResponseWriter, r *http.Request) {
@@ -334,7 +284,7 @@ func (h *Handler) addKeys(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, KeysResult{res.Added, res.Problems})
+	writeJSON(w, http.StatusOK, KeysResult{Added: res.Added, Problems: res.Problems})
 }
 
 func (h *Handler) removeKey(w http.ResponseWriter, r *http.Request) {
@@ -378,11 +328,7 @@ func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]User, len(users))
 	for i, u := range users {
-		out[i] = User{
-			ID: u.ID, Email: u.Email, Name: u.Name, Disabled: u.Disabled,
-			Admin: h.cfg.IsAdmin(u.Email), Allowed: h.cfg.EmailAllowed(u.Email),
-			Subdomains: u.Subdomains, Passkeys: u.Passkeys, Providers: u.Providers, LastLoginAt: u.LastLoginAt,
-		}
+		out[i] = api.NewUser(h.cfg, u)
 	}
 	writeJSON(w, http.StatusOK, out)
 }

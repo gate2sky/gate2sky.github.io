@@ -3,14 +3,12 @@
 package web
 
 import (
-	"bytes"
 	"context"
 	"crypto/subtle"
 	"embed"
 	"errors"
 	"fmt"
 	"html/template"
-	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -28,7 +26,7 @@ import (
 	"github.com/jgermade/securegate/internal/tunnel"
 )
 
-//go:embed templates static
+//go:embed templates ui
 var assets embed.FS
 
 // Options configure a Server.
@@ -62,13 +60,15 @@ type Server struct {
 	webauthn  *webauthn.WebAuthn
 	cookies   cookieNames
 	providers []provider
-	pages     map[string]*template.Template
+	shell     *template.Template
+	tunnelErr *template.Template
+	ui        map[string]uiFile
 	dashboard http.Handler
 	proxy     *httputil.ReverseProxy
 }
 
 type cookieNames struct {
-	session, oauth, flash, access, emailLogin, passkey string
+	session, oauth, access, emailLogin, passkey string
 }
 
 // New builds the handler.
@@ -103,7 +103,6 @@ func New(o Options) (*Server, error) {
 	s.cookies = cookieNames{
 		session:    prefix + "securegate",
 		oauth:      prefix + "securegate-oauth",
-		flash:      prefix + "securegate-flash",
 		access:     prefix + "securegate-access",
 		emailLogin: prefix + "securegate-email",
 		passkey:    prefix + "securegate-passkey",
@@ -131,8 +130,14 @@ func New(o Options) (*Server, error) {
 		}
 	}
 	var err error
-	if s.pages, err = s.parseTemplates(); err != nil {
-		return nil, err
+	if s.shell, err = template.ParseFS(assets, "templates/app.html"); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
+	if s.tunnelErr, err = template.ParseFS(assets, "templates/tunnel_error.html"); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
+	if s.ui, err = loadUI(); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
 	}
 	s.dashboard = s.routes()
 	s.proxy = s.newProxy()
@@ -163,46 +168,59 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
-	static, _ := fs.Sub(assets, "static")
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
+	mux.HandleFunc("GET /ui/", s.serveUI)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
 
-	mux.HandleFunc("GET /{$}", s.handleHome)
+	// Pages: the same shell for each, and the app draws the one its path
+	// names. Signed out, every page is the sign-in form.
+	mux.HandleFunc("GET /{$}", s.handleApp)
 	mux.HandleFunc("GET /login", s.handleLoginPage)
+	mux.HandleFunc("GET /account", s.handleApp)
+	mux.HandleFunc("GET /subdomains/{name}", s.handleApp)
+	mux.HandleFunc("GET /admin", s.handleAdminPage)
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		s.pageError(w, r, http.StatusNotFound, "There is no page here.")
+	})
 	mux.HandleFunc("GET /auth/{provider}/login", s.handleOAuthLogin)
 	mux.HandleFunc("GET /auth/{provider}/callback", s.handleOAuthCallback)
 	mux.HandleFunc("GET /tunnel-auth", s.handleTunnelAuth)
+
+	// The API the app calls.
+	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
+		jsonError(w, http.StatusNotFound, "Not found.")
+	})
 	if s.cfg.Auth.Email.Enabled() {
-		mux.Handle("POST /login/email", s.sameOrigin(s.handleEmailLogin))
-		mux.HandleFunc("GET /login/code", s.handleCodePage)
-		mux.Handle("POST /login/code", s.sameOrigin(s.handleCodeLogin))
+		mux.Handle("POST /api/login/email", s.sameOrigin(s.handleEmailLogin))
+		mux.Handle("DELETE /api/login/email", s.sameOrigin(s.handleEmailCancel))
+		mux.Handle("POST /api/login/code", s.sameOrigin(s.handleCodeLogin))
 	}
 	if s.webauthn != nil {
-		mux.Handle("POST /login/passkey/options", s.sameOrigin(s.handlePasskeyLoginOptions))
-		mux.Handle("POST /login/passkey", s.sameOrigin(s.handlePasskeyLogin))
+		mux.Handle("POST /api/login/passkey/options", s.sameOrigin(s.handlePasskeyLoginOptions))
+		mux.Handle("POST /api/login/passkey", s.sameOrigin(s.handlePasskeyLogin))
 	}
 
 	user := s.requireUser
-	mux.Handle("POST /logout", user(s.handleLogout))
-	mux.Handle("GET /account", user(s.handleAccount))
+	mux.Handle("POST /api/logout", user(s.handleLogout))
+	mux.Handle("GET /api/account", user(s.handleAccount))
 	if s.webauthn != nil {
-		mux.Handle("POST /account/passkeys/options", user(s.handlePasskeyRegisterOptions))
-		mux.Handle("POST /account/passkeys", user(s.handlePasskeyRegister))
-		mux.Handle("POST /account/passkeys/{id}/delete", user(s.handleDeletePasskey))
+		mux.Handle("POST /api/account/passkeys/options", user(s.handlePasskeyRegisterOptions))
+		mux.Handle("POST /api/account/passkeys", user(s.handlePasskeyRegister))
+		mux.Handle("DELETE /api/account/passkeys/{id}", user(s.handleDeletePasskey))
 	}
-	mux.Handle("POST /subdomains", user(s.handleCreateSubdomain))
-	mux.Handle("GET /subdomains/{name}", user(s.handleSubdomain))
-	mux.Handle("POST /subdomains/{name}/access", user(s.handleSetAccess))
-	mux.Handle("POST /subdomains/{name}/keys", user(s.handleAddKeys))
-	mux.Handle("POST /subdomains/{name}/keys/{id}/delete", user(s.handleDeleteKey))
-	mux.Handle("POST /subdomains/{name}/disconnect", user(s.handleDisconnect))
-	mux.Handle("POST /subdomains/{name}/delete", user(s.handleDeleteSubdomain))
+	mux.Handle("GET /api/subdomains", user(s.handleListSubdomains))
+	mux.Handle("POST /api/subdomains", user(s.handleCreateSubdomain))
+	mux.Handle("GET /api/subdomains/{name}", user(s.handleSubdomain))
+	mux.Handle("PATCH /api/subdomains/{name}", user(s.handleUpdateSubdomain))
+	mux.Handle("DELETE /api/subdomains/{name}", user(s.handleDeleteSubdomain))
+	mux.Handle("POST /api/subdomains/{name}/keys", user(s.handleAddKeys))
+	mux.Handle("DELETE /api/subdomains/{name}/keys/{id}", user(s.handleDeleteKey))
+	mux.Handle("POST /api/subdomains/{name}/disconnect", user(s.handleDisconnect))
 
 	admin := func(h http.HandlerFunc) http.Handler { return s.requireUser(s.requireAdmin(h)) }
-	mux.Handle("GET /admin", admin(s.handleAdmin))
-	mux.Handle("POST /admin/users", admin(s.handleAdminCreateUser))
-	mux.Handle("POST /admin/users/{id}/disable", admin(s.handleSetUserDisabled(true)))
-	mux.Handle("POST /admin/users/{id}/enable", admin(s.handleSetUserDisabled(false)))
+	mux.Handle("GET /api/admin/subdomains", admin(s.handleAdminSubdomains))
+	mux.Handle("GET /api/admin/users", admin(s.handleAdminUsers))
+	mux.Handle("POST /api/admin/users", admin(s.handleAdminCreateUser))
+	mux.Handle("PATCH /api/admin/users/{id}", admin(s.handleAdminUpdateUser))
 
 	return s.securityHeaders(s.withSession(mux))
 }
@@ -210,8 +228,7 @@ func (s *Server) routes() http.Handler {
 func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
-		h.Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; "+
-			"connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+		h.Set("Content-Security-Policy", csp(""))
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "same-origin")
@@ -249,7 +266,11 @@ func (s *Server) withSession(next http.Handler) http.Handler {
 				r = r.WithContext(context.WithValue(r.Context(), authKey, a))
 			case err != nil && !errors.Is(err, store.ErrNotFound):
 				s.log.Error("load session", "err", err)
-				s.renderError(w, r, http.StatusInternalServerError, "Something went wrong. Please try again.")
+				if isAPI(r) {
+					jsonError(w, http.StatusInternalServerError, msgInternal)
+				} else {
+					s.pageError(w, r, http.StatusInternalServerError, msgInternal)
+				}
 				return
 			default:
 				s.clearCookie(w, s.cookies.session)
@@ -259,38 +280,29 @@ func (s *Server) withSession(next http.Handler) http.Handler {
 	})
 }
 
-// requireUser redirects anonymous visitors to the login page and checks
-// the CSRF token of state-changing requests.
+// requireUser answers API calls from anonymous visitors with a 401, and
+// checks the origin and CSRF token of calls that change something.
 func (s *Server) requireUser(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a := currentAuth(r)
-		if r.Method == http.MethodGet || r.Method == http.MethodHead {
-			if a == nil {
-				http.Redirect(w, r, "/login?rd="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
+		if a == nil {
+			jsonError(w, http.StatusUnauthorized, "Your session has ended. Please sign in again.")
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
+			// Tunnel subdomains are same-site with the dashboard, so SameSite
+			// cookies do not stop their pages from calling the API: check
+			// both the origin and the session's token.
+			if !s.fromDashboard(r) {
+				jsonError(w, http.StatusForbidden, "Cross-origin request blocked.")
 				return
 			}
-			next(w, r)
-			return
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
-		if a == nil {
-			s.renderError(w, r, http.StatusUnauthorized, "Your session has expired. Please sign in again.")
-			return
-		}
-		// Tunnel subdomains are same-site with the dashboard, so SameSite
-		// cookies do not stop them from submitting forms here: check both
-		// the origin and a per-session token (a header for fetch requests).
-		if !s.fromDashboard(r) {
-			s.renderError(w, r, http.StatusForbidden, "Cross-origin request blocked.")
-			return
-		}
-		token := r.Header.Get("X-CSRF-Token")
-		if token == "" {
-			token = r.PostFormValue("csrf_token")
-		}
-		if subtle.ConstantTimeCompare([]byte(token), []byte(a.Session.CSRFToken)) != 1 {
-			s.renderError(w, r, http.StatusForbidden, "Invalid form token. Reload the page and try again.")
-			return
+			token := r.Header.Get("X-CSRF-Token")
+			if subtle.ConstantTimeCompare([]byte(token), []byte(a.Session.CSRFToken)) != 1 {
+				jsonError(w, http.StatusForbidden, "Invalid request token. Reload the page and try again.")
+				return
+			}
 		}
 		next(w, r)
 	})
@@ -313,7 +325,7 @@ func (s *Server) sameOrigin(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		if r.Header.Get("Origin") == "" && r.Header.Get("Referer") == "" || !s.fromDashboard(r) {
-			s.renderError(w, r, http.StatusForbidden, "Cross-origin request blocked.")
+			jsonError(w, http.StatusForbidden, "Cross-origin request blocked.")
 			return
 		}
 		next(w, r)
@@ -341,7 +353,7 @@ func (s *Server) clientIP(r *http.Request) string {
 func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if a := currentAuth(r); a == nil || !a.Admin {
-			s.renderError(w, r, http.StatusNotFound, "Page not found.")
+			jsonError(w, http.StatusNotFound, "Not found.")
 			return
 		}
 		next(w, r)
@@ -372,86 +384,6 @@ func (s *Server) clearCookie(w http.ResponseWriter, name string) {
 	})
 }
 
-// flash is a one-time message shown after a redirect.
-type flash struct {
-	Kind string // "ok" or "error"
-	Msg  string
-}
-
-func (s *Server) setFlash(w http.ResponseWriter, kind, format string, args ...any) {
-	v := s.signer.sign("flash", flash{Kind: kind, Msg: fmt.Sprintf(format, args...)}, time.Minute)
-	s.setCookie(w, s.cookies.flash, v, time.Now().Add(time.Minute))
-}
-
-func (s *Server) takeFlash(w http.ResponseWriter, r *http.Request) *flash {
-	c, err := r.Cookie(s.cookies.flash)
-	if err != nil {
-		return nil
-	}
-	s.clearCookie(w, s.cookies.flash)
-	var f flash
-	if s.signer.verify("flash", c.Value, &f) != nil {
-		return nil
-	}
-	return &f
-}
-
-// view is the data every dashboard template receives.
-type view struct {
-	Title    string
-	Auth     *authInfo
-	Flash    *flash
-	Domain   string
-	Passkeys bool
-	Page     any
-}
-
-func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page, title string, data any) {
-	v := view{Title: title, Auth: currentAuth(r), Domain: s.cfg.Domain(), Passkeys: s.webauthn != nil, Page: data}
-	v.Flash = s.takeFlash(w, r)
-	var buf bytes.Buffer
-	if err := s.pages[page].Execute(&buf, v); err != nil {
-		s.log.Error("render template", "page", page, "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	w.Write(buf.Bytes())
-}
-
-func (s *Server) renderError(w http.ResponseWriter, r *http.Request, status int, msg string) {
-	s.render(w, r, status, "error", http.StatusText(status), struct {
-		Status int
-		Msg    string
-	}{status, msg})
-}
-
-func (s *Server) parseTemplates() (map[string]*template.Template, error) {
-	funcs := template.FuncMap{
-		"tunnelURL":  s.cfg.TunnelURL,
-		"sshCommand": s.sshCommand,
-		"ago":        ago,
-		"datetime":   func(t time.Time) string { return t.UTC().Format("2006-01-02 15:04 UTC") },
-		"bytes":      humanBytes,
-	}
-	pages := map[string]*template.Template{}
-	for _, p := range []string{"login", "login_code", "account", "dashboard", "subdomain", "admin", "error"} {
-		t, err := template.New("layout.html").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html")
-		if err != nil {
-			return nil, fmt.Errorf("parse template %s: %w", p, err)
-		}
-		pages[p] = t
-	}
-	t, err := template.New("tunnel_error.html").Funcs(funcs).ParseFS(assets, "templates/tunnel_error.html")
-	if err != nil {
-		return nil, fmt.Errorf("parse template tunnel_error: %w", err)
-	}
-	pages["tunnel_error"] = t
-	return pages, nil
-}
-
 // sshCommand is the command a user runs to expose localhost:3000.
 func (s *Server) sshCommand(name string) string {
 	cmd := "ssh"
@@ -459,35 +391,6 @@ func (s *Server) sshCommand(name string) string {
 		cmd += fmt.Sprintf(" -p %d", p)
 	}
 	return fmt.Sprintf("%s -R %s:80:localhost:3000 %s", cmd, name, s.cfg.SSHHost())
-}
-
-func ago(t time.Time) string {
-	if t.IsZero() {
-		return "never"
-	}
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 48*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	}
-	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-}
-
-func humanBytes(n int64) string {
-	const unit = 1024
-	if n < unit {
-		return fmt.Sprintf("%d B", n)
-	}
-	div, exp := int64(unit), 0
-	for m := n / unit; m >= unit; m /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
 }
 
 // localPath returns rd if it is a path on this host, else "/". It stops

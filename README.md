@@ -222,7 +222,9 @@ auth:
 - **Dashboard:** server-side sessions (only a hash of the token is stored),
   `__Host-` cookies over HTTPS, CSRF tokens plus an `Origin` check on every
   state change (tunnels are same-site with the dashboard, so SameSite cookies
-  alone are not enough), and a strict Content-Security-Policy.
+  alone are not enough), and a strict Content-Security-Policy: scripts only
+  from the dashboard itself or with the page's per-response nonce, never
+  `eval`, no inline styles, no connections to other hosts.
 - **Protected tunnels:** the dashboard issues a short-lived, single-use,
   host-bound token that the tunnel host exchanges for a host-only, HttpOnly
   cookie tied to the dashboard session. Signing out revokes access to every
@@ -237,6 +239,15 @@ go test -race ./...
 
 `scripts/setup-check.sh` walks the installer against builds of this tree:
 install, update, reinstall, a bad checksum, uninstall and `--purge`.
+
+The dashboard is a [jq79](https://github.com/jgermade/jq79) app in
+[`internal/web/ui`](internal/web/ui): single-file `.html` components loaded
+at runtime, with no build step, embedded in the binary and talking to a JSON
+API under `/api`. The server sends one page shell for every dashboard path,
+with a fresh CSP nonce and the session's boot data; jq79 builds each
+component's functions as scripts carrying that nonce
+(`Component79.safeEval({ nonce: true })`). Edit a component and rebuild the
+binary to see it.
 
 `internal/e2e` runs the whole system: SSH clients opening tunnels, browsers
 signing in with email codes, a software WebAuthn authenticator and a fake

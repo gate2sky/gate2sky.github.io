@@ -71,17 +71,6 @@ func (s *Server) finishCeremony(w http.ResponseWriter, r *http.Request, purpose 
 	return &pc, true
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
-
-func jsonError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
-}
-
 func (s *Server) handlePasskeyLoginOptions(w http.ResponseWriter, r *http.Request) {
 	assertion, session, err := s.webauthn.BeginDiscoverableLogin(webauthn.WithUserVerification(protocol.VerificationRequired))
 	if err != nil {
@@ -134,7 +123,7 @@ func (s *Server) handlePasskeyRegisterOptions(w http.ResponseWriter, r *http.Req
 	pu, err := s.passkeyUser(r.Context(), currentAuth(r).User)
 	if err != nil {
 		s.log.Error("load passkeys", "err", err)
-		jsonError(w, http.StatusInternalServerError, "Something went wrong. Please try again.")
+		jsonError(w, http.StatusInternalServerError, msgInternal)
 		return
 	}
 	exclude := make([]protocol.CredentialDescriptor, len(pu.creds))
@@ -151,7 +140,7 @@ func (s *Server) handlePasskeyRegisterOptions(w http.ResponseWriter, r *http.Req
 	)
 	if err != nil {
 		s.log.Error("begin passkey registration", "err", err)
-		jsonError(w, http.StatusInternalServerError, "Something went wrong. Please try again.")
+		jsonError(w, http.StatusInternalServerError, msgInternal)
 		return
 	}
 	s.startCeremony(w, "passkey-register", passkeyCeremony{Session: *session})
@@ -168,7 +157,7 @@ func (s *Server) handlePasskeyRegister(w http.ResponseWriter, r *http.Request) {
 	pu, err := s.passkeyUser(r.Context(), a.User)
 	if err != nil {
 		s.log.Error("load passkeys", "err", err)
-		jsonError(w, http.StatusInternalServerError, "Something went wrong. Please try again.")
+		jsonError(w, http.StatusInternalServerError, msgInternal)
 		return
 	}
 	cred, err := s.webauthn.FinishRegistration(pu, pc.Session, r)
@@ -186,22 +175,21 @@ func (s *Server) handlePasskeyRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := json.Marshal(cred)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "Something went wrong. Please try again.")
+		jsonError(w, http.StatusInternalServerError, msgInternal)
 		return
 	}
-	_, err = s.store.AddPasskey(r.Context(), a.User.ID, name, cred.ID, data)
+	pk, err := s.store.AddPasskey(r.Context(), a.User.ID, name, cred.ID, data)
 	if errors.Is(err, store.ErrConflict) {
 		jsonError(w, http.StatusConflict, "This passkey is already registered.")
 		return
 	}
 	if err != nil {
 		s.log.Error("save passkey", "err", err)
-		jsonError(w, http.StatusInternalServerError, "Something went wrong. Please try again.")
+		jsonError(w, http.StatusInternalServerError, msgInternal)
 		return
 	}
 	s.log.Info("passkey added", "user_id", a.User.ID, "name", name)
-	s.setFlash(w, "ok", "Passkey %q added. Next time, sign in with it.", name)
-	writeJSON(w, http.StatusOK, map[string]string{"redirect": localPath(r.URL.Query().Get("rd"))})
+	writeJSON(w, http.StatusOK, passkeyView(pk))
 }
 
 func (s *Server) handleDeletePasskey(w http.ResponseWriter, r *http.Request) {
@@ -210,30 +198,11 @@ func (s *Server) handleDeletePasskey(w http.ResponseWriter, r *http.Request) {
 	err := s.store.DeletePasskey(r.Context(), a.User.ID, id)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		s.setFlash(w, "error", "That passkey no longer exists.")
+		jsonError(w, http.StatusNotFound, "That passkey no longer exists.")
 	case err != nil:
-		s.internalError(w, r, "delete passkey", err)
-		return
+		s.internalError(w, "delete passkey", err)
 	default:
 		s.log.Info("passkey removed", "user_id", a.User.ID, "passkey_id", id)
-		s.setFlash(w, "ok", "Passkey removed. Also delete it from your device or password manager.")
+		w.WriteHeader(http.StatusNoContent)
 	}
-	http.Redirect(w, r, "/account", http.StatusSeeOther)
-}
-
-func (s *Server) handleAccount(w http.ResponseWriter, r *http.Request) {
-	a := currentAuth(r)
-	var keys []*store.Passkey
-	if s.webauthn != nil {
-		var err error
-		if keys, err = s.store.PasskeysByUser(r.Context(), a.User.ID); err != nil {
-			s.internalError(w, r, "list passkeys", err)
-			return
-		}
-	}
-	s.render(w, r, http.StatusOK, "account", "Account", struct {
-		Passkeys []*store.Passkey
-		Welcome  bool
-		Next     string
-	}{keys, r.URL.Query().Get("welcome") != "", localPath(r.URL.Query().Get("rd"))})
 }
