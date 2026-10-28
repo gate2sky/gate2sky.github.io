@@ -11,38 +11,38 @@
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
   --fg: #fff;
-  --muted: #d5d8e0;
-  --bg: #2c2f37;
-  --wall-1: rgb(10 132 255 / .3);
-  --wall-2: rgb(191 90 242 / .24);
-  --wall-3: rgb(64 200 224 / .18);
-  --wall-4: rgb(255 159 10 / .1);
+  --muted: #e0e3ea;
+  --bg: #1c1e24;
+  --wall-1: rgb(10 132 255 / .24);
+  --wall-2: rgb(191 90 242 / .2);
+  --wall-3: rgb(64 200 224 / .14);
+  --wall-4: rgb(255 159 10 / .08);
 
   /* Materials: translucent fills that blur what is behind them. */
-  --material: rgb(94 99 114 / .8);
-  --material-bar: rgb(36 39 47 / .78);
-  --material-hud: rgb(94 99 114 / .92);
-  --material-edge: rgb(255 255 255 / .16);
+  --material: rgb(100 105 120 / .88);
+  --material-bar: rgb(26 28 34 / .8);
+  --material-hud: rgb(100 105 120 / .94);
+  --material-edge: rgb(255 255 255 / .2);
   --blur: blur(28px) saturate(170%);
 
   --fill: rgb(255 255 255 / .13);
   --fill-2: rgb(255 255 255 / .07);
   --field: rgb(26 28 35 / .5);
   --field-line: rgb(255 255 255 / .24);
-  --line: rgb(255 255 255 / .18);
+  --line: rgb(255 255 255 / .2);
   --separator: rgb(255 255 255 / .15);
-  --shadow: 0 1px 2px rgb(0 0 0 / .2), 0 12px 32px rgb(5 8 20 / .38);
+  --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 14px 36px rgb(0 0 0 / .5);
   --shadow-pop: 0 2px 6px rgb(0 0 0 / .2), 0 22px 56px rgb(10 14 30 / .45);
 
   /* --accent fills controls; --link is the same blue, light enough to read
      as text on the graphite materials. */
   --accent: #0071e3;
   --accent-fg: #fff;
-  --link: #a8d1ff;
+  --link: #b8daff;
   --green: #30d158;
   --ok: #8ff0a9;
   --red: #ff453a;
-  --err: #ffbdb8;
+  --err: #ffc9c4;
   --orange: #ff9f0a;
   --warn: #ffd08a;
   --ring: 0 0 0 3.5px rgb(64 156 255 / .7);
