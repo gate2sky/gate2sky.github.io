@@ -12,26 +12,26 @@
 
   --fg: #fff;
   --muted: #d5d8e0;
-  --bg: #3d414c;
-  --wall-1: rgb(10 132 255 / .38);
-  --wall-2: rgb(191 90 242 / .3);
-  --wall-3: rgb(64 200 224 / .26);
-  --wall-4: rgb(255 159 10 / .16);
+  --bg: #2c2f37;
+  --wall-1: rgb(10 132 255 / .3);
+  --wall-2: rgb(191 90 242 / .24);
+  --wall-3: rgb(64 200 224 / .18);
+  --wall-4: rgb(255 159 10 / .1);
 
   /* Materials: translucent fills that blur what is behind them. */
-  --material: rgb(86 91 104 / .55);
-  --material-bar: rgb(52 56 66 / .72);
-  --material-hud: rgb(70 75 88 / .88);
-  --material-edge: rgb(255 255 255 / .12);
+  --material: rgb(94 99 114 / .8);
+  --material-bar: rgb(36 39 47 / .78);
+  --material-hud: rgb(94 99 114 / .92);
+  --material-edge: rgb(255 255 255 / .16);
   --blur: blur(28px) saturate(170%);
 
   --fill: rgb(255 255 255 / .13);
   --fill-2: rgb(255 255 255 / .07);
   --field: rgb(26 28 35 / .5);
   --field-line: rgb(255 255 255 / .24);
-  --line: rgb(255 255 255 / .16);
+  --line: rgb(255 255 255 / .18);
   --separator: rgb(255 255 255 / .15);
-  --shadow: 0 1px 1px rgb(0 0 0 / .08), 0 10px 30px rgb(10 14 30 / .22);
+  --shadow: 0 1px 2px rgb(0 0 0 / .2), 0 12px 32px rgb(5 8 20 / .38);
   --shadow-pop: 0 2px 6px rgb(0 0 0 / .2), 0 22px 56px rgb(10 14 30 / .45);
 
   /* --accent fills controls; --link is the same blue, light enough to read
@@ -42,7 +42,7 @@
   --green: #30d158;
   --ok: #8ff0a9;
   --red: #ff453a;
-  --err: #ffaaa4;
+  --err: #ffbdb8;
   --orange: #ff9f0a;
   --warn: #ffd08a;
   --ring: 0 0 0 3.5px rgb(64 156 255 / .7);
