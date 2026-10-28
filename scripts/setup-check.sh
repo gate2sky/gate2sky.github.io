@@ -100,7 +100,7 @@ setup uninstall | tee "$work/out"
 expect "^Removed $bin" "uninstall did not remove the binary"
 expect 'Kept the configuration and data' "uninstall did not say what it kept"
 [ ! -e "$bin" ] || fail "the binary is still there"
-[ -f "$config" ] && [ -f "$work/etc/state/securegate.db" ] || fail "uninstall deleted the configuration or data"
+if [ ! -f "$config" ] || [ ! -f "$work/etc/state/securegate.db" ]; then fail "uninstall deleted the configuration or data"; fi
 
 step "uninstall --purge without a terminal or --yes deletes nothing"
 setup install >/dev/null
@@ -114,7 +114,7 @@ setup install >/dev/null
 setup uninstall --purge --yes | tee "$work/out"
 expect "Deleted $work/etc/state" "purge did not delete the data directory"
 expect "Deleted $config" "purge did not delete the configuration"
-[ ! -e "$work/etc/state" ] && [ ! -e "$config" ] || fail "purge left files behind"
+if [ -e "$work/etc/state" ] || [ -e "$config" ]; then fail "purge left files behind"; fi
 
 step "the --purge guard refuses dangerous data directories"
 setup install >/dev/null

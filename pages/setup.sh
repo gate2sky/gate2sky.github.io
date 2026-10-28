@@ -305,6 +305,7 @@ $(cat "$TMP/error")"
 	maybe_root "$DIR" mkdir -p "$DIR" || die "could not create $DIR"
 	# Copied beside the old one and renamed over it: nobody ever runs half a
 	# binary, and a server already running keeps the file it started from.
+	# shellcheck disable=SC2016 # $1..$3 are the inner shell's arguments
 	if ! maybe_root "$DIR" sh -c 'cp "$1" "$2/.securegate.$3" && mv -f "$2/.securegate.$3" "$2/securegate"' \
 		sh "$new" "$DIR" "$$"; then
 		maybe_root "$DIR" rm -f "$DIR/.securegate.$$"
