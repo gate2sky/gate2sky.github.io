@@ -110,10 +110,13 @@ func TestParseErrors(t *testing.T) {
 }
 
 func TestExampleConfig(t *testing.T) {
-	t.Setenv("GITHUB_CLIENT_ID", "id")
-	t.Setenv("GITHUB_CLIENT_SECRET", "secret")
-	if _, err := Load("../../securegate.example.yaml"); err != nil {
+	t.Setenv("SMTP_PASSWORD", "secret")
+	cfg, err := Load("../../securegate.example.yaml")
+	if err != nil {
 		t.Fatal(err)
+	}
+	if !cfg.Auth.Email.Enabled() || !cfg.PasskeysEnabled() || len(cfg.Auth.Providers) != 0 {
+		t.Errorf("sign-in methods: email %v, passkeys %v, providers %d", cfg.Auth.Email.Enabled(), cfg.PasskeysEnabled(), len(cfg.Auth.Providers))
 	}
 }
 

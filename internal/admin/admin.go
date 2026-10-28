@@ -149,12 +149,10 @@ func (h *Handler) Serve(ctx context.Context) error {
 		ln.Close()
 		return err
 	}
+	defer os.Remove(path)
 	srv := &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second}
-	go func() {
-		<-ctx.Done()
-		srv.Close()
-		os.Remove(path)
-	}()
+	stop := context.AfterFunc(ctx, func() { srv.Close() })
+	defer stop()
 	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

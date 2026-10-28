@@ -1,0 +1,32 @@
+{{- if .Values.traefik.enabled }}
+{{- $domain := .Values.domain -}}
+{{- $tlsSecret := include "securegate.tlsSecret" . -}}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "securegate.fullname" . }}
+  labels:
+    {{- include "securegate.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    {{- toYaml .Values.traefik.entryPoints | nindent 4 }}
+  routes:
+    # The dashboard and every tunnel: securegate routes by Host itself.
+    - match: Host(`{{ $domain }}`) || HostRegexp(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.{{ $domain | replace "." "\\." }}$`)
+      kind: Rule
+      services:
+        - name: {{ include "securegate.fullname" . }}
+          port: http
+  {{- if or .Values.traefik.tls.certResolver $tlsSecret }}
+  tls:
+    {{- if $tlsSecret }}
+    secretName: {{ $tlsSecret }}
+    {{- else }}
+    certResolver: {{ .Values.traefik.tls.certResolver }}
+    domains:
+      - main: {{ $domain | quote }}
+        sans:
+          - {{ printf "*.%s" $domain | quote }}
+    {{- end }}
+  {{- end }}
+{{- end }}

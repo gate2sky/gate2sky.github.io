@@ -16,3 +16,39 @@ jobs:
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - run: go vet ./...
       - run: go test -race ./...
+      - name: Cross-compile
+        run: |
+          for target in linux/amd64 linux/arm64 darwin/arm64 windows/amd64; do
+            GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/securegate
+          done
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/securegate
+      - name: Render with the default values
+        run: helm template sg deploy/helm/securegate > default.yaml
+      - name: Render with a LoadBalancer for SSH, cert-manager and secrets
+        run: |
+          helm template sg deploy/helm/securegate \
+            --set domain=tunnels.example.org \
+            --set traefik.ssh.enabled=false --set sshService.enabled=true \
+            --set certManager.enabled=true \
+            --set secretEnv.SMTP_PASSWORD=x > alt.yaml
+      - name: Check the rendered configuration
+        run: |
+          grep -q 'proxy_protocol: true' default.yaml
+          grep -q 'proxy_protocol: false' alt.yaml
+          grep -q 'public_url: https://tunnels.example.org' alt.yaml
+          grep -q 'kind: IngressRouteTCP' default.yaml
+          ! grep -q 'kind: IngressRouteTCP' alt.yaml
+          grep -q 'kind: Certificate' alt.yaml
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t securegate:ci .
+      - run: docker run --rm securegate:ci version

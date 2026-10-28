@@ -129,42 +129,42 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	defer os.Remove(pidFile)
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	errc := make(chan error, 5)
-
-	sshLn, err := net.Listen("tcp", cfg.SSH.Listen)
-	if err != nil {
-		return err
-	}
-	if cfg.SSH.ProxyProtocol {
-		sshLn = &proxyproto.Listener{Listener: sshLn, ReadHeaderTimeout: 10 * time.Second}
-	}
-	httpLn, err := net.Listen("tcp", cfg.HTTP.Listen)
-	if err != nil {
-		sshLn.Close()
-		return err
-	}
-	go func() { errc <- s.ssh.Serve(sshLn) }()
-	go func() {
-		if err := s.admin.Serve(ctx); err != nil {
-			errc <- err
+	// Open every listener before serving, so a bad port or certificate
+	// stops startup cleanly.
+	var listeners []net.Listener
+	listen := func(addr string) (net.Listener, error) {
+		ln, err := net.Listen("tcp", addr)
+		if err == nil {
+			listeners = append(listeners, ln)
 		}
-	}()
+		return ln, err
+	}
+	closeAll := func() {
+		for _, ln := range listeners {
+			ln.Close()
+		}
+	}
+	sshLn, err := listen(cfg.SSH.Listen)
+	if err != nil {
+		return err
+	}
+	httpLn, err := listen(cfg.HTTP.Listen)
+	if err != nil {
+		closeAll()
+		return err
+	}
 
 	httpLog := slog.NewLogLogger(log.Handler(), slog.LevelDebug)
 	newServer := func(h http.Handler) *http.Server {
 		// No write timeout: tunnels carry long downloads and websockets.
 		return &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute, ErrorLog: httpLog}
 	}
-	var servers []*http.Server
+	httpSrv := newServer(s.web)
+	var httpsSrv *http.Server
+	var httpsLn net.Listener
 	if tlsCfg := cfg.HTTP.TLS; tlsCfg.Enabled() {
-		httpsLn, err := net.Listen("tcp", tlsCfg.Listen)
-		if err != nil {
-			return err
-		}
 		redirect := redirectToHTTPS(cfg)
-		httpsSrv := newServer(s.web)
+		httpsSrv = newServer(s.web)
 		if tlsCfg.ACME.Enabled {
 			m := &autocert.Manager{
 				Prompt:     autocert.AcceptTOS,
@@ -178,19 +178,39 @@ func (s *Server) Run(ctx context.Context) error {
 		} else {
 			cert, err := tls.LoadX509KeyPair(tlsCfg.CertFile, tlsCfg.KeyFile)
 			if err != nil {
+				closeAll()
 				return fmt.Errorf("load TLS certificate: %w", err)
 			}
 			httpsSrv.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
 		}
-		httpSrv := newServer(redirect)
-		servers = append(servers, httpsSrv, httpSrv)
+		httpSrv.Handler = redirect
+		if httpsLn, err = listen(tlsCfg.Listen); err != nil {
+			closeAll()
+			return err
+		}
+	}
+	if cfg.SSH.ProxyProtocol {
+		sshLn = &proxyproto.Listener{Listener: sshLn, ReadHeaderTimeout: 10 * time.Second}
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errc := make(chan error, 4)
+	adminDone := make(chan struct{})
+	go func() {
+		defer close(adminDone)
+		if err := s.admin.Serve(ctx); err != nil {
+			errc <- err
+		}
+	}()
+	go func() { errc <- s.ssh.Serve(sshLn) }()
+	go func() { errc <- httpSrv.Serve(httpLn) }()
+	servers := []*http.Server{httpSrv}
+	if httpsSrv != nil {
+		servers = append(servers, httpsSrv)
 		go func() { errc <- httpsSrv.ServeTLS(httpsLn, "", "") }()
-		go func() { errc <- httpSrv.Serve(httpLn) }()
 		log.Info("listening", "https", httpsLn.Addr().String(), "http", httpLn.Addr().String()+" (redirects to https)")
 	} else {
-		httpSrv := newServer(s.web)
-		servers = append(servers, httpSrv)
-		go func() { errc <- httpSrv.Serve(httpLn) }()
 		log.Info("listening", "http", httpLn.Addr().String())
 	}
 
@@ -228,6 +248,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}
 	cancel()
+	<-adminDone
 	s.ssh.Close()
 	shutdownCtx, done := context.WithTimeout(context.Background(), 5*time.Second)
 	defer done()

@@ -1,0 +1,10 @@
+apiVersion: v2
+name: securegate
+description: Expose local services on your domain through SSH tunnels, with a web dashboard (email codes, passkeys, OAuth).
+type: application
+version: 0.1.0
+appVersion: "0.2.0"
+keywords: [ssh, tunnel, reverse-proxy, ngrok, sish, traefik]
+home: https://github.com/jgermade/securegate
+sources:
+  - https://github.com/jgermade/securegate
