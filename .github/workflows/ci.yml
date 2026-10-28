@@ -46,6 +46,28 @@ jobs:
           ! grep -q 'kind: IngressRouteTCP' alt.yaml
           grep -q 'kind: Certificate' alt.yaml
 
+  installer:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: shellcheck
+        if: runner.os == 'Linux'
+        run: shellcheck -s sh pages/setup.sh && shellcheck scripts/setup-check.sh
+      - name: Walk the installer against this tree
+        run: scripts/setup-check.sh
+      - name: The landing is self-contained
+        run: |
+          if grep -rInE '(src|href)="https?://' pages/ | grep -vE 'https://(github\.com|jgermade\.github\.io)/'; then
+            echo "pages/ must not load anything from another host"
+            exit 1
+          fi
+
   docker:
     runs-on: ubuntu-latest
     steps:

@@ -1,12 +1,110 @@
 name: Release
+
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to raise.
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      dry-run:
+        description: Build everything and publish nothing — just check the release would work.
+        type: boolean
+        default: false
+
 permissions:
-  contents: read
+  contents: write
   packages: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Raise the version
+        id: bump
+        run: |
+          set -euo pipefail
+          # The version lives in the tags: the newest v* tag, or 0.0.0.
+          current=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1)
+          current=${current#v}
+          current=${current:-0.0.0}
+          IFS=. read -r major minor patch <<< "$current"
+          case "${{ inputs.bump }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          next="$major.$minor.$patch"
+          echo "$current → $next"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
+
+  binaries:
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build securegate-${{ matrix.target }}.tar.gz
+        run: |
+          set -euo pipefail
+          target=${{ matrix.target }}
+          mkdir -p "dist/securegate-$target"
+          CGO_ENABLED=0 GOOS=${target%-*} GOARCH=${target#*-} go build -trimpath \
+            -ldflags "-s -w -X main.version=${{ needs.version.outputs.version }}" \
+            -o "dist/securegate-$target/securegate" ./cmd/securegate
+          cp README.md "dist/securegate-$target/"
+          # The layout pages/setup.sh unpacks: securegate-<target>/securegate.
+          tar -czf "dist/securegate-$target.tar.gz" -C dist "securegate-$target"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: securegate-${{ matrix.target }}
+          path: dist/securegate-${{ matrix.target }}.tar.gz
+
+  publish:
+    needs: [version, binaries]
+    if: ${{ !inputs.dry-run }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: securegate-*
+          path: dist
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # What pages/setup.sh checks a download against before it installs it.
+          (cd dist && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS)
+          gh release create "${{ needs.version.outputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "${{ needs.version.outputs.tag }}" \
+            --generate-notes \
+            dist/*.tar.gz dist/SHA256SUMS
+
   image:
+    needs: [version, publish]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,19 +115,16 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
       - uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: VERSION=${{ github.ref_name }}
+          build-args: VERSION=${{ needs.version.outputs.version }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.version.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+
+  pages:
+    needs: publish
+    uses: ./.github/workflows/pages.yml

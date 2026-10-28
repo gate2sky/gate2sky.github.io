@@ -1,5 +1,12 @@
 # securegate
 
+**[jgermade.github.io/securegate](https://jgermade.github.io/securegate/)** ·
+[releases](https://github.com/jgermade/securegate/releases)
+
+```sh
+curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh
+```
+
 Expose local HTTP services on your own domain through SSH, like
 [sish](https://github.com/antoniomika/sish) or ngrok, managed from a web
 dashboard or an interactive terminal wizard.
@@ -54,7 +61,34 @@ A new connection for a subdomain replaces the previous one, so reconnecting
 ## Getting started
 
 You need a domain where both `gate.example.com` and `*.gate.example.com`
-point to the server.
+point to the server. Then, on Linux or macOS:
+
+```sh
+curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh
+```
+
+The installer downloads the release for your machine, checks it against the
+release's `SHA256SUMS`, runs it once before it replaces anything, opens the
+setup wizard and, on Linux with systemd, installs the service. Run it again to
+update (the service is restarted), reconfigure or uninstall:
+
+```sh
+curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh -s -- reinstall
+curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh -s -- configure
+curl -fsSL https://jgermade.github.io/securegate/setup.sh | sh -s -- uninstall --purge
+```
+
+| Option | |
+| --- | --- |
+| `--dir DIR` | Where the binary goes. Default `/usr/local/bin`, or `SECUREGATE_INSTALL_DIR`. |
+| `--version TAG` | A release such as `v0.2.0`. Default the latest, or `SECUREGATE_VERSION`. |
+| `--config FILE` | Default `/etc/securegate/securegate.yaml`. |
+| `--no-service` | Neither install nor restart the systemd service. |
+| `--purge` | With `uninstall`: also delete the configuration, data and service user. |
+| `-y`, `--yes` | Do not ask; `--purge` needs it when there is no terminal. |
+| `SECUREGATE_DOWNLOAD_URL` | A directory with `securegate-<os>-<arch>.tar.gz` and `SHA256SUMS`, used instead of GitHub. |
+
+From source:
 
 ```bash
 go build -o securegate ./cmd/securegate     # Go 1.26+
@@ -103,8 +137,8 @@ docker run -d --name securegate --restart unless-stopped -v securegate:/data \
 docker exec -it securegate securegate config     # manage subdomains, keys and users
 ```
 
-The image is published to `ghcr.io/jgermade/securegate` when a `v*` tag is
-pushed; until then, build it with `docker build -t securegate .`. See
+Every release publishes the image to `ghcr.io/jgermade/securegate`; before
+the first one, build it with `docker build -t securegate .`. See
 [`deploy/docker/compose.yaml`](deploy/docker/compose.yaml) for Compose.
 With Docker alone, choose Let's Encrypt in the setup: securegate gets a
 certificate for each registered subdomain on demand, so no DNS challenge is
@@ -201,10 +235,21 @@ auth:
 go test -race ./...
 ```
 
+`scripts/setup-check.sh` walks the installer against builds of this tree:
+install, update, reinstall, a bad checksum, uninstall and `--purge`.
+
 `internal/e2e` runs the whole system: SSH clients opening tunnels, browsers
 signing in with email codes, a software WebAuthn authenticator and a fake
 OpenID Connect provider, and the configuration wizard against a live admin
 socket.
+
+### Releases and the landing
+
+Run the **Release** workflow from the Actions tab, choosing patch, minor or
+major. It tags the version, attaches `securegate-<os>-<arch>.tar.gz` for
+Linux and macOS (amd64, arm64) with `SHA256SUMS`, publishes the Docker image
+and deploys [`pages/`](pages/) — the landing and `setup.sh` — to GitHub Pages
+(enable it once in Settings → Pages → Source: GitHub Actions).
 
 ## Roadmap
 
