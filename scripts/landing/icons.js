@@ -1,7 +1,8 @@
 // Renders pages/favicon.svg into the bitmaps for what does not take an SVG
 // icon: favicon.ico (16 and 32 px; older Safari, and the /favicon.ico every
-// browser asks for) and apple-touch-icon.png (180 px on the page's night, as
-// iOS fills transparency with black).
+// browser asks for) and apple-touch-icon.png (180 px, edge to edge on the
+// logo's own navy: iOS rounds the corners itself and fills transparency
+// with black).
 //
 //     node scripts/landing/icons.js
 const fs = require("fs")
@@ -46,6 +47,6 @@ function ico(images) {
   const images = []
   for (const size of [16, 32]) images.push({ size, png: await render(browser, size) })
   fs.writeFileSync(path.join(pages, "favicon.ico"), ico(images))
-  fs.writeFileSync(path.join(pages, "apple-touch-icon.png"), await render(browser, 180, { background: "#05070d", inset: 26 }))
+  fs.writeFileSync(path.join(pages, "apple-touch-icon.png"), await render(browser, 180, { background: "#121a33" }))
   await browser.close()
 })()
