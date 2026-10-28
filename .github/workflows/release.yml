@@ -2,8 +2,8 @@ name: Release
 
 # Started by hand from the Actions tab, on the default branch: raises the
 # version, builds that commit with build.yml, publishes the GitHub release
-# with the binaries pages/setup.sh installs and the Docker image, and deploys
-# the landing to GitHub Pages.
+# with the binaries pages/setup.sh installs, the Docker image and the Helm
+# chart, and deploys the landing to GitHub Pages.
 on:
   workflow_dispatch:
     inputs:
@@ -143,8 +143,29 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/gate2sky:latest
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
+  # The chart as an OCI artifact, so `helm install gate2sky
+  # oci://ghcr.io/<owner>/charts/gate2sky` needs no clone. Under charts/ so it
+  # does not land on the image's ghcr.io/<owner>/gate2sky.
+  chart:
+    needs: [version, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+      - uses: azure/setup-helm@v4
+      - name: Push the chart
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$TOKEN" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm package deploy/helm/gate2sky -d dist
+          helm push "dist/gate2sky-${{ needs.version.outputs.version }}.tgz" oci://ghcr.io/${{ github.repository_owner }}/charts
+
+  # The landing tells people to install the chart, so it waits for it.
   pages:
-    needs: [build, publish]
+    needs: [build, publish, chart]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
