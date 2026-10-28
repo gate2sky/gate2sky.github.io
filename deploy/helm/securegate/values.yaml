@@ -1,0 +1,111 @@
+# Dashboard host. Tunnels are served on its direct subdomains
+# (https://myapp.<domain>), so point both <domain> and *.<domain> at Traefik.
+domain: gate.example.com
+
+image:
+  repository: ghcr.io/jgermade/securegate
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# securegate configuration, merged over the chart's defaults (public_url,
+# ports, data_dir, trust_proxy_headers, ssh.public_*). Any option of
+# securegate.example.yaml can go here. Reference secrets as ${VAR} and put
+# them in secretEnv or existingSecret.
+config:
+  auth:
+    admins: [you@example.com]
+    allowed_domains: []
+    email:
+      from: "securegate <no-reply@gate.example.com>"
+      smtp:
+        host: smtp.example.com
+        port: 587
+        username: securegate
+        password: ${SMTP_PASSWORD}
+
+# Environment variables stored in a Secret created by the chart.
+secretEnv: {}
+#  SMTP_PASSWORD: change-me
+#  GITHUB_CLIENT_SECRET: change-me
+
+# Or use a Secret you manage; each key becomes an environment variable.
+existingSecret: ""
+
+# SSH host and port users type in `ssh -p <port> <host>`. The port must be
+# the one Traefik's SSH entry point (or sshService) exposes.
+ssh:
+  publicHost: ""   # defaults to domain
+  publicPort: 2222
+
+traefik:
+  # Route the dashboard and every tunnel through a Traefik IngressRoute.
+  enabled: true
+  entryPoints: [websecure]
+  tls:
+    # Name of a Traefik certificate resolver. Tunnels need a certificate for
+    # *.<domain>, so the resolver must use the DNS-01 challenge.
+    certResolver: ""
+    # Or an existing TLS secret holding a certificate for <domain> and
+    # *.<domain> (see certManager below).
+    secretName: ""
+  # SSH over a TCP entry point of Traefik, e.g. started with
+  # --entryPoints.ssh.address=:2222 and exposed by the Traefik service.
+  ssh:
+    enabled: true
+    entryPoint: ssh
+    # Send the client address with the PROXY protocol, so securegate logs
+    # and shows real client IPs. Leave sshService disabled when using it.
+    proxyProtocol: true
+
+# Alternative to Traefik for SSH: a Service of its own (e.g. a LoadBalancer).
+sshService:
+  enabled: false
+  type: LoadBalancer
+  port: 2222
+  annotations: {}
+  loadBalancerIP: ""
+
+# Issue the wildcard certificate with cert-manager (needs a DNS-01 issuer).
+# The secret is used by the IngressRoute when traefik.tls.secretName is empty.
+certManager:
+  enabled: false
+  issuerRef:
+    name: letsencrypt-dns
+    kind: ClusterIssuer
+
+persistence:
+  # The SQLite database, SSH host key and signing key live here. Without
+  # persistence, every restart changes the SSH host key and signs users out.
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  accessModes: [ReadWriteOnce]
+  existingClaim: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]

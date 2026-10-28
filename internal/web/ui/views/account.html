@@ -1,0 +1,100 @@
+<script :setup>
+  // The signed-in user's profile and passkeys. Right after a first sign-in
+  // (`?welcome=1`) it suggests adding a passkey before going on.
+  const { app, go, query, toast } = await import("@ui/lib/store.js")
+  const { api } = await import("@ui/lib/api.js")
+  const { ago, date } = await import("@ui/lib/format.js")
+  const { supported, register, problem } = await import("@ui/lib/passkeys.js")
+
+  document.title = "Account · securegate"
+
+  const next = query("rd") || "/"
+  let passkeys = []
+  const load = async () => {
+    try {
+      passkeys = (await api("GET", "/account")).passkeys
+    } catch (e) {
+      toast(e.message, "error")
+    }
+  }
+  await load()
+
+  const welcome = app.passkeys && query("welcome") && !passkeys.length
+
+  let passkeyName = ""
+  let busy = false
+  let error = ""
+
+  const addPasskey = async () => {
+    busy = true
+    error = ""
+    try {
+      const added = await register(passkeyName)
+      passkeyName = ""
+      toast(`Passkey "${added.name}" added. Next time, sign in with it.`)
+      if (welcome) return go(next)
+      await load()
+    } catch (e) {
+      error = problem(e)
+    }
+    busy = false
+  }
+
+  const removePasskey = async passkey => {
+    if (!confirm(`Remove the passkey "${passkey.name}"?`)) return
+    try {
+      await api("DELETE", "/account/passkeys/" + passkey.id)
+      toast("Passkey removed. Also delete it from your device or password manager.")
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    load()
+  }
+</script>
+
+<div class="page-head"><h1>Account</h1></div>
+
+<section :if="welcome" class="card callout">
+  <h2>Sign in faster next time</h2>
+  <p>Add a passkey and sign in with your fingerprint, face or device PIN instead of waiting for an email. Passkeys can’t be phished.</p>
+  <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+  <div class="actions">
+    <button type="button" class="button" :disabled="busy || !supported" @click="addPasskey">Add a passkey</button>
+    <a :href="next">Skip for now →</a>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Profile</h2>
+  <dl class="stats">
+    <div><dt>Email</dt><dd>{{ app.user.email }}</dd></div>
+    <div :if="app.user.name"><dt>Name</dt><dd>{{ app.user.name }}</dd></div>
+    <div><dt>Member since</dt><dd>{{ date(app.user.created_at) }}</dd></div>
+  </dl>
+</section>
+
+<section :if="app.passkeys" class="card">
+  <div class="card-head"><h2>Passkeys</h2><span class="muted">{{ passkeys.length }}</span></div>
+  <p class="muted">Sign in without email codes. Each device or password manager has its own passkey.</p>
+  <div :if="passkeys.length" class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Added</th><th>Last used</th><th></th></tr></thead>
+      <tbody>
+        <tr :each="passkey in passkeys" :key="passkey.id">
+          <td>{{ passkey.name }}</td>
+          <td>{{ ago(passkey.created_at) }}</td>
+          <td>{{ ago(passkey.last_used_at) }}</td>
+          <td class="right"><button type="button" class="link danger" @click="removePasskey(passkey)">Remove</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p :else class="empty-inline">No passkeys yet.</p>
+  <div :if="error && !welcome" class="flash flash-error" role="alert">{{ error }}</div>
+  <p :if="!supported" class="muted small">This browser does not support passkeys.</p>
+  <form class="form form-row" @submit.prevent="addPasskey">
+    <input name="passkey-name" maxlength="64" placeholder="Name, e.g. MacBook or 1Password" aria-label="Passkey name"
+           autocomplete="off" :value="passkeyName" @input="passkeyName = $event.target.value">
+    <button type="submit" class="button" :disabled="busy || !supported">Add a passkey</button>
+  </form>
+</section>

@@ -1,0 +1,22 @@
+<script :setup="{ model = 'public', name = 'access', disabled = false }">
+  // Who can open a subdomain, as three radios. The choice goes back up
+  // through `:model`, and as a `pick` event for a parent that saves it.
+  //
+  //   <AccessOptions :model="access" />
+  //   <AccessOptions :model="sub.access" @pick="save($event.detail)" />
+  const OPTIONS = [
+    { value: "public", label: "Public", hint: "anyone with the URL" },
+    { value: "users", label: "Signed-in users", hint: "anyone who can sign in to this securegate" },
+    { value: "private", label: "Private", hint: "only the owner, after signing in" },
+  ]
+  const pick = value => {
+    $updateModel(value)
+    $emit("pick", value)
+  }
+</script>
+
+<label class="radio" :each="option in OPTIONS" :key="option.value">
+  <input type="radio" :name="name" :value="option.value" :checked="model === option.value" :disabled="disabled"
+         @change="pick(option.value)">
+  <span><strong>{{ option.label }}</strong> <span class="muted">— {{ option.hint }}</span></span>
+</label>

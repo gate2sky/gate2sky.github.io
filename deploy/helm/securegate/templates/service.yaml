@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "securegate.fullname" . }}
+  labels:
+    {{- include "securegate.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "securegate.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+    - name: ssh
+      port: 2222
+      targetPort: ssh
+{{- if .Values.sshService.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "securegate.fullname" . }}-ssh
+  labels:
+    {{- include "securegate.labels" . | nindent 4 }}
+  {{- with .Values.sshService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.sshService.type }}
+  {{- with .Values.sshService.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- if eq .Values.sshService.type "LoadBalancer" }}
+  externalTrafficPolicy: Local
+  {{- end }}
+  selector:
+    {{- include "securegate.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: ssh
+      port: {{ .Values.sshService.port }}
+      targetPort: ssh
+{{- end }}

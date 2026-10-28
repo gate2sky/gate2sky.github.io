@@ -1,0 +1,407 @@
+// Package web serves the dashboard on the main host and proxies every
+// subdomain to its SSH tunnel.
+package web
+
+import (
+	"context"
+	"crypto/subtle"
+	"embed"
+	"errors"
+	"fmt"
+	"html/template"
+	"log/slog"
+	"net"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/go-webauthn/webauthn/webauthn"
+
+	"github.com/jgermade/securegate/internal/config"
+	"github.com/jgermade/securegate/internal/mail"
+	"github.com/jgermade/securegate/internal/manage"
+	"github.com/jgermade/securegate/internal/store"
+	"github.com/jgermade/securegate/internal/tunnel"
+)
+
+//go:embed templates ui
+var assets embed.FS
+
+// Options configure a Server.
+type Options struct {
+	Config   *config.Config
+	Store    *store.Store
+	Registry *tunnel.Registry
+	Manage   *manage.Service
+	// Mailer sends sign-in codes. Defaults to the configured SMTP server.
+	Mailer mail.Sender
+	// Secret signs OAuth state and tunnel access cookies. Keep it stable
+	// across restarts so visitors stay signed in to private tunnels.
+	Secret []byte
+	Logger *slog.Logger
+	// HTTPClient talks to OAuth providers. Defaults to a client with a
+	// 15 second timeout.
+	HTTPClient *http.Client
+}
+
+// Server is the HTTP handler for the dashboard and all tunnels.
+type Server struct {
+	cfg       *config.Config
+	store     *store.Store
+	registry  *tunnel.Registry
+	manage    *manage.Service
+	mailer    mail.Sender
+	log       *slog.Logger
+	signer    signer
+	nonces    *nonceSet
+	codes     *codeStore
+	webauthn  *webauthn.WebAuthn
+	cookies   cookieNames
+	providers []provider
+	shell     *template.Template
+	tunnelErr *template.Template
+	ui        map[string]uiFile
+	dashboard http.Handler
+	proxy     *httputil.ReverseProxy
+}
+
+type cookieNames struct {
+	session, oauth, access, emailLogin, passkey string
+}
+
+// New builds the handler.
+func New(o Options) (*Server, error) {
+	if len(o.Secret) < 32 {
+		return nil, errors.New("web: secret must be at least 32 bytes")
+	}
+	client := o.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 15 * time.Second}
+	}
+	s := &Server{
+		cfg:      o.Config,
+		store:    o.Store,
+		registry: o.Registry,
+		manage:   o.Manage,
+		mailer:   o.Mailer,
+		log:      o.Logger,
+		signer:   signer{key: o.Secret},
+		nonces:   newNonceSet(),
+		codes:    newCodeStore(),
+	}
+	if s.mailer == nil {
+		s.mailer = mail.New(s.cfg.Auth.Email, s.log)
+	}
+	// The __Host- prefix stops tunnel subdomains, which serve arbitrary
+	// content, from planting cookies for the dashboard (or each other).
+	prefix := ""
+	if s.cfg.Secure() {
+		prefix = "__Host-"
+	}
+	s.cookies = cookieNames{
+		session:    prefix + "securegate",
+		oauth:      prefix + "securegate-oauth",
+		access:     prefix + "securegate-access",
+		emailLogin: prefix + "securegate-email",
+		passkey:    prefix + "securegate-passkey",
+	}
+	if s.cfg.PasskeysEnabled() {
+		wa, err := webauthn.New(&webauthn.Config{
+			RPID:          s.cfg.Domain(),
+			RPDisplayName: "securegate",
+			// Tunnel subdomains may claim this RP ID too, so assertions
+			// are only accepted from the dashboard's exact origin.
+			RPOrigins: []string{s.cfg.DashboardURL("")},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("web: passkeys: %w", err)
+		}
+		s.webauthn = wa
+	}
+	for _, pc := range s.cfg.Auth.Providers {
+		redirect := s.cfg.DashboardURL("/auth/" + pc.ID + "/callback")
+		switch pc.Type {
+		case "github":
+			s.providers = append(s.providers, newGitHubProvider(pc, redirect, client))
+		case "oidc":
+			s.providers = append(s.providers, newOIDCProvider(pc, redirect, client))
+		}
+	}
+	var err error
+	if s.shell, err = template.ParseFS(assets, "templates/app.html"); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
+	if s.tunnelErr, err = template.ParseFS(assets, "templates/tunnel_error.html"); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
+	if s.ui, err = loadUI(); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
+	s.dashboard = s.routes()
+	s.proxy = s.newProxy()
+	return s, nil
+}
+
+// ServeHTTP dispatches on the Host header: the dashboard lives on the
+// configured domain, tunnels on its direct subdomains.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	host := strings.ToLower(r.Host)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.TrimSuffix(host, ".")
+	domain := s.cfg.Domain()
+	switch {
+	case host == domain:
+		s.dashboard.ServeHTTP(w, r)
+	case strings.HasSuffix(host, "."+domain) && !strings.Contains(strings.TrimSuffix(host, "."+domain), "."):
+		s.serveTunnel(w, r, strings.TrimSuffix(host, "."+domain))
+	case r.URL.Path == "/healthz":
+		// Load balancer health checks often use the bare IP as Host.
+		w.Write([]byte("ok\n"))
+	default:
+		http.Error(w, "unknown host", http.StatusMisdirectedRequest)
+	}
+}
+
+func (s *Server) routes() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /ui/", s.serveUI)
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
+
+	// Pages: the same shell for each, and the app draws the one its path
+	// names. Signed out, every page is the sign-in form.
+	mux.HandleFunc("GET /{$}", s.handleApp)
+	mux.HandleFunc("GET /login", s.handleLoginPage)
+	mux.HandleFunc("GET /account", s.handleApp)
+	mux.HandleFunc("GET /subdomains/{name}", s.handleApp)
+	mux.HandleFunc("GET /admin", s.handleAdminPage)
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		s.pageError(w, r, http.StatusNotFound, "There is no page here.")
+	})
+	mux.HandleFunc("GET /auth/{provider}/login", s.handleOAuthLogin)
+	mux.HandleFunc("GET /auth/{provider}/callback", s.handleOAuthCallback)
+	mux.HandleFunc("GET /tunnel-auth", s.handleTunnelAuth)
+
+	// The API the app calls.
+	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
+		jsonError(w, http.StatusNotFound, "Not found.")
+	})
+	if s.cfg.Auth.Email.Enabled() {
+		mux.Handle("POST /api/login/email", s.sameOrigin(s.handleEmailLogin))
+		mux.Handle("DELETE /api/login/email", s.sameOrigin(s.handleEmailCancel))
+		mux.Handle("POST /api/login/code", s.sameOrigin(s.handleCodeLogin))
+	}
+	if s.webauthn != nil {
+		mux.Handle("POST /api/login/passkey/options", s.sameOrigin(s.handlePasskeyLoginOptions))
+		mux.Handle("POST /api/login/passkey", s.sameOrigin(s.handlePasskeyLogin))
+	}
+
+	user := s.requireUser
+	mux.Handle("POST /api/logout", user(s.handleLogout))
+	mux.Handle("GET /api/account", user(s.handleAccount))
+	if s.webauthn != nil {
+		mux.Handle("POST /api/account/passkeys/options", user(s.handlePasskeyRegisterOptions))
+		mux.Handle("POST /api/account/passkeys", user(s.handlePasskeyRegister))
+		mux.Handle("DELETE /api/account/passkeys/{id}", user(s.handleDeletePasskey))
+	}
+	mux.Handle("GET /api/subdomains", user(s.handleListSubdomains))
+	mux.Handle("POST /api/subdomains", user(s.handleCreateSubdomain))
+	mux.Handle("GET /api/subdomains/{name}", user(s.handleSubdomain))
+	mux.Handle("PATCH /api/subdomains/{name}", user(s.handleUpdateSubdomain))
+	mux.Handle("DELETE /api/subdomains/{name}", user(s.handleDeleteSubdomain))
+	mux.Handle("POST /api/subdomains/{name}/keys", user(s.handleAddKeys))
+	mux.Handle("DELETE /api/subdomains/{name}/keys/{id}", user(s.handleDeleteKey))
+	mux.Handle("POST /api/subdomains/{name}/disconnect", user(s.handleDisconnect))
+
+	admin := func(h http.HandlerFunc) http.Handler { return s.requireUser(s.requireAdmin(h)) }
+	mux.Handle("GET /api/admin/subdomains", admin(s.handleAdminSubdomains))
+	mux.Handle("GET /api/admin/users", admin(s.handleAdminUsers))
+	mux.Handle("POST /api/admin/users", admin(s.handleAdminCreateUser))
+	mux.Handle("PATCH /api/admin/users/{id}", admin(s.handleAdminUpdateUser))
+
+	return s.securityHeaders(s.withSession(mux))
+}
+
+func (s *Server) securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", csp(""))
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "same-origin")
+		h.Set("Cross-Origin-Opener-Policy", "same-origin")
+		if s.cfg.Secure() {
+			h.Set("Strict-Transport-Security", "max-age=31536000")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+type ctxKey int
+
+const authKey ctxKey = iota
+
+// authInfo is the signed-in user of a dashboard request.
+type authInfo struct {
+	Session *store.Session
+	User    *store.User
+	Admin   bool
+}
+
+func currentAuth(r *http.Request) *authInfo {
+	a, _ := r.Context().Value(authKey).(*authInfo)
+	return a
+}
+
+func (s *Server) withSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if c, err := r.Cookie(s.cookies.session); err == nil && c.Value != "" {
+			sess, user, err := s.store.SessionByToken(r.Context(), c.Value)
+			switch {
+			case err == nil && s.cfg.EmailAllowed(user.Email):
+				a := &authInfo{Session: sess, User: user, Admin: s.cfg.IsAdmin(user.Email)}
+				r = r.WithContext(context.WithValue(r.Context(), authKey, a))
+			case err != nil && !errors.Is(err, store.ErrNotFound):
+				s.log.Error("load session", "err", err)
+				if isAPI(r) {
+					jsonError(w, http.StatusInternalServerError, msgInternal)
+				} else {
+					s.pageError(w, r, http.StatusInternalServerError, msgInternal)
+				}
+				return
+			default:
+				s.clearCookie(w, s.cookies.session)
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requireUser answers API calls from anonymous visitors with a 401, and
+// checks the origin and CSRF token of calls that change something.
+func (s *Server) requireUser(next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a := currentAuth(r)
+		if a == nil {
+			jsonError(w, http.StatusUnauthorized, "Your session has ended. Please sign in again.")
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
+			// Tunnel subdomains are same-site with the dashboard, so SameSite
+			// cookies do not stop their pages from calling the API: check
+			// both the origin and the session's token.
+			if !s.fromDashboard(r) {
+				jsonError(w, http.StatusForbidden, "Cross-origin request blocked.")
+				return
+			}
+			token := r.Header.Get("X-CSRF-Token")
+			if subtle.ConstantTimeCompare([]byte(token), []byte(a.Session.CSRFToken)) != 1 {
+				jsonError(w, http.StatusForbidden, "Invalid request token. Reload the page and try again.")
+				return
+			}
+		}
+		next(w, r)
+	})
+}
+
+// fromDashboard reports whether a request was sent by a dashboard page,
+// going by its Origin (or, for older browsers, Referer) header.
+func (s *Server) fromDashboard(r *http.Request) bool {
+	origin := s.cfg.DashboardURL("")
+	if o := r.Header.Get("Origin"); o != "" {
+		return o == origin
+	}
+	ref := r.Header.Get("Referer")
+	return ref == "" || ref == origin || strings.HasPrefix(ref, origin+"/")
+}
+
+// sameOrigin guards the sign-in forms and calls, which have no session to
+// carry a CSRF token yet.
+func (s *Server) sameOrigin(next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+		if r.Header.Get("Origin") == "" && r.Header.Get("Referer") == "" || !s.fromDashboard(r) {
+			jsonError(w, http.StatusForbidden, "Cross-origin request blocked.")
+			return
+		}
+		next(w, r)
+	})
+}
+
+// clientIP is the visitor's address, for rate limiting and logs.
+func (s *Server) clientIP(r *http.Request) string {
+	if s.cfg.HTTP.TrustProxyHeaders {
+		// The last entry was added by the proxy we trust.
+		if xff := r.Header.Values("X-Forwarded-For"); len(xff) > 0 {
+			parts := strings.Split(xff[len(xff)-1], ",")
+			if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
+				return ip
+			}
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if a := currentAuth(r); a == nil || !a.Admin {
+			jsonError(w, http.StatusNotFound, "Not found.")
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (s *Server) setCookie(w http.ResponseWriter, name, value string, expires time.Time) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		Expires:  expires,
+		HttpOnly: true,
+		Secure:   s.cfg.Secure(),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (s *Server) clearCookie(w http.ResponseWriter, name string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     name,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   s.cfg.Secure(),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// sshCommand is the command a user runs to expose localhost:3000.
+func (s *Server) sshCommand(name string) string {
+	cmd := "ssh"
+	if p := s.cfg.SSHPort(); p != 22 {
+		cmd += fmt.Sprintf(" -p %d", p)
+	}
+	return fmt.Sprintf("%s -R %s:80:localhost:3000 %s", cmd, name, s.cfg.SSHHost())
+}
+
+// localPath returns rd if it is a path on this host, else "/". It stops
+// redirects to other sites after login.
+func localPath(rd string) string {
+	if !strings.HasPrefix(rd, "/") || strings.HasPrefix(rd, "//") || strings.HasPrefix(rd, "/\\") {
+		return "/"
+	}
+	u, err := url.Parse(rd)
+	if err != nil || u.Scheme != "" || u.Host != "" {
+		return "/"
+	}
+	return rd
+}

@@ -1,0 +1,30 @@
+# securegate with Docker Compose, terminating TLS itself (Let's Encrypt).
+#
+#   docker compose run --rm securegate config    # create /data/securegate.yaml
+#   docker compose up -d
+#   docker compose exec securegate securegate config   # manage subdomains, keys, users
+#
+# Point gate.example.com and *.gate.example.com to this host. In the setup,
+# choose Let's Encrypt and keep the default ports (80, 443 and 2222).
+services:
+  securegate:
+    image: ghcr.io/jgermade/securegate:latest
+    build: ../..
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "2222:2222"
+    volumes:
+      - securegate:/data
+    # Secrets referenced as ${VAR} in the configuration:
+    # environment:
+    #   SMTP_PASSWORD: change-me
+    healthcheck:
+      test: ["CMD", "securegate", "status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  securegate:

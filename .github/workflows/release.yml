@@ -1,0 +1,151 @@
+name: Release
+
+# Started by hand from the Actions tab, on the default branch: raises the
+# version, builds that commit with build.yml, publishes the GitHub release
+# with the binaries pages/setup.sh installs and the Docker image, and deploys
+# the landing to GitHub Pages.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to raise.
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      dry-run:
+        description: Build everything and publish nothing — just check the release would work.
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+      sha: ${{ steps.bump.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Raise the version
+        id: bump
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.dry-run }}" != "true" ] && [ "$GITHUB_REF_NAME" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "::error::release from ${{ github.event.repository.default_branch }}, not $GITHUB_REF_NAME (or tick dry-run)"
+            exit 1
+          fi
+
+          current=$(cat VERSION)
+          IFS=. read -r major minor patch <<< "$current"
+          case "${{ inputs.bump }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          next="$major.$minor.$patch"
+          echo "$current → $next"
+          if git rev-parse -q --verify "refs/tags/v$next" >/dev/null; then
+            echo "::error::v$next already exists"
+            exit 1
+          fi
+
+          # The version lives in VERSION; the Helm chart follows it, so its
+          # default image is the one this release publishes.
+          echo "$next" > VERSION
+          sed -i -E "s/^version: .*/version: $next/; s/^appVersion: .*/appVersion: \"$next\"/" deploy/helm/securegate/Chart.yaml
+          git diff
+
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            echo "dry run: leaving the bump uncommitted"
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION deploy/helm/securegate/Chart.yaml
+          git commit -m "Release v$next"
+          git tag -a "v$next" -m "v$next"
+          git push origin HEAD --follow-tags
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      # The bump is a new commit: build it, not the commit the release started from.
+      ref: ${{ needs.version.outputs.sha }}
+      version: ${{ needs.version.outputs.version }}
+      pages: true
+
+  publish:
+    needs: [version, build]
+    if: ${{ !inputs.dry-run }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: securegate-*
+          path: dist
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # What pages/setup.sh checks a download against before it installs it.
+          (cd dist && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS)
+          gh release create "${{ needs.version.outputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "${{ needs.version.outputs.tag }}" \
+            --generate-notes \
+            dist/*.tar.gz dist/SHA256SUMS
+
+  image:
+    needs: [version, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ needs.version.outputs.version }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.version.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+
+  pages:
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

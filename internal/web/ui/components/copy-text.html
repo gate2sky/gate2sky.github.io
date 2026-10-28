@@ -1,0 +1,20 @@
+<script :setup="{ command = '' }">
+  // A command to copy, with a button that copies it. (Not `text`: on a
+  // component's tag `:text` is jq79's directive, never a prop.)
+  let copied = false
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(command)
+      copied = true
+      setTimeout(() => { copied = false }, 1600)
+    } catch {
+      // No clipboard (a page served over plain HTTP): select it instead.
+      getSelection().selectAllChildren($self("code"))
+    }
+  }
+</script>
+
+<div class="command">
+  <code>{{ command }}</code>
+  <button type="button" class="copy" @click="copy">{{ copied ? "Copied" : "Copy" }}</button>
+</div>

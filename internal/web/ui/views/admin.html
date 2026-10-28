@@ -1,0 +1,118 @@
+<script :setup>
+  // For administrators: every subdomain with its tunnel, and every account.
+  const { app, toast } = await import("@ui/lib/store.js")
+  const { api } = await import("@ui/lib/api.js")
+  const { ago, plural } = await import("@ui/lib/format.js")
+  const StatusBadge = await import("@ui/components/status-badge.html")
+
+  document.title = "Admin · securegate"
+
+  let subdomains = []
+  let users = []
+  const load = async () => {
+    try {
+      ;[subdomains, users] = await Promise.all([api("GET", "/admin/subdomains"), api("GET", "/admin/users")])
+    } catch (e) {
+      toast(e.message, "error")
+    }
+  }
+  await load()
+  $: online = subdomains.filter(sub => sub.tunnel).length
+
+  $attached(() => {
+    const timer = setInterval(() => document.hidden || load(), 5000)
+    const off = $detached(() => {
+      clearInterval(timer)
+      off()
+    })
+  })
+
+  const signIn = user =>
+    [user.passkeys ? plural(user.passkeys, "passkey") : "", user.providers].filter(Boolean).join(" · ") || "email"
+
+  const setDisabled = async (user, disabled) => {
+    try {
+      await api("PATCH", "/admin/users/" + user.id, { disabled })
+      toast(`${disabled ? "Disabled" : "Enabled"} ${user.email}.`)
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    load()
+  }
+
+  let email = ""
+  let error = ""
+  const addUser = async () => {
+    error = ""
+    try {
+      const user = await api("POST", "/admin/users", { email })
+      email = ""
+      toast(user.allowed
+        ? `Added ${user.email}. They can now sign in with their email.`
+        : `Added ${user.email}, but auth.allowed_* in the configuration does not let them sign in yet.`,
+        user.allowed ? "ok" : "error")
+      load()
+    } catch (e) {
+      error = e.message
+    }
+  }
+</script>
+
+<div class="page-head"><h1>Admin</h1></div>
+
+<section class="card">
+  <div class="card-head"><h2>Subdomains</h2><span class="muted">{{ online }} online · {{ subdomains.length }} registered</span></div>
+  <div :if="subdomains.length" class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Subdomain</th><th>Owner</th><th>Access</th><th>Keys</th><th>Status</th><th>Requests</th></tr></thead>
+      <tbody>
+        <tr :each="sub in subdomains" :key="sub.name">
+          <td><a :href="'/subdomains/' + encodeURIComponent(sub.name)"><strong>{{ sub.name }}</strong></a></td>
+          <td>{{ sub.owner }}</td>
+          <td><span class="badge" :class="'badge-' + sub.access">{{ sub.access }}</span></td>
+          <td>{{ sub.keys }}</td>
+          <td>
+            <StatusBadge :tunnel="sub.tunnel" />
+            <div :if="sub.tunnel" class="muted small">{{ sub.tunnel.client_addr }} · {{ ago(sub.tunnel.created_at) }}</div>
+          </td>
+          <td>{{ sub.tunnel ? sub.tunnel.requests : "—" }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p :else class="empty-inline">No subdomains registered.</p>
+</section>
+
+<section class="card">
+  <div class="card-head"><h2>Users</h2><span class="muted">{{ users.length }}</span></div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>User</th><th>Sign-in</th><th>Subdomains</th><th>Last sign-in</th><th></th></tr></thead>
+      <tbody>
+        <tr :each="user in users" :key="user.id" :class.disabled="user.disabled">
+          <td>
+            <strong>{{ user.name || user.email }}</strong>
+            <span :if="user.admin" class="badge">admin</span>
+            <div :if="user.name" class="muted small">{{ user.email }}</div>
+            <div :if="!user.allowed" class="small danger">not allowed by the configuration</div>
+          </td>
+          <td class="small">{{ signIn(user) }}</td>
+          <td>{{ user.subdomains }}</td>
+          <td>{{ ago(user.last_login_at) }}</td>
+          <td class="right">
+            <span :if="user.id === app.user.id" class="muted small">you</span>
+            <button :elseif="user.disabled" type="button" class="link" @click="setDisabled(user, false)">Enable</button>
+            <button :else type="button" class="link danger" @click="setDisabled(user, true)">Disable</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+  <form class="form form-row" @submit.prevent="addUser">
+    <input type="email" name="email" required placeholder="new.user@example.com" aria-label="Email of the new user"
+           autocomplete="off" :value="email" @input="email = $event.target.value">
+    <button type="submit" class="button button-secondary">Add user</button>
+  </form>
+  <p class="hint">Added users sign in with that email address. Who may sign in at all is set by <code>auth.allowed_*</code> in the configuration.</p>
+</section>
