@@ -71,6 +71,10 @@
   --strand-2: #ffe066;
   --haze: .55;
   --note: #fff 5%;
+  --glow-1: rgb(61 107 255 / .24);
+  --glow-2: rgb(130 90 255 / .14);
+  --glow-3: rgb(90 216 255 / .1);
+  --glow-4: rgb(61 107 255 / .12);
 }
 [data-theme="light"] {
   --bg: #f4f6fb;
@@ -102,6 +106,10 @@
   --strand-2: #d06a00;
   --haze: .35;
   --note: #ffd23f 9%;
+  --glow-1: rgb(45 91 255 / .2);
+  --glow-2: rgb(175 90 242 / .16);
+  --glow-3: rgb(11 159 216 / .2);
+  --glow-4: rgb(255 159 10 / .14);
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -118,20 +126,13 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* The sky */
-.sky { position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: radial-gradient(1200px 700px at 75% -10%, color-mix(in srgb, var(--blue) 22%, transparent), transparent 70%),
-              radial-gradient(900px 600px at 0% 110%, color-mix(in srgb, var(--cyan) 10%, transparent), transparent 70%), var(--bg); }
-.sky { overflow: hidden; }
-.sky svg { position: relative; width: 100%; height: 100%; }
-.sky circle { fill: var(--star); animation: twinkle 6s ease-in-out infinite; }
-@keyframes twinkle { 0%, 100% { opacity: .25 } 50% { opacity: .9 } }
-/* The layers pan by one sky width, so they end where they started. */
-.pan { animation: pan linear infinite; }
-.pan-1 { animation-duration: 420s; }
-.pan-2 { animation-duration: 260s; }
-.pan-3 { animation-duration: 160s; }
-@keyframes pan { to { transform: translateX(-1600px) } }
+/* The sky: stars that each glow and fade on their own clock, over color
+   glows that wander like the dashboard's wallpaper, each on its own path
+   and clock. By day, only the glows. */
+.sky { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: var(--bg); }
+.sky svg { position: relative; z-index: 1; width: 100%; height: 100%; }
+.sky circle { fill: var(--star); opacity: .2; animation: twinkle ease-in-out infinite; }
+@keyframes twinkle { 0%, 100% { opacity: .12 } 50% { opacity: var(--peak, .9) } }
 .meteor { opacity: 0; animation: meteor linear infinite; }
 .meteor line { stroke-width: 1.6; stroke-linecap: round; }
 @keyframes meteor {
@@ -140,18 +141,15 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "
   6%, 100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--a)) translateX(520px); }
 }
 [data-theme="light"] .meteors { display: none; }
-/* By day, the sky is color glows that wander like the dashboard's
-   wallpaper, each on its own path and clock. */
-.sky::before, .sky::after { content: ""; position: absolute; inset: -25%; display: none; will-change: transform; }
-[data-theme="light"] .sky::before, [data-theme="light"] .sky::after { display: block; }
+.sky::before, .sky::after { content: ""; position: absolute; inset: -25%; will-change: transform; }
 .sky::before {
-  background: radial-gradient(40% 36% at 24% 22%, rgb(45 91 255 / .2), transparent 70%),
-              radial-gradient(34% 32% at 78% 26%, rgb(175 90 242 / .16), transparent 70%);
+  background: radial-gradient(40% 36% at 24% 22%, var(--glow-1), transparent 70%),
+              radial-gradient(34% 32% at 78% 26%, var(--glow-2), transparent 70%);
   animation: drift-a 26s ease-in-out infinite;
 }
 .sky::after {
-  background: radial-gradient(42% 34% at 66% 78%, rgb(11 159 216 / .2), transparent 70%),
-              radial-gradient(30% 28% at 22% 76%, rgb(255 159 10 / .14), transparent 70%);
+  background: radial-gradient(42% 34% at 66% 78%, var(--glow-3), transparent 70%),
+              radial-gradient(30% 28% at 22% 76%, var(--glow-4), transparent 70%);
   animation: drift-b 33s ease-in-out infinite;
 }
 @keyframes drift-a {
@@ -410,6 +408,7 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 .code pre .c { color: var(--code-dim); } .code pre .p { color: var(--cyan); user-select: none; }
 .code .copy { position: absolute; top: 10px; right: 10px; padding: 6px 9px; font-size: 12px; }
 .hint { text-align: center; color: var(--muted); font-size: 14px; margin: 14px auto 0; max-width: 40em; }
+.hint-lead { margin: 28px auto 12px; }
 
 /* Footer */
 footer { border-top: 1px solid var(--border); padding: 30px 0 46px; color: var(--muted); font-size: 14px; }
@@ -738,6 +737,16 @@ docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data -p 80:8
     --set domain=gate.example.com \
     --set traefik.tls.certResolver=letsencrypt-dns</pre></div>
             <p class="hint">An IngressRoute for the dashboard and every subdomain, SSH over a Traefik TCP entry point with the PROXY protocol. See the <a href="https://github.com/gate2sky/gate2sky.github.io/tree/main/deploy/helm/gate2sky">chart</a>, also in a classic repository: <code>helm repo add gate2sky https://gate2sky.github.io/charts</code>.</p>
+            <p class="hint hint-lead">Traefik opens the SSH port once it has an entry point for it. In the values of Traefik’s own chart:</p>
+            <div class="code"><button class="copy" type="button" data-copy="ports:&#10;  ssh:&#10;    port: 2222&#10;    expose: {default: true}&#10;    exposedPort: 2222&#10;    protocol: TCP" aria-label="Copy"><span>Copy</span></button>
+<pre><span class="c"># traefik values.yaml</span>
+ports:
+  ssh:
+    port: 2222
+    expose: {default: true}
+    exposedPort: 2222
+    protocol: TCP</pre></div>
+            <p class="hint">Keep <code>exposedPort</code> and the chart’s <code>ssh.publicPort</code> the same, so the dashboard shows the right <code>ssh -p</code>. Port 22 only works on an address no other <code>sshd</code> uses, such as a node’s.</p>
           </div>
         </div>
       </div>

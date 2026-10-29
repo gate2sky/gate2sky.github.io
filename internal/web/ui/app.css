@@ -214,7 +214,7 @@ a.who.active { background: var(--fill); }
 }
 
 main.wrap { padding-top: 24px; padding-bottom: 40px; }
-.footer { color: var(--muted); font-size: 12px; padding-bottom: 32px; text-align: center; }
+.footer { color: var(--muted); font-size: 12px; padding-bottom: calc(56px + env(safe-area-inset-bottom)); text-align: center; }
 .footer a { color: inherit; font-weight: 600; }
 .footer a:hover { color: var(--fg); }
 
@@ -340,6 +340,20 @@ a.name-cell:hover { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { .badge-online .dot { animation: none; } }
 td .badge { margin-right: 6px; }
 
+/* Dialogs: a card near the top of the page, which dims and blurs behind it. */
+
+.dialog {
+  position: fixed; inset: 0 0 auto; width: min(360px, calc(100vw - 32px)); margin: max(72px, 12vh) auto 0; padding: 20px;
+  color: var(--fg); background: var(--material-hud); box-shadow: 0 .5px 0 var(--material-edge) inset, var(--shadow-pop);
+}
+.dialog[open] { animation: dialog-in .2s cubic-bezier(.2, .9, .3, 1.2); }
+.dialog::backdrop { background: rgb(10 14 30 / .35); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.dialog h2 { font-size: 17px; margin-bottom: 6px; }
+.dialog p { margin: 0 0 18px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(-8px) scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .dialog[open] { animation: none; } }
+
 /* Buttons: push buttons with a soft top highlight. */
 
 .button {
@@ -362,6 +376,7 @@ td .badge { margin-right: 6px; }
   --accent: #d92d23;
   color: #fff;
 }
+.button-dark { --accent: #3a3f4a; }
 .button-plain { color: var(--muted); background: none; box-shadow: none; padding: 5px 10px; font-weight: 500; }
 .button-plain:hover { color: var(--fg); background: var(--fill-2); filter: none; }
 .button:disabled { opacity: .45; cursor: default; filter: none; }
