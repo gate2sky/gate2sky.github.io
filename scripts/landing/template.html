@@ -49,6 +49,7 @@
   --surface-2: #131b31;
   --border: #1c2640;
   --fg: #e8eefc;
+  --wordmark: var(--fg);
   --muted: #93a0bb;
   --dim: #5f6b85;
   --cyan: #5ad8ff;
@@ -83,6 +84,7 @@
   --surface-2: #f1f4fa;
   --border: #d7deea;
   --fg: #0e1526;
+  --wordmark: #333a3e;
   --muted: #4c5a75;
   --dim: #8090ab;
   --cyan: #0b9fd8;
@@ -171,6 +173,7 @@ header { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
 .bar { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 12px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
 .brand:hover { text-decoration: none; }
+.brand .word { color: var(--wordmark); }
 .brand svg { width: 40px; height: 40px; margin: -6px -2px -6px -4px; overflow: visible; }
 nav { display: flex; align-items: center; gap: 4px; }
 nav a { color: var(--muted); font-size: 14px; padding: 6px 10px; border-radius: 8px; display: none; }
@@ -493,7 +496,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
   <div class="wrap bar">
     <a class="brand" href="#top" aria-label="intergate home">
       @@BRAND@@
-      <span class="glow">intergate</span>
+      <span class="word">inter<span class="glow">gate</span></span>
     </a>
     <nav aria-label="Sections">
       <a href="#how">How it works</a>
