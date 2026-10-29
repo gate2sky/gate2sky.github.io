@@ -3,26 +3,26 @@
 domain: gate.example.com
 
 image:
-  repository: ghcr.io/gate2sky/gate2sky
+  repository: ghcr.io/gate2net/gate2net
   # Defaults to the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
-# gate2sky configuration, merged over the chart's defaults (public_url,
+# gate2net configuration, merged over the chart's defaults (public_url,
 # ports, data_dir, trust_proxy_headers, ssh.public_*). Any option of
-# gate2sky.example.yaml can go here. Reference secrets as ${VAR} and put
+# gate2net.example.yaml can go here. Reference secrets as ${VAR} and put
 # them in secretEnv or existingSecret.
 config:
   auth:
     admins: [you@example.com]
     allowed_domains: []
     email:
-      from: "gate2sky <no-reply@gate.example.com>"
+      from: "gate2net <no-reply@gate.example.com>"
       smtp:
         host: smtp.example.com
         port: 587
-        username: gate2sky
+        username: gate2net
         password: ${SMTP_PASSWORD}
 
 # Environment variables stored in a Secret created by the chart.
@@ -55,7 +55,7 @@ traefik:
   ssh:
     enabled: true
     entryPoint: ssh
-    # Send the client address with the PROXY protocol, so gate2sky logs
+    # Send the client address with the PROXY protocol, so gate2net logs
     # and shows real client IPs. Leave sshService disabled when using it.
     proxyProtocol: true
 
@@ -76,7 +76,7 @@ tcp:
   first: 30000
   last: 30019
   maxPorts: 5
-  # Also expose the range over UDP, for UDP ports (the gate2sky client).
+  # Also expose the range over UDP, for UDP ports (the gate2net client).
   # Needs LoadBalancers that take both protocols (Kubernetes 1.26+).
   udp: true
   # Host in the ports' addresses; defaults to ssh.publicHost, then domain.

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/store"
 )
 
 func TestPickGrant(t *testing.T) {

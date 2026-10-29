@@ -1,7 +1,7 @@
-// Package clientapp is the gate2sky app: the client of package client with
+// Package clientapp is the gate2net app: the client of package client with
 // its settings saved, its state kept for a window to show, a local web UI
 // that window shows, and starting with the system. It holds no platform
-// code but autostart's; the tray and the window live in cmd/gate2sky-gui.
+// code but autostart's; the tray and the window live in cmd/gate2net-gui.
 package clientapp
 
 import (
@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/client"
+	"github.com/gate2net/gate2net.github.io/internal/client"
 )
 
 // Forward is a forward as saved and shown.
@@ -46,7 +46,7 @@ type Settings struct {
 func (s Settings) Check() error {
 	switch {
 	case s.Server == "" || s.HostKey == "":
-		return errors.New("enter your gate2sky's address and look it up first")
+		return errors.New("enter your gate2net's address and look it up first")
 	case s.Subdomain == "":
 		return errors.New("enter the subdomain")
 	case len(s.Forwards) == 0:
@@ -140,14 +140,14 @@ func Open(path string) (*App, error) {
 	return a, nil
 }
 
-// DefaultPath is where the settings live: %APPDATA%\gate2sky\app.json on
-// Windows, ~/.config/gate2sky/app.json on Linux.
+// DefaultPath is where the settings live: %APPDATA%\gate2net\app.json on
+// Windows, ~/.config/gate2net/app.json on Linux.
 func DefaultPath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "gate2sky", "app.json"), nil
+	return filepath.Join(dir, "gate2net", "app.json"), nil
 }
 
 // Settings returns the saved settings.
@@ -181,7 +181,7 @@ func (a *App) SetSettings(s Settings) error {
 	return nil
 }
 
-// Discover asks a gate2sky dashboard where its SSH endpoint is and which
+// Discover asks a gate2net dashboard where its SSH endpoint is and which
 // host key it has, and saves the answer.
 func (a *App) Discover(ctx context.Context, dashboard string, hc *http.Client) error {
 	dashboard = strings.TrimSpace(dashboard)
@@ -207,7 +207,7 @@ func (a *App) Discover(ctx context.Context, dashboard string, hc *http.Client) e
 	}
 	if resp.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&info) != nil ||
 		info.Server == "" || !strings.HasPrefix(info.HostKey, "SHA256:") {
-		return fmt.Errorf("%s doesn't look like a gate2sky (no /client.json)", u.Host)
+		return fmt.Errorf("%s doesn't look like a gate2net (no /client.json)", u.Host)
 	}
 	s := a.Settings()
 	s.Dashboard, s.Server, s.HostKey, s.Domain = strings.TrimSuffix(info.Dashboard, "/"), info.Server, info.HostKey, info.Domain

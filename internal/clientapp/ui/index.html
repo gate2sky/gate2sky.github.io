@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gate2sky</title>
+<title>gate2net</title>
 <style>
   :root {
     color-scheme: light;
@@ -72,7 +72,7 @@
 <body>
 <header>
   <img src="/logo.svg" alt="">
-  <h1>gate2sky</h1>
+  <h1>gate2net</h1>
   <span id="status" class="pill">disconnected</span>
   <button id="toggle" type="button">Connect</button>
 </header>
@@ -80,7 +80,7 @@
   <p id="error" class="error" hidden></p>
 
   <section>
-    <h2>Your gate2sky</h2>
+    <h2>Your gate2net</h2>
     <div class="row">
       <label>Dashboard address <span class="hint">As in your browser, e.g. gate.example.com</span>
         <input id="dashboard" placeholder="gate.example.com" autocomplete="off" spellcheck="false"></label>
@@ -91,7 +91,7 @@
       <label>Subdomain
         <span class="suffix"><input id="subdomain" placeholder="myapp" autocomplete="off" spellcheck="false"><span id="domain">.gate.example.com</span></span></label>
       <label>SSH key <span class="hint">Optional: the agent's keys and ~/.ssh are tried first</span>
-        <input id="keyfile" placeholder="C:\Users\me\.ssh\gate2sky" autocomplete="off" spellcheck="false"></label>
+        <input id="keyfile" placeholder="C:\Users\me\.ssh\gate2net" autocomplete="off" spellcheck="false"></label>
     </div>
   </section>
 
@@ -111,8 +111,8 @@
 
   <section>
     <h2>Options</h2>
-    <label class="check"><input id="autostart" type="checkbox"> <span id="autostart-label">Start gate2sky when I sign in</span></label>
-    <label class="check" style="margin-top:6px"><input id="connectOnStart" type="checkbox"> Connect as soon as gate2sky starts</label>
+    <label class="check"><input id="autostart" type="checkbox"> <span id="autostart-label">Start gate2net when I sign in</span></label>
+    <label class="check" style="margin-top:6px"><input id="connectOnStart" type="checkbox"> Connect as soon as gate2net starts</label>
   </section>
 
   <section>
@@ -199,7 +199,7 @@
     if (document.activeElement !== $("dashboard")) $("dashboard").value = settings.dashboard || ""
     if (document.activeElement !== $("subdomain")) $("subdomain").value = settings.subdomain || ""
     if (document.activeElement !== $("keyfile")) $("keyfile").value = settings.key_file || ""
-    $("domain").textContent = "." + (s.settings.domain || "your gate2sky")
+    $("domain").textContent = "." + (s.settings.domain || "your gate2net")
     $("found").hidden = !s.settings.server
     $("found").innerHTML = s.settings.server ? `SSH <code></code> · host key <code></code>` : ""
     if (s.settings.server) {
@@ -251,7 +251,7 @@
     settings.forwards.push({ kind: b.dataset.add, name: "", local: "" })
     renderForwards(); save()
   }
-  if (/Windows/.test(navigator.userAgent)) $("autostart-label").textContent = "Start gate2sky with Windows"
+  if (/Windows/.test(navigator.userAgent)) $("autostart-label").textContent = "Start gate2net with Windows"
   document.addEventListener("focusin", () => { editing = true })
   document.addEventListener("focusout", () => { editing = false })
 

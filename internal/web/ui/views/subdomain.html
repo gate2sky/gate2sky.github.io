@@ -34,7 +34,7 @@
   }
   await load()
   $: name !== loaded && load()
-  $: document.title = `${name} · gate2sky`
+  $: document.title = `${name} · gate2net`
 
   $attached(() => {
     // Not while a key is being renamed or a dialog is open: a reload would

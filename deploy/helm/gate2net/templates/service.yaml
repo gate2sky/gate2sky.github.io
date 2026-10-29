@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "gate2sky.fullname" . }}
+  name: {{ include "gate2net.fullname" . }}
   labels:
-    {{- include "gate2sky.labels" . | nindent 4 }}
+    {{- include "gate2net.labels" . | nindent 4 }}
 spec:
   type: ClusterIP
   selector:
-    {{- include "gate2sky.selectorLabels" . | nindent 4 }}
+    {{- include "gate2net.selectorLabels" . | nindent 4 }}
   ports:
     - name: http
       port: 8080
@@ -20,9 +20,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "gate2sky.fullname" . }}-ssh
+  name: {{ include "gate2net.fullname" . }}-ssh
   labels:
-    {{- include "gate2sky.labels" . | nindent 4 }}
+    {{- include "gate2net.labels" . | nindent 4 }}
   {{- with .Values.sshService.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -36,7 +36,7 @@ spec:
   externalTrafficPolicy: Local
   {{- end }}
   selector:
-    {{- include "gate2sky.selectorLabels" . | nindent 4 }}
+    {{- include "gate2net.selectorLabels" . | nindent 4 }}
   ports:
     - name: ssh
       port: {{ .Values.sshService.port }}
@@ -47,9 +47,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "gate2sky.fullname" . }}-tcp
+  name: {{ include "gate2net.fullname" . }}-tcp
   labels:
-    {{- include "gate2sky.labels" . | nindent 4 }}
+    {{- include "gate2net.labels" . | nindent 4 }}
   {{- with .Values.tcp.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -64,7 +64,7 @@ spec:
   externalTrafficPolicy: Local
   {{- end }}
   selector:
-    {{- include "gate2sky.selectorLabels" . | nindent 4 }}
+    {{- include "gate2net.selectorLabels" . | nindent 4 }}
   ports:
     {{- range $p := untilStep (int .Values.tcp.first) (int (add1 .Values.tcp.last)) 1 }}
     - name: tcp-{{ $p }}

@@ -13,7 +13,7 @@ import (
 	"fyne.io/systray"
 	webview2 "github.com/jchv/go-webview2"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/clientapp"
+	"github.com/gate2net/gate2net.github.io/internal/clientapp"
 )
 
 //go:embed icon.ico
@@ -49,12 +49,12 @@ func (win *window) open(url string) {
 	ready := make(chan webview2.WebView)
 	go func() {
 		runtime.LockOSThread()
-		data := filepath.Join(os.Getenv("LOCALAPPDATA"), "gate2sky", "webview")
+		data := filepath.Join(os.Getenv("LOCALAPPDATA"), "gate2net", "webview")
 		w := webview2.NewWithOptions(webview2.WebViewOptions{
 			AutoFocus: true,
 			DataPath:  data,
 			WindowOptions: webview2.WindowOptions{
-				Title: "gate2sky", Width: 840, Height: 780, Center: true,
+				Title: "gate2net", Width: 840, Height: 780, Center: true,
 			},
 		})
 		ready <- w
@@ -88,16 +88,16 @@ func shell(app *clientapp.App, ui *clientapp.UI, openWindow bool) {
 	ui.Show = func() { win.open(ui.URL()) }
 	systray.Run(func() {
 		systray.SetIcon(icon)
-		systray.SetTooltip("gate2sky")
+		systray.SetTooltip("gate2net")
 		systray.SetOnTapped(ui.Show)
-		open := systray.AddMenuItem("Open gate2sky", "Show the window")
+		open := systray.AddMenuItem("Open gate2net", "Show the window")
 		systray.AddSeparator()
 		toggle := systray.AddMenuItem("Connect", "")
 		dashboard := systray.AddMenuItem("Open the dashboard", "")
 		systray.AddSeparator()
 		autostart := systray.AddMenuItemCheckbox("Start with Windows", "", clientapp.AutostartEnabled())
 		systray.AddSeparator()
-		quit := systray.AddMenuItem("Quit", "Disconnect and close gate2sky")
+		quit := systray.AddMenuItem("Quit", "Disconnect and close gate2net")
 
 		update := func() {
 			st := app.State()
@@ -107,7 +107,7 @@ func shell(app *clientapp.App, ui *clientapp.UI, openWindow bool) {
 			} else {
 				toggle.SetTitle("Connect")
 			}
-			tip := "gate2sky: " + string(st.Status)
+			tip := "gate2net: " + string(st.Status)
 			if st.Settings.Subdomain != "" {
 				tip += " (" + st.Settings.Subdomain + ")"
 			}
@@ -166,7 +166,7 @@ func shell(app *clientapp.App, ui *clientapp.UI, openWindow bool) {
 
 func fatal(err error) {
 	text, _ := syscall.UTF16PtrFromString(err.Error())
-	title, _ := syscall.UTF16PtrFromString("gate2sky")
+	title, _ := syscall.UTF16PtrFromString("gate2net")
 	messageBox.Call(0, uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(title)), mbIconError)
 	os.Exit(1)
 }

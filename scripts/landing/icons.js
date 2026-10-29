@@ -15,7 +15,7 @@ const pages = path.join(__dirname, "../../pages")
 const svg = "data:image/svg+xml;base64," + fs.readFileSync(path.join(pages, "favicon.svg")).toString("base64")
 
 // The desktop app's tray icon is the favicon too.
-process.on("exit", () => fs.copyFileSync(path.join(pages, "favicon.ico"), path.join(__dirname, "../../cmd/gate2sky-gui/icon.ico")))
+process.on("exit", () => fs.copyFileSync(path.join(pages, "favicon.ico"), path.join(__dirname, "../../cmd/gate2net-gui/icon.ico")))
 
 // The same cut as hero.brand() in gen.py's hero.py: no comments, no tile.
 fs.writeFileSync(path.join(__dirname, "../../internal/web/ui/logo-mark.svg"), fs.readFileSync(path.join(pages, "favicon.svg"), "utf8")

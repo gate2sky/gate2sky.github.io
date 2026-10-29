@@ -14,7 +14,7 @@ func autostartFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "autostart", "gate2sky.desktop"), nil
+	return filepath.Join(dir, "autostart", "gate2net.desktop"), nil
 }
 
 // AutostartSupported reports whether SetAutostart can work here.
@@ -49,6 +49,6 @@ func SetAutostart(on bool) error {
 	if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
 		return err
 	}
-	entry := fmt.Sprintf("[Desktop Entry]\nType=Application\nName=gate2sky\nExec=%q --background\nX-GNOME-Autostart-enabled=true\n", exe)
+	entry := fmt.Sprintf("[Desktop Entry]\nType=Application\nName=gate2net\nExec=%q --background\nX-GNOME-Autostart-enabled=true\n", exe)
 	return os.WriteFile(f, []byte(entry), 0o644)
 }

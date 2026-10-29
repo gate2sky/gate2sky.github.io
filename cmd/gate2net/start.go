@@ -15,16 +15,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/admin"
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/server"
-	"github.com/gate2sky/gate2sky.github.io/internal/service"
+	"github.com/gate2net/gate2net.github.io/internal/admin"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/server"
+	"github.com/gate2net/gate2net.github.io/internal/service"
 )
 
 func loadConfig(path string) (*config.Config, error) {
 	cfg, err := config.Load(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("no configuration at %s: create one with `gate2sky config`", path)
+		return nil, fmt.Errorf("no configuration at %s: create one with `gate2net config`", path)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
@@ -34,7 +34,7 @@ func loadConfig(path string) (*config.Config, error) {
 
 func cmdStart(args []string) error {
 	fs, cfgFlag := newFlags("start")
-	detached := fs.Bool("detached", false, "run in the background, logging to <data_dir>/gate2sky.log")
+	detached := fs.Bool("detached", false, "run in the background, logging to <data_dir>/gate2net.log")
 	debug := fs.Bool("debug", false, "enable debug logging")
 	if err := fs.Parse(args); err != nil {
 		return errQuiet
@@ -68,12 +68,12 @@ func cmdStart(args []string) error {
 // answers on its admin socket.
 func startDetached(path string, cfg *config.Config, debug bool) error {
 	if pid := server.RunningPID(cfg); pid != 0 {
-		return fmt.Errorf("gate2sky is already running (PID %d)", pid)
+		return fmt.Errorf("gate2net is already running (PID %d)", pid)
 	}
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return err
 	}
-	logPath := filepath.Join(cfg.DataDir, "gate2sky.log")
+	logPath := filepath.Join(cfg.DataDir, "gate2net.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
@@ -101,20 +101,20 @@ func startDetached(path string, cfg *config.Config, debug bool) error {
 	for {
 		select {
 		case <-exited:
-			fmt.Fprintf(os.Stderr, "gate2sky exited during startup. Last lines of %s:\n", logPath)
+			fmt.Fprintf(os.Stderr, "gate2net exited during startup. Last lines of %s:\n", logPath)
 			printTail(os.Stderr, logPath, 15)
 			return errQuiet
 		case <-deadline:
-			return fmt.Errorf("gate2sky (PID %d) did not become ready in time; see %s", cmd.Process.Pid, logPath)
+			return fmt.Errorf("gate2net (PID %d) did not become ready in time; see %s", cmd.Process.Pid, logPath)
 		case <-time.After(100 * time.Millisecond):
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		st, err := client.Status(ctx)
 		cancel()
 		if err == nil {
-			fmt.Printf("gate2sky %s started in the background (PID %d)\n", st.Version, st.PID)
+			fmt.Printf("gate2net %s started in the background (PID %d)\n", st.Version, st.PID)
 			fmt.Printf("  dashboard: %s\n  ssh:       %s\n  logs:      %s\n", st.DashboardURL, st.SSH, logPath)
-			fmt.Println("Stop it with `gate2sky stop`.")
+			fmt.Println("Stop it with `gate2net stop`.")
 			return nil
 		}
 	}
@@ -149,11 +149,11 @@ func cmdStop(args []string, out io.Writer) error {
 		return err
 	}
 	if service.Active() {
-		return errors.New("gate2sky runs as a system service; stop it with `sudo systemctl stop gate2sky`")
+		return errors.New("gate2net runs as a system service; stop it with `sudo systemctl stop gate2net`")
 	}
 	pid := server.RunningPID(cfg)
 	if pid == 0 {
-		fmt.Fprintln(out, "gate2sky is not running")
+		fmt.Fprintln(out, "gate2net is not running")
 		return nil
 	}
 	p, err := os.FindProcess(pid)
@@ -165,12 +165,12 @@ func cmdStop(args []string, out io.Writer) error {
 	}
 	for range 100 {
 		if server.RunningPID(cfg) == 0 {
-			fmt.Fprintf(out, "gate2sky stopped (PID %d)\n", pid)
+			fmt.Fprintf(out, "gate2net stopped (PID %d)\n", pid)
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	return fmt.Errorf("gate2sky (PID %d) did not stop within 10s", pid)
+	return fmt.Errorf("gate2net (PID %d) did not stop within 10s", pid)
 }
 
 func cmdStatus(args []string, out io.Writer) error {
@@ -187,10 +187,10 @@ func cmdStatus(args []string, out io.Writer) error {
 	st, err := admin.NewClient(cfg.Admin.Socket).Status(ctx)
 	if err != nil {
 		if pid := server.RunningPID(cfg); pid != 0 {
-			return fmt.Errorf("gate2sky is running (PID %d) but its admin socket does not answer: %w", pid, err)
+			return fmt.Errorf("gate2net is running (PID %d) but its admin socket does not answer: %w", pid, err)
 		}
 		if errors.Is(err, admin.ErrNotRunning) {
-			fmt.Fprintln(out, "gate2sky is not running")
+			fmt.Fprintln(out, "gate2net is not running")
 			return errQuiet
 		}
 		return err
@@ -199,7 +199,7 @@ func cmdStatus(args []string, out io.Writer) error {
 	if service.Active() {
 		how = "as a systemd service"
 	}
-	fmt.Fprintf(out, "gate2sky %s is running %s (PID %d, up %s)\n", st.Version, how, st.PID, time.Since(st.StartedAt).Round(time.Second))
+	fmt.Fprintf(out, "gate2net %s is running %s (PID %d, up %s)\n", st.Version, how, st.PID, time.Since(st.StartedAt).Round(time.Second))
 	fmt.Fprintf(out, "  dashboard:  %s\n  ssh:        %s\n", st.DashboardURL, st.SSH)
 	fmt.Fprintf(out, "  subdomains: %d registered, %d online\n  users:      %d\n", st.Subdomains, st.TunnelsOnline, st.Users)
 	return nil
@@ -218,14 +218,14 @@ func cmdService(args []string, out io.Writer) error {
 	switch {
 	case *install:
 		path := configPath(*cfgFlag)
-		if *cfgFlag == "" && os.Getenv("GATE2SKY_CONFIG") == "" {
+		if *cfgFlag == "" && os.Getenv("GATE2NET_CONFIG") == "" {
 			if _, err := os.Stat(path); err != nil {
 				path = systemConfigPath
 			}
 		}
 		opts.ConfigPath = absPath(path)
 		if _, err := os.Stat(opts.ConfigPath); err != nil {
-			return fmt.Errorf("no configuration at %s: create it first with `sudo gate2sky config --config %s`", opts.ConfigPath, opts.ConfigPath)
+			return fmt.Errorf("no configuration at %s: create it first with `sudo gate2net config --config %s`", opts.ConfigPath, opts.ConfigPath)
 		}
 		cfg, err := loadConfig(opts.ConfigPath)
 		if err != nil {

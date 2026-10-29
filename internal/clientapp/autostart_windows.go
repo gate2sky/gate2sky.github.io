@@ -10,7 +10,7 @@ import (
 // tray.
 const (
 	runKey   = `Software\Microsoft\Windows\CurrentVersion\Run`
-	runValue = "gate2sky"
+	runValue = "gate2net"
 )
 
 // AutostartSupported reports whether SetAutostart can work here.

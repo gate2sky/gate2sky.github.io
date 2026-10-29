@@ -2,5 +2,5 @@
 data/
 deploy/
 *.db
-gate2sky.yaml
-/gate2sky
+gate2net.yaml
+/gate2net

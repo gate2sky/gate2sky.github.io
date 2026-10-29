@@ -1,6 +1,6 @@
-# gate2sky configuration.
+# gate2net configuration.
 #
-# `gate2sky config` writes this file for you with an interactive wizard.
+# `gate2net config` writes this file for you with an interactive wizard.
 # ${VAR} in values is replaced with environment variables, and relative
 # paths are relative to this file's directory.
 
@@ -10,17 +10,17 @@
 public_url: https://gate.example.com
 
 # SQLite database, SSH host key, signing key and certificates live here.
-data_dir: /var/lib/gate2sky
+data_dir: /var/lib/gate2net
 
 http:
   listen: ":80"
   # Remove the tls block when a reverse proxy (Traefik, Caddy, nginx...)
-  # terminates TLS in front of gate2sky, and keep public_url on https.
+  # terminates TLS in front of gate2net, and keep public_url on https.
   tls:
     listen: ":443"
     # Either a wildcard certificate for gate.example.com and *.gate.example.com:
-    # cert_file: /etc/gate2sky/fullchain.pem
-    # key_file: /etc/gate2sky/privkey.pem
+    # cert_file: /etc/gate2net/fullchain.pem
+    # key_file: /etc/gate2net/privkey.pem
     # ...or certificates from Let's Encrypt, issued on demand for the
     # dashboard and every registered subdomain:
     acme:
@@ -50,13 +50,13 @@ auth:
 
   # Sign in with a one-time code sent by email. Users can then add passkeys.
   email:
-    from: "gate2sky <no-reply@gate.example.com>"
+    from: "gate2net <no-reply@gate.example.com>"
     code_ttl: 10m
     smtp:
       host: smtp.example.com
       port: 587
       tls: starttls   # starttls, tls (port 465) or none (local relay only)
-      username: gate2sky
+      username: gate2net
       password: ${SMTP_PASSWORD}
     # For local development only: write the codes to the log instead.
     # log_only: true
@@ -82,8 +82,8 @@ auth:
   #     client_secret: ${GOOGLE_CLIENT_SECRET}
 
 # admin:
-#   # Unix socket used by `gate2sky config` and `gate2sky status`.
-#   socket: /var/lib/gate2sky/admin.sock
+#   # Unix socket used by `gate2net config` and `gate2net status`.
+#   socket: /var/lib/gate2net/admin.sock
 
 limits:
   subdomains_per_user: 10
@@ -92,7 +92,7 @@ limits:
 
 # TCP and UDP ports for subdomains (databases, SSH, games...). TCP ports are
 # forwarded with ssh -R <port>.<subdomain>:0:localhost:<local port>, UDP ports
-# with the gate2sky client (<public_url>/tunnel.sh). Each port gets a public
+# with the gate2net client (<public_url>/tunnel.sh). Each port gets a public
 # number from this range for good; open it in your firewall, TCP and UDP.
 # tcp:
 #   ports: 30000-30019

@@ -1,10 +1,10 @@
-// Command gate2sky-gui is the gate2sky app for the desktop: the client of
-// `gate2sky tunnel` with a window to set it up and watch it, an icon in
+// Command gate2net-gui is the gate2net app for the desktop: the client of
+// `gate2net tunnel` with a window to set it up and watch it, an icon in
 // the system tray, and starting with the system. On Windows the window is
 // native (WebView2); elsewhere it opens in the browser.
 //
-//	gate2sky-gui                 open the window
-//	gate2sky-gui --background    start in the tray, as when starting with Windows
+//	gate2net-gui                 open the window
+//	gate2net-gui --background    start in the tray, as when starting with Windows
 package main
 
 import (
@@ -14,7 +14,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/clientapp"
+	"github.com/gate2net/gate2net.github.io/internal/clientapp"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -25,7 +25,7 @@ func main() {
 	showVersion := flag.Bool("version", false, "print the version")
 	flag.Parse()
 	if *showVersion {
-		fmt.Println("gate2sky-gui", version)
+		fmt.Println("gate2net-gui", version)
 		return
 	}
 	if err := run(!*background); err != nil {
@@ -59,7 +59,7 @@ func run(openWindow bool) error {
 		app.Logf("could not record this instance: %v", err)
 	}
 	defer unpublish()
-	app.Logf("gate2sky %s", version)
+	app.Logf("gate2net %s", version)
 
 	if app.Settings().ConnectOnStart {
 		if err := app.Connect(); err != nil {

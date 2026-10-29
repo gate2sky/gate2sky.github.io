@@ -200,7 +200,7 @@
 
   <div :if="hasUDP && sub.tunnel_command">
     <div class="command-head">
-      <p class="muted">To forward them, UDP included, with the gate2sky client and an authorized key (ssh-agent or <code>-i</code>):</p>
+      <p class="muted">To forward them, UDP included, with the gate2net client and an authorized key (ssh-agent or <code>-i</code>):</p>
       <div class="segmented" role="group" aria-label="Operating system">
         <button type="button" :aria-pressed="os === 'unix' ? 'true' : 'false'" @click="os = 'unix'">Linux / macOS</button>
         <button type="button" :aria-pressed="os === 'windows' ? 'true' : 'false'" @click="os = 'windows'">Windows</button>
@@ -208,7 +208,7 @@
     </div>
     <CopyText :if="os === 'unix'" :command="sub.tunnel_command" />
     <CopyText :else :command="sub.tunnel_command_windows" />
-    <p class="muted small">Plain <code>ssh</code> only carries TCP. The script downloads the client for this server, checks it and deletes it when it ends (<code>--cache</code> first keeps it). Add <code>--http 3000</code> for the HTTP tunnel.<span :if="os === 'windows'"> In PowerShell; keys come from the OpenSSH agent (<code>ssh-add</code>) or <code>%USERPROFILE%\.ssh</code>. Rather a window and a tray icon? <a href="https://github.com/gate2sky/gate2sky.github.io/releases/latest" target="_blank" rel="noopener">The gate2sky app</a> (<code>gate2sky-gui.exe</code>, in the same download) does the same.</span> UDP over SSH suits games and DNS-like traffic; fast-paced games and calls may feel jittery.</p>
+    <p class="muted small">Plain <code>ssh</code> only carries TCP. The script downloads the client for this server, checks it and deletes it when it ends (<code>--cache</code> first keeps it). Add <code>--http 3000</code> for the HTTP tunnel.<span :if="os === 'windows'"> In PowerShell; keys come from the OpenSSH agent (<code>ssh-add</code>) or <code>%USERPROFILE%\.ssh</code>. Rather a window and a tray icon? <a href="https://github.com/gate2net/gate2net.github.io/releases/latest" target="_blank" rel="noopener">The gate2net app</a> (<code>gate2net-gui.exe</code>, in the same download) does the same.</span> UDP over SSH suits games and DNS-like traffic; fast-paced games and calls may feel jittery.</p>
   </div>
   <div :elseif="sub.ports_command">
     <p class="muted">To forward them, with an authorized key:</p>
@@ -238,7 +238,7 @@
       </label>
     </div>
     <div :if="warning" class="flash flash-warn">{{ warning }}</div>
-    <div :if="udp" class="flash flash-info">UDP ports are forwarded with the gate2sky client, not plain <code>ssh</code>: the page shows the command once the port exists.</div>
+    <div :if="udp" class="flash flash-info">UDP ports are forwarded with the gate2net client, not plain <code>ssh</code>: the page shows the command once the port exists.</div>
     <fieldset>
       <legend>Who can connect</legend>
       <label class="radio tone-green">
@@ -249,7 +249,7 @@
       </label>
       <textarea :if="restricted" name="allow" rows="2" spellcheck="false" aria-label="Allowed addresses" :placeholder="sub.client_ip"
                 :value="allowText" @input="allowText = $event.target.value"></textarea>
-      <p :if="restricted" class="hint">Your address, as gate2sky sees it, is <code>{{ sub.client_ip }}</code>.</p>
+      <p :if="restricted" class="hint">Your address, as gate2net sees it, is <code>{{ sub.client_ip }}</code>.</p>
       <label class="radio tone-orange">
         <input type="radio" name="port-access" :checked="!restricted" @change="restricted = false">
         <span class="radio-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg></span>

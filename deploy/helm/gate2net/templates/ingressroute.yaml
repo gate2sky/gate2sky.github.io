@@ -1,21 +1,21 @@
 {{- if .Values.traefik.enabled }}
 {{- $domain := .Values.domain -}}
-{{- $tlsSecret := include "gate2sky.tlsSecret" . -}}
+{{- $tlsSecret := include "gate2net.tlsSecret" . -}}
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: {{ include "gate2sky.fullname" . }}
+  name: {{ include "gate2net.fullname" . }}
   labels:
-    {{- include "gate2sky.labels" . | nindent 4 }}
+    {{- include "gate2net.labels" . | nindent 4 }}
 spec:
   entryPoints:
     {{- toYaml .Values.traefik.entryPoints | nindent 4 }}
   routes:
-    # The dashboard and every tunnel: gate2sky routes by Host itself.
+    # The dashboard and every tunnel: gate2net routes by Host itself.
     - match: Host(`{{ $domain }}`) || HostRegexp(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.{{ $domain | replace "." "\\." }}$`)
       kind: Rule
       services:
-        - name: {{ include "gate2sky.fullname" . }}
+        - name: {{ include "gate2net.fullname" . }}
           port: http
   {{- if or .Values.traefik.tls.certResolver $tlsSecret }}
   tls:

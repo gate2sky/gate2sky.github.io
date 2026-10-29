@@ -17,8 +17,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/clientapp"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/clientapp"
+	"github.com/gate2net/gate2net.github.io/internal/store"
 )
 
 // writeKey makes a key and saves it as an OpenSSH private key file, for
@@ -52,7 +52,7 @@ func TestApp(t *testing.T) {
 		t.Fatalf("add port: %s", b)
 	}
 
-	app, err := clientapp.Open(filepath.Join(t.TempDir(), "gate2sky", "app.json"))
+	app, err := clientapp.Open(filepath.Join(t.TempDir(), "gate2net", "app.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

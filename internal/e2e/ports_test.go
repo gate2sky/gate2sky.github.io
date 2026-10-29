@@ -12,8 +12,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/api"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/api"
+	"github.com/gate2net/gate2net.github.io/internal/store"
 )
 
 // freeRange finds n consecutive ports nobody listens on, for tcp.ports.

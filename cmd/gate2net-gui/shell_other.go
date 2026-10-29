@@ -10,14 +10,14 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/clientapp"
+	"github.com/gate2net/gate2net.github.io/internal/clientapp"
 )
 
 // shell opens the window in the browser, without a tray icon, and runs
 // until interrupted.
 func shell(app *clientapp.App, ui *clientapp.UI, openWindow bool) {
 	ui.Show = func() { openBrowser(ui.URL()) }
-	fmt.Println("gate2sky is running; its window:", ui.URL())
+	fmt.Println("gate2net is running; its window:", ui.URL())
 	if openWindow {
 		ui.Show()
 	}
@@ -35,6 +35,6 @@ func openBrowser(url string) {
 }
 
 func fatal(err error) {
-	fmt.Fprintln(os.Stderr, "gate2sky-gui:", err)
+	fmt.Fprintln(os.Stderr, "gate2net-gui:", err)
 	os.Exit(1)
 }

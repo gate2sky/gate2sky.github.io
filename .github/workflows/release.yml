@@ -5,7 +5,7 @@ name: Release
 # with the binaries pages/setup.sh installs, the Docker image and the Helm
 # chart, and deploys the landing and the Helm repository to GitHub Pages.
 # Every binary, the image and the chart carry a build provenance attestation:
-# `gh attestation verify <file> --repo gate2sky/gate2sky.github.io`.
+# `gh attestation verify <file> --repo gate2net/gate2net.github.io`.
 on:
   workflow_dispatch:
     inputs:
@@ -67,7 +67,7 @@ jobs:
           # The version lives in VERSION; the Helm chart follows it, so its
           # default image is the one this release publishes.
           echo "$next" > VERSION
-          sed -i -E "s/^version: .*/version: $next/; s/^appVersion: .*/appVersion: \"$next\"/" deploy/helm/gate2sky/Chart.yaml
+          sed -i -E "s/^version: .*/version: $next/; s/^appVersion: .*/appVersion: \"$next\"/" deploy/helm/gate2net/Chart.yaml
           # The landing's footer shows the version too.
           python3 scripts/landing/gen.py scripts/landing/template.html pages/index.html
           git diff
@@ -82,7 +82,7 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add VERSION deploy/helm/gate2sky/Chart.yaml pages/index.html
+          git add VERSION deploy/helm/gate2net/Chart.yaml pages/index.html
           git commit -m "Release v$next"
           git tag -a "v$next" -m "v$next"
           git push origin HEAD --follow-tags
@@ -103,7 +103,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: gate2sky-*
+          pattern: gate2net-*
           path: dist
           merge-multiple: true
       # Signed by GitHub with this workflow's identity: proves each archive
@@ -150,22 +150,22 @@ jobs:
           push: true
           build-args: VERSION=${{ needs.version.outputs.version }}
           # The image is named after the project, not the repository
-          # (gate2sky.github.io), so it is ghcr.io/<owner>/gate2sky.
+          # (gate2net.github.io), so it is ghcr.io/<owner>/gate2net.
           tags: |
-            ghcr.io/${{ github.repository_owner }}/gate2sky:${{ needs.version.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/gate2sky:latest
+            ghcr.io/${{ github.repository_owner }}/gate2net:${{ needs.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/gate2net:latest
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ghcr.io/${{ github.repository_owner }}/gate2sky
+          subject-name: ghcr.io/${{ github.repository_owner }}/gate2net
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
   # The chart, two ways, so there is nothing to clone: as an OCI artifact
-  # (`helm install gate2sky oci://ghcr.io/<owner>/charts/gate2sky`; under
-  # charts/ so it does not land on the image's ghcr.io/<owner>/gate2sky) and
+  # (`helm install gate2net oci://ghcr.io/<owner>/charts/gate2net`; under
+  # charts/ so it does not land on the image's ghcr.io/<owner>/gate2net) and
   # attached to the release, where the classic repository the pages job
-  # publishes points (`helm repo add gate2sky https://gate2sky.github.io/charts`).
+  # publishes points (`helm repo add gate2net https://gate2net.github.io/charts`).
   chart:
     needs: [version, publish]
     runs-on: ubuntu-latest
@@ -181,9 +181,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          chart="dist/gate2sky-${{ needs.version.outputs.version }}.tgz"
+          chart="dist/gate2net-${{ needs.version.outputs.version }}.tgz"
           echo "$TOKEN" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-          helm package deploy/helm/gate2sky -d dist
+          helm package deploy/helm/gate2net -d dist
           helm push "$chart" oci://ghcr.io/${{ github.repository_owner }}/charts 2>&1 | tee push.log
           digest=$(sed -n 's/^Digest: //p' push.log)
           test -n "$digest"
@@ -191,7 +191,7 @@ jobs:
           gh release upload "${{ needs.version.outputs.tag }}" "$chart" --repo "$GITHUB_REPOSITORY"
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: dist/gate2sky-${{ needs.version.outputs.version }}.tgz
+          subject-path: dist/gate2net-${{ needs.version.outputs.version }}.tgz
       # The attestation is pushed with Docker's credentials, not the ones
       # `helm registry login` keeps in Helm's own config.
       - uses: docker/login-action@v3
@@ -201,13 +201,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ghcr.io/${{ github.repository_owner }}/charts/gate2sky
+          subject-name: ghcr.io/${{ github.repository_owner }}/charts/gate2net
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
       - uses: actions/upload-artifact@v4
         with:
           name: chart
-          path: dist/gate2sky-${{ needs.version.outputs.version }}.tgz
+          path: dist/gate2net-${{ needs.version.outputs.version }}.tgz
 
   # The landing tells people to install the chart, so it waits for it. Pages
   # replaces the whole site on each deploy, so the Helm repository's index

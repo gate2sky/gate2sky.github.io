@@ -1,15 +1,15 @@
 // Package api holds the JSON shapes that both the dashboard's API and the
 // admin socket answer with, and their conversions from stored records, so
-// the browser and `gate2sky config` read the same thing.
+// the browser and `gate2net config` read the same thing.
 package api
 
 import (
 	"time"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/ports"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
-	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/ports"
+	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/tunnel"
 )
 
 // Subdomain is a registered subdomain and its live tunnel, if any.

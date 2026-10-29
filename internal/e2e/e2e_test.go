@@ -1,4 +1,4 @@
-// Package e2e runs gate2sky end to end: a real SSH server and HTTP
+// Package e2e runs gate2net end to end: a real SSH server and HTTP
 // handler, SSH clients that open tunnels, browsers that sign in through a
 // fake OpenID Connect provider.
 package e2e
@@ -24,12 +24,12 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/api"
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/mail"
-	"github.com/gate2sky/gate2sky.github.io/internal/server"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
-	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
+	"github.com/gate2net/gate2net.github.io/internal/api"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/mail"
+	"github.com/gate2net/gate2net.github.io/internal/server"
+	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/tunnel"
 )
 
 const domain = "gate.test"
@@ -354,7 +354,7 @@ func TestPublicTunnel(t *testing.T) {
 		t.Fatalf("tunnel stats: %+v", tun)
 	}
 
-	// Unregistered and offline subdomains get gate2sky's error pages.
+	// Unregistered and offline subdomains get gate2net's error pages.
 	if resp, _ := get(t, h.browser(false), "http://nope."+domain+"/"); resp.StatusCode != http.StatusNotFound {
 		t.Errorf("unregistered subdomain: %d", resp.StatusCode)
 	}
@@ -760,7 +760,7 @@ func TestProtectedTunnels(t *testing.T) {
 	noFollow.Jar = owner.Jar
 	resp, _ = get(t, noFollow, "http://"+domain+"/tunnel-auth?rd="+url.QueryEscape("http://secret."+domain+"/"))
 	handoff := resp.Header.Get("Location")
-	if !strings.HasPrefix(handoff, "http://secret."+domain+"/__gate2sky/auth?") {
+	if !strings.HasPrefix(handoff, "http://secret."+domain+"/__gate2net/auth?") {
 		t.Fatalf("hand-off location %q", handoff)
 	}
 	stolen := strings.Replace(handoff, "secret.", "team.", 1)
@@ -773,7 +773,7 @@ func TestProtectedTunnels(t *testing.T) {
 	if resp, _ := get(t, h.browser(false), handoff); resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("hand-off reused: %d", resp.StatusCode)
 	}
-	// tunnel-auth only redirects to tunnels of this gate2sky.
+	// tunnel-auth only redirects to tunnels of this gate2net.
 	if resp, _ := get(t, noFollow, "http://"+domain+"/tunnel-auth?rd="+url.QueryEscape("http://evil.com/")); resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("tunnel-auth to foreign host: %d", resp.StatusCode)
 	}

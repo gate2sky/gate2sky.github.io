@@ -15,16 +15,16 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/names"
-	"github.com/gate2sky/gate2sky.github.io/internal/ports"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
-	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/names"
+	"github.com/gate2net/gate2net.github.io/internal/ports"
+	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/tunnel"
 )
 
 const (
-	extFingerprint = "gate2sky-fingerprint"
-	extPublicKey   = "gate2sky-public-key"
+	extFingerprint = "gate2net-fingerprint"
+	extPublicKey   = "gate2net-public-key"
 
 	handshakeTimeout = 30 * time.Second
 )
@@ -59,7 +59,7 @@ func New(cfg *config.Config, st *store.Store, reg *tunnel.Registry, pr *ports.Re
 		conns:    map[*clientConn]struct{}{},
 	}
 	s.sshCfg = &ssh.ServerConfig{
-		ServerVersion:               "SSH-2.0-gate2sky",
+		ServerVersion:               "SSH-2.0-gate2net",
 		MaxAuthTries:                6,
 		PublicKeyCallback:           s.authenticate,
 		KeyboardInteractiveCallback: s.explainUnknownKey,
@@ -78,7 +78,7 @@ func (s *Server) explainUnknownKey(meta ssh.ConnMetadata, _ ssh.KeyboardInteract
 		return nil, errNoKey
 	}
 	return nil, &ssh.BannerError{Err: errNoKey, Message: fmt.Sprintf(
-		"gate2sky: none of your SSH keys is registered.\r\n"+
+		"gate2net: none of your SSH keys is registered.\r\n"+
 			"Add your public key (e.g. ~/.ssh/id_ed25519.pub) to a subdomain at\r\n  %s\r\nthen try again.\r\n",
 		s.cfg.DashboardURL("/"))}
 }

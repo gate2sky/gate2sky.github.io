@@ -1,5 +1,5 @@
-// Package udpframe is how UDP travels over SSH between the gate2sky server
-// and the gate2sky client, which plain OpenSSH can't do: the client asks
+// Package udpframe is how UDP travels over SSH between the gate2net server
+// and the gate2net client, which plain OpenSSH can't do: the client asks
 // for a port with a global request like tcpip-forward, and the server
 // opens a channel per remote address, carrying its datagrams each after
 // its length.
@@ -14,12 +14,12 @@ import (
 const (
 	// ForwardRequest asks the server to forward a UDP port, with the
 	// payload of tcpip-forward (RFC 4254 section 7.1).
-	ForwardRequest = "udp-forward@gate2sky"
+	ForwardRequest = "udp-forward@gate2net"
 	// CancelRequest stops it.
-	CancelRequest = "cancel-udp-forward@gate2sky"
+	CancelRequest = "cancel-udp-forward@gate2net"
 	// ChannelType carries the datagrams of one remote address, with the
 	// payload of forwarded-tcpip (RFC 4254 section 7.2).
-	ChannelType = "udp@gate2sky"
+	ChannelType = "udp@gate2net"
 
 	// MaxDatagram is the largest datagram carried.
 	MaxDatagram = 65507
