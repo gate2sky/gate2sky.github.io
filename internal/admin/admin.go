@@ -346,7 +346,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, User{ID: u.ID, Email: u.Email, Admin: h.cfg.UserAdmin(u.Email, u.Admin), Allowed: h.cfg.UserAllowed(u.Email, u.Added, u.Admin)})
+	writeJSON(w, http.StatusCreated, api.NewUser(h.cfg, store.UserSummary{User: *u}))
 }
 
 func (h *Handler) setDisabled(disabled bool) http.HandlerFunc {

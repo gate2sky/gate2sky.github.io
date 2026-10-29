@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -804,10 +805,10 @@ func TestDisableUserClosesTunnels(t *testing.T) {
 
 func TestAddedUsersAndRoles(t *testing.T) {
 	h := newHarness(t)
-	admin := h.loggedIn("admin@example.com")
+	owner := h.loggedIn("admin@example.com")
 	byEmail := func(email string) api.User {
 		t.Helper()
-		_, body := call(t, admin, "GET", "/api/admin/users", nil)
+		_, body := call(t, owner, "GET", "/api/admin/users", nil)
 		for _, u := range decode[[]api.User](t, body) {
 			if u.Email == email {
 				return u
@@ -820,44 +821,97 @@ func TestAddedUsersAndRoles(t *testing.T) {
 		resp, _ := call(t, c, "GET", "/api/admin/users", nil)
 		return resp.StatusCode == http.StatusOK
 	}
+	patch := func(c *http.Client, email string, change any) int {
+		t.Helper()
+		resp, _ := call(t, c, "PATCH", fmt.Sprintf("/api/admin/users/%d", byEmail(email).ID), change)
+		return resp.StatusCode
+	}
 
 	// auth.allowed_* does not let carol in, until an administrator adds her.
 	requestCode(t, h.browser(true), "carol@other.test", "/")
 	h.mail.none(t)
-	resp, body := call(t, admin, "POST", "/api/admin/users", map[string]string{"email": "carol@other.test"})
-	if u := decode[api.User](t, body); resp.StatusCode != http.StatusCreated || !u.Allowed || u.Admin {
+	resp, body := call(t, owner, "POST", "/api/admin/users", map[string]string{"email": "carol@other.test"})
+	if u := decode[api.User](t, body); resp.StatusCode != http.StatusCreated || !u.Allowed || u.Role != "user" {
 		t.Fatalf("add user: %d %+v", resp.StatusCode, u)
 	}
+	call(t, owner, "POST", "/api/admin/users", map[string]string{"email": "dave@other.test"})
 	carol := h.browser(true)
 	h.emailLogin(carol, "carol@other.test", "/")
 	if isAdmin(carol) {
 		t.Fatal("an added user is an administrator")
 	}
-
-	// The role applies from the next request, and only another
-	// administrator takes it away; auth.admins always stays.
-	id := byEmail("carol@other.test").ID
-	if resp, _ := call(t, admin, "PATCH", fmt.Sprintf("/api/admin/users/%d", id), map[string]bool{"admin": true}); resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("make admin: %d", resp.StatusCode)
+	if u := byEmail("admin@example.com"); u.Role != "owner" || !u.ConfigOwner {
+		t.Errorf("auth.admins is not an owner: %+v", u)
 	}
-	if !isAdmin(carol) || !byEmail("carol@other.test").Admin {
+
+	// Roles apply from the next request.
+	if code := patch(owner, "carol@other.test", map[string]string{"role": "admin"}); code != http.StatusNoContent {
+		t.Fatalf("make admin: %d", code)
+	}
+	if !isAdmin(carol) || byEmail("carol@other.test").Role != "admin" {
 		t.Fatal("not an administrator after getting the role")
 	}
-	if resp, _ := call(t, carol, "PATCH", fmt.Sprintf("/api/admin/users/%d", id), map[string]bool{"admin": false}); resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("removes own role: %d", resp.StatusCode)
+
+	// Admins manage users and admins, but not owners, and nobody their own role.
+	if code := patch(carol, "dave@other.test", map[string]string{"role": "admin"}); code != http.StatusNoContent {
+		t.Errorf("admin makes an admin: %d", code)
 	}
-	cfgAdmin := byEmail("admin@example.com")
-	if !cfgAdmin.ConfigAdmin {
-		t.Errorf("admin@example.com not marked as a configured administrator: %+v", cfgAdmin)
+	if code := patch(carol, "dave@other.test", map[string]string{"role": "owner"}); code != http.StatusBadRequest {
+		t.Errorf("admin makes an owner: %d", code)
 	}
-	if resp, _ := call(t, carol, "PATCH", fmt.Sprintf("/api/admin/users/%d", cfgAdmin.ID), map[string]bool{"admin": false}); resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("removes a configured administrator's role: %d", resp.StatusCode)
+	if code := patch(carol, "carol@other.test", map[string]string{"role": "user"}); code != http.StatusBadRequest {
+		t.Errorf("changes own role: %d", code)
 	}
-	if resp, _ := call(t, admin, "PATCH", fmt.Sprintf("/api/admin/users/%d", id), map[string]bool{"admin": false}); resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("remove admin: %d", resp.StatusCode)
+	if code := patch(carol, "admin@example.com", map[string]string{"role": "user"}); code != http.StatusBadRequest {
+		t.Errorf("admin changes a configured owner: %d", code)
+	}
+	if code := patch(owner, "dave@other.test", map[string]string{"role": "owner"}); code != http.StatusNoContent {
+		t.Fatalf("owner makes an owner: %d", code)
+	}
+	if code := patch(carol, "dave@other.test", map[string]string{"role": "user"}); code != http.StatusBadRequest {
+		t.Errorf("admin changes an owner: %d", code)
+	}
+	if code := patch(carol, "dave@other.test", map[string]bool{"disabled": true}); code != http.StatusForbidden {
+		t.Errorf("admin disables an owner: %d", code)
+	}
+	if code := patch(owner, "admin@example.com", map[string]string{"role": "user"}); code != http.StatusBadRequest {
+		t.Errorf("configured owner changed: %d", code)
+	}
+	if code := patch(owner, "carol@other.test", map[string]string{"role": "nobody"}); code != http.StatusBadRequest {
+		t.Errorf("unknown role: %d", code)
+	}
+
+	if code := patch(owner, "carol@other.test", map[string]string{"role": "user"}); code != http.StatusNoContent {
+		t.Fatalf("back to user: %d", code)
 	}
 	if isAdmin(carol) {
 		t.Error("still an administrator after losing the role")
+	}
+
+	// Deleting: not yourself, not owners in auth.admins, owners only by
+	// owners; the account and its subdomains go, and the session with them.
+	del := func(c *http.Client, email string) int {
+		t.Helper()
+		resp, _ := call(t, c, "DELETE", fmt.Sprintf("/api/admin/users/%d", byEmail(email).ID), nil)
+		return resp.StatusCode
+	}
+	patch(owner, "dave@other.test", map[string]string{"role": "admin"})
+	dave := h.browser(true)
+	h.emailLogin(dave, "dave@other.test", "/")
+	if code := del(dave, "dave@other.test"); code != http.StatusBadRequest {
+		t.Errorf("deletes themselves: %d", code)
+	}
+	if code := del(owner, "admin@example.com"); code != http.StatusBadRequest {
+		t.Errorf("deletes a configured owner: %d", code)
+	}
+	if code := del(dave, "carol@other.test"); code != http.StatusNoContent {
+		t.Fatalf("admin deletes a user: %d", code)
+	}
+	if _, err := h.store.UserByEmail(t.Context(), "carol@other.test"); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("deleted user still there: %v", err)
+	}
+	if _, boot := page(t, carol, "/"); boot.User != nil {
+		t.Error("deleted user still signed in")
 	}
 }
 

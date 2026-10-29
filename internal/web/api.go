@@ -309,17 +309,52 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, api.NewUser(s.cfg, store.UserSummary{User: *u}))
 }
 
+func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
+	a := currentAuth(r)
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if id == a.User.ID {
+		jsonError(w, http.StatusBadRequest, "You can't delete your own account.")
+		return
+	}
+	if u, err := s.store.UserByID(r.Context(), id); err == nil && s.cfg.IsAdmin(u.Email) {
+		jsonError(w, http.StatusBadRequest, u.Email+" is an owner in the configuration (auth.admins): remove them there first.")
+		return
+	}
+	if !s.mayManageOwner(w, r, id, "delete") {
+		return
+	}
+	if err := s.manage.DeleteUser(r.Context(), id, a.User.Email); err != nil {
+		s.fail(w, "delete user", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// mayManageOwner answers with an error, and false, when the user with this
+// id is an owner and the signed-in administrator is not: only owners manage
+// owners.
+func (s *Server) mayManageOwner(w http.ResponseWriter, r *http.Request, id int64, action string) bool {
+	if currentAuth(r).Role == store.RoleOwner {
+		return true
+	}
+	if u, err := s.store.UserByID(r.Context(), id); err == nil && s.cfg.UserRole(u.Email, string(u.Role)) == string(store.RoleOwner) {
+		jsonError(w, http.StatusForbidden, "Only owners can "+action+" an owner.")
+		return false
+	}
+	return true
+}
+
 func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	a := currentAuth(r)
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	var req struct {
-		Disabled *bool `json:"disabled"`
-		Admin    *bool `json:"admin"`
+		Disabled *bool       `json:"disabled"`
+		Role     *store.Role `json:"role"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	if req.Disabled == nil && req.Admin == nil {
+	if req.Disabled == nil && req.Role == nil {
 		jsonError(w, http.StatusBadRequest, "Nothing to change.")
 		return
 	}
@@ -327,9 +362,7 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "You can't disable your own account.")
 		return
 	}
-	// Another administrator has to take the role away, so there is always one.
-	if id == a.User.ID && req.Admin != nil && !*req.Admin {
-		jsonError(w, http.StatusBadRequest, "You can't remove your own administrator role.")
+	if req.Disabled != nil && !s.mayManageOwner(w, r, id, "enable or disable") {
 		return
 	}
 	if req.Disabled != nil {
@@ -338,9 +371,9 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if req.Admin != nil {
-		if err := s.manage.SetUserAdmin(r.Context(), id, *req.Admin, a.User.Email); err != nil {
-			s.fail(w, "set user admin", err)
+	if req.Role != nil {
+		if err := s.manage.SetUserRole(r.Context(), id, *req.Role, a.User, a.Role); err != nil {
+			s.fail(w, "set user role", err)
 			return
 		}
 	}

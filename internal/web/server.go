@@ -227,6 +227,7 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("GET /api/admin/users", admin(s.handleAdminUsers))
 	mux.Handle("POST /api/admin/users", admin(s.handleAdminCreateUser))
 	mux.Handle("PATCH /api/admin/users/{id}", admin(s.handleAdminUpdateUser))
+	mux.Handle("DELETE /api/admin/users/{id}", admin(s.handleAdminDeleteUser))
 
 	return s.securityHeaders(s.withSession(mux))
 }
@@ -254,7 +255,10 @@ const authKey ctxKey = iota
 type authInfo struct {
 	Session *store.Session
 	User    *store.User
-	Admin   bool
+	// Role is the effective one, auth.admins included; Admin is set for
+	// admins and owners.
+	Role  store.Role
+	Admin bool
 }
 
 func currentAuth(r *http.Request) *authInfo {
@@ -267,8 +271,9 @@ func (s *Server) withSession(next http.Handler) http.Handler {
 		if c, err := r.Cookie(s.cookies.session); err == nil && c.Value != "" {
 			sess, user, err := s.store.SessionByToken(r.Context(), c.Value)
 			switch {
-			case err == nil && s.cfg.UserAllowed(user.Email, user.Added, user.Admin):
-				a := &authInfo{Session: sess, User: user, Admin: s.cfg.UserAdmin(user.Email, user.Admin)}
+			case err == nil && s.cfg.UserAllowed(user.Email, user.Added, string(user.Role)):
+				role := store.Role(s.cfg.UserRole(user.Email, string(user.Role)))
+				a := &authInfo{Session: sess, User: user, Role: role, Admin: role != store.RoleUser}
 				r = r.WithContext(context.WithValue(r.Context(), authKey, a))
 			case err != nil && !errors.Is(err, store.ErrNotFound):
 				s.log.Error("load session", "err", err)

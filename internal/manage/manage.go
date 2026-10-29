@@ -253,7 +253,7 @@ func (s *Service) CreateUser(ctx context.Context, email, actor string) (*store.U
 		if u, err = s.store.UserByEmail(ctx, email); err != nil {
 			return nil, err
 		}
-		if s.cfg.UserAllowed(u.Email, u.Added, u.Admin) {
+		if s.cfg.UserAllowed(u.Email, u.Added, string(u.Role)) {
 			return nil, Errorf("%s already has an account", email)
 		}
 	} else if err != nil {
@@ -300,9 +300,33 @@ func (s *Service) SetUserDisabled(ctx context.Context, userID int64, disabled bo
 	return nil
 }
 
-// SetUserAdmin gives or takes the administrator role. Addresses in
-// auth.admins stay administrators whatever it is set to.
-func (s *Service) SetUserAdmin(ctx context.Context, userID int64, admin bool, actor string) error {
+// DeleteUser removes an account and everything it owns, and closes its
+// tunnels. Someone the configuration allows can sign in again, as a new
+// account.
+func (s *Service) DeleteUser(ctx context.Context, userID int64, actor string) error {
+	err := s.store.DeleteUser(ctx, userID)
+	if errors.Is(err, store.ErrNotFound) {
+		return Errorf("user not found")
+	}
+	if err != nil {
+		return err
+	}
+	for _, t := range s.registry.List() {
+		if t.OwnerID == userID {
+			t.Close("the owner's account was deleted")
+		}
+	}
+	s.log.Info("user deleted", "user_id", userID, "by", actor)
+	return nil
+}
+
+// SetUserRole changes the role of another user. Admins manage users and
+// admins; only owners make owners or change them, and addresses in
+// auth.admins stay owners whatever it is set to.
+func (s *Service) SetUserRole(ctx context.Context, userID int64, role store.Role, actor *store.User, actorRole store.Role) error {
+	if !role.Valid() {
+		return Errorf("unknown role %q", role)
+	}
 	u, err := s.store.UserByID(ctx, userID)
 	if errors.Is(err, store.ErrNotFound) {
 		return Errorf("user not found")
@@ -310,13 +334,18 @@ func (s *Service) SetUserAdmin(ctx context.Context, userID int64, admin bool, ac
 	if err != nil {
 		return err
 	}
-	if !admin && s.cfg.IsAdmin(u.Email) {
-		return Errorf("%s is an administrator in the configuration (auth.admins)", u.Email)
+	switch {
+	case u.ID == actor.ID:
+		return Errorf("you can't change your own role")
+	case s.cfg.IsAdmin(u.Email):
+		return Errorf("%s is an owner in the configuration (auth.admins)", u.Email)
+	case actorRole != store.RoleOwner && (u.Role == store.RoleOwner || role == store.RoleOwner):
+		return Errorf("only owners can make or change owners")
 	}
-	if err := s.store.SetUserAdmin(ctx, userID, admin); err != nil {
+	if err := s.store.SetUserRole(ctx, userID, role); err != nil {
 		return err
 	}
-	s.log.Info("user updated", "user_id", userID, "admin", admin, "by", actor)
+	s.log.Info("user updated", "user_id", userID, "role", role, "by", actor.Email)
 	return nil
 }
 

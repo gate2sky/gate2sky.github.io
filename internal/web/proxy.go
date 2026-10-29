@@ -166,7 +166,7 @@ func (s *Server) tunnelVisitor(r *http.Request, name string) *store.User {
 		return nil
 	}
 	_, user, err := s.store.SessionByID(r.Context(), g.SessionID)
-	if err != nil || !s.cfg.UserAllowed(user.Email, user.Added, user.Admin) {
+	if err != nil || !s.cfg.UserAllowed(user.Email, user.Added, string(user.Role)) {
 		return nil
 	}
 	return user

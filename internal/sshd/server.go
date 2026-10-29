@@ -106,7 +106,7 @@ func (s *Server) grants(ctx context.Context, fingerprint, publicKey string) ([]s
 	}
 	out := all[:0]
 	for _, g := range all {
-		if g.PublicKey == publicKey && s.cfg.UserAllowed(g.OwnerEmail, g.OwnerAdded, g.OwnerAdmin) {
+		if g.PublicKey == publicKey && s.cfg.UserAllowed(g.OwnerEmail, g.OwnerAdded, string(g.OwnerRole)) {
 			out = append(out, g)
 		}
 	}

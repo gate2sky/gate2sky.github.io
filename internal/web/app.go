@@ -61,6 +61,7 @@ type me struct {
 	Name      string    `json:"name"`
 	AvatarURL string    `json:"avatar_url"`
 	Admin     bool      `json:"admin"`
+	Role      string    `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -87,7 +88,7 @@ func (s *Server) serveApp(w http.ResponseWriter, r *http.Request, status int, pe
 	}
 	if a := currentAuth(r); a != nil {
 		u := a.User
-		b.User = &me{ID: u.ID, Email: u.Email, Name: u.Name, AvatarURL: u.AvatarURL, Admin: a.Admin, CreatedAt: u.CreatedAt}
+		b.User = &me{ID: u.ID, Email: u.Email, Name: u.Name, AvatarURL: u.AvatarURL, Admin: a.Admin, Role: string(a.Role), CreatedAt: u.CreatedAt}
 		b.CSRF = a.Session.CSRFToken
 	} else if f, ok := s.emailFlow(r); ok {
 		b.EmailFlow = f.Email

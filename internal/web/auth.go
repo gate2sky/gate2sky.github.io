@@ -67,7 +67,7 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user *stor
 	if user.Disabled {
 		return "Your account has been disabled by an administrator.", false
 	}
-	if !s.cfg.UserAllowed(user.Email, user.Added, user.Admin) {
+	if !s.cfg.UserAllowed(user.Email, user.Added, string(user.Role)) {
 		s.log.Info("sign-in denied", "method", method, "email", user.Email)
 		return fmt.Sprintf("The account %s is not allowed to use this gate2sky.", user.Email), false
 	}

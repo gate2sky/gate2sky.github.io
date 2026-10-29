@@ -215,7 +215,7 @@ func (s *Server) mayUseEmail(ctx context.Context, email string) bool {
 // administrator or made one.
 func (s *Server) emailAllowed(ctx context.Context, email string) bool {
 	if u, err := s.store.UserByEmail(ctx, email); err == nil {
-		return s.cfg.UserAllowed(u.Email, u.Added, u.Admin)
+		return s.cfg.UserAllowed(u.Email, u.Added, string(u.Role))
 	}
 	return s.cfg.EmailAllowed(email)
 }

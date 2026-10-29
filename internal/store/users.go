@@ -21,13 +21,26 @@ type User struct {
 	WebAuthnID []byte
 	Disabled   bool
 	// Added is set for accounts an administrator added: they may sign in
-	// whatever auth.allowed_* says. Admin is the administrator role given
-	// from the dashboard, on top of auth.admins.
+	// whatever auth.allowed_* says. Role is the one given from the
+	// dashboard; auth.admins makes owners whatever it says.
 	Added       bool
-	Admin       bool
+	Role        Role
 	CreatedAt   time.Time
 	LastLoginAt time.Time
 }
+
+// Role is what a user may do. Admins manage every subdomain and account but
+// owners'; owners manage everything.
+type Role string
+
+const (
+	RoleUser  Role = "user"
+	RoleAdmin Role = "admin"
+	RoleOwner Role = "owner"
+)
+
+// Valid reports whether r is a known role.
+func (r Role) Valid() bool { return r == RoleUser || r == RoleAdmin || r == RoleOwner }
 
 // DisplayName is the best human-readable name for the user.
 func (u *User) DisplayName() string {
@@ -47,14 +60,14 @@ type Identity struct {
 	AvatarURL string
 }
 
-const userColumns = `id, email, name, avatar_url, webauthn_id, disabled, added, admin, created_at, last_login_at`
+const userColumns = `id, email, name, avatar_url, webauthn_id, disabled, added, role, created_at, last_login_at`
 
 type scanner interface{ Scan(dest ...any) error }
 
 func scanUser(row scanner) (*User, error) {
 	var u User
 	var created, lastLogin int64
-	if err := row.Scan(&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.WebAuthnID, &u.Disabled, &u.Added, &u.Admin, &created, &lastLogin); err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.WebAuthnID, &u.Disabled, &u.Added, &u.Role, &created, &lastLogin); err != nil {
 		return nil, notFound(err)
 	}
 	u.CreatedAt, u.LastLoginAt = fromUnix(created), fromUnix(lastLogin)
@@ -188,7 +201,7 @@ func (s *Store) ListUsers(ctx context.Context) ([]UserSummary, error) {
 	for rows.Next() {
 		var us UserSummary
 		var created, lastLogin int64
-		if err := rows.Scan(&us.ID, &us.Email, &us.Name, &us.AvatarURL, &us.WebAuthnID, &us.Disabled, &us.Added, &us.Admin, &created, &lastLogin,
+		if err := rows.Scan(&us.ID, &us.Email, &us.Name, &us.AvatarURL, &us.WebAuthnID, &us.Disabled, &us.Added, &us.Role, &created, &lastLogin,
 			&us.Subdomains, &us.Passkeys, &us.Providers); err != nil {
 			return nil, err
 		}
@@ -227,19 +240,32 @@ func (s *Store) SetUserDisabled(ctx context.Context, id int64, disabled bool) er
 	return tx.Commit()
 }
 
+// DeleteUser removes an account with everything it owns: subdomains and
+// their keys, passkeys, linked identities and sessions.
+func (s *Store) DeleteUser(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // SetUserAdded records that an administrator added the user, which lets
 // them sign in whatever auth.allowed_* says.
 func (s *Store) SetUserAdded(ctx context.Context, id int64) error {
-	return s.setUserFlag(ctx, id, "added", true)
+	return s.setUser(ctx, id, "added", true)
 }
 
-// SetUserAdmin gives or takes the administrator role. It does not change
-// auth.admins, which always makes its addresses administrators.
-func (s *Store) SetUserAdmin(ctx context.Context, id int64, admin bool) error {
-	return s.setUserFlag(ctx, id, "admin", admin)
+// SetUserRole changes a user's role. auth.admins still makes its addresses
+// owners whatever it is.
+func (s *Store) SetUserRole(ctx context.Context, id int64, role Role) error {
+	return s.setUser(ctx, id, "role", role)
 }
 
-func (s *Store) setUserFlag(ctx context.Context, id int64, column string, v bool) error {
+func (s *Store) setUser(ctx context.Context, id int64, column string, v any) error {
 	res, err := s.db.ExecContext(ctx, `UPDATE users SET `+column+` = ? WHERE id = ?`, v, id)
 	if err != nil {
 		return err
@@ -378,7 +404,7 @@ func (s *Store) CreateSession(ctx context.Context, userID int64, ttl time.Durati
 
 const sessionUserQuery = `
 	SELECT s.id, s.user_id, s.csrf_token, s.created_at, s.expires_at,
-		u.id, u.email, u.name, u.avatar_url, u.webauthn_id, u.disabled, u.added, u.admin, u.created_at, u.last_login_at
+		u.id, u.email, u.name, u.avatar_url, u.webauthn_id, u.disabled, u.added, u.role, u.created_at, u.last_login_at
 	FROM sessions s JOIN users u ON u.id = s.user_id `
 
 func (s *Store) scanSessionUser(row scanner) (*Session, *User, error) {
@@ -386,7 +412,7 @@ func (s *Store) scanSessionUser(row scanner) (*Session, *User, error) {
 	var u User
 	var sCreated, sExpires, uCreated, uLogin int64
 	if err := row.Scan(&sess.ID, &sess.UserID, &sess.CSRFToken, &sCreated, &sExpires,
-		&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.WebAuthnID, &u.Disabled, &u.Added, &u.Admin, &uCreated, &uLogin); err != nil {
+		&u.ID, &u.Email, &u.Name, &u.AvatarURL, &u.WebAuthnID, &u.Disabled, &u.Added, &u.Role, &uCreated, &uLogin); err != nil {
 		return nil, nil, notFound(err)
 	}
 	sess.CreatedAt, sess.ExpiresAt = fromUnix(sCreated), fromUnix(sExpires)
