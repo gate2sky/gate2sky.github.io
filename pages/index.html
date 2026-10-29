@@ -70,6 +70,7 @@
   --strand-1: #8ff0ff;
   --strand-2: #ffe066;
   --haze: .55;
+  --note: #fff 5%;
 }
 [data-theme="light"] {
   --bg: #f4f6fb;
@@ -100,6 +101,7 @@
   --strand-1: #0b9fd8;
   --strand-2: #d06a00;
   --haze: .35;
+  --note: #ffd23f 9%;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -120,9 +122,50 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "
 .sky { position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background: radial-gradient(1200px 700px at 75% -10%, color-mix(in srgb, var(--blue) 22%, transparent), transparent 70%),
               radial-gradient(900px 600px at 0% 110%, color-mix(in srgb, var(--cyan) 10%, transparent), transparent 70%), var(--bg); }
-.sky svg { width: 100%; height: 100%; }
+.sky { overflow: hidden; }
+.sky svg { position: relative; width: 100%; height: 100%; }
 .sky circle { fill: var(--star); animation: twinkle 6s ease-in-out infinite; }
 @keyframes twinkle { 0%, 100% { opacity: .25 } 50% { opacity: .9 } }
+/* The layers pan by one sky width, so they end where they started. */
+.pan { animation: pan linear infinite; }
+.pan-1 { animation-duration: 420s; }
+.pan-2 { animation-duration: 260s; }
+.pan-3 { animation-duration: 160s; }
+@keyframes pan { to { transform: translateX(-1600px) } }
+.meteor { opacity: 0; animation: meteor linear infinite; }
+.meteor line { stroke-width: 1.6; stroke-linecap: round; }
+@keyframes meteor {
+  0% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--a)) translateX(0); }
+  1% { opacity: 1; }
+  6%, 100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--a)) translateX(520px); }
+}
+[data-theme="light"] .meteors { display: none; }
+/* By day, the sky is color glows that wander like the dashboard's
+   wallpaper, each on its own path and clock. */
+.sky::before, .sky::after { content: ""; position: absolute; inset: -25%; display: none; will-change: transform; }
+[data-theme="light"] .sky::before, [data-theme="light"] .sky::after { display: block; }
+.sky::before {
+  background: radial-gradient(40% 36% at 24% 22%, rgb(45 91 255 / .2), transparent 70%),
+              radial-gradient(34% 32% at 78% 26%, rgb(175 90 242 / .16), transparent 70%);
+  animation: drift-a 26s ease-in-out infinite;
+}
+.sky::after {
+  background: radial-gradient(42% 34% at 66% 78%, rgb(11 159 216 / .2), transparent 70%),
+              radial-gradient(30% 28% at 22% 76%, rgb(255 159 10 / .14), transparent 70%);
+  animation: drift-b 33s ease-in-out infinite;
+}
+@keyframes drift-a {
+  0%, 100% { transform: translate(-12%, -8%) rotate(0deg) scale(1); }
+  25% { transform: translate(14%, -4%) rotate(28deg) scale(1.15); }
+  50% { transform: translate(16%, 14%) rotate(52deg) scale(.92); }
+  75% { transform: translate(-8%, 15%) rotate(22deg) scale(1.1); }
+}
+@keyframes drift-b {
+  0%, 100% { transform: translate(12%, 8%) rotate(0deg) scale(1.06); }
+  30% { transform: translate(-15%, 10%) rotate(-30deg) scale(.92); }
+  60% { transform: translate(-16%, -14%) rotate(-54deg) scale(1.16); }
+  80% { transform: translate(9%, -12%) rotate(-18deg) scale(1); }
+}
 
 /* Header */
 header { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
@@ -266,6 +309,34 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 .term .copy { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); padding: 4px 9px; font-size: 12px; border-radius: 8px; }
 .term .tbar i { width: 11px; height: 11px; border-radius: 50%; background: var(--code-button-border); }
 .term .tbar i:nth-child(1) { background: #ff5f57; } .term .tbar i:nth-child(2) { background: #febc2e; } .term .tbar i:nth-child(3) { background: #28c840; }
+/* Two ways to name the key: whatever ssh offers by default, or a file
+   with -i. Each tab shows its own command, copy button and session. */
+.term input { position: absolute; opacity: 0; pointer-events: none; }
+.term .tbar { align-items: center; }
+.term .tbar i { flex: none; }
+.key-tabs { display: flex; gap: 14px; align-self: stretch; margin: -12px 76px -13px 14px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.key-tabs label { flex: none; display: flex; align-items: center; padding: 0 2px; cursor: pointer; font-size: 12px; font-weight: 600;
+  color: var(--code-dim); border-bottom: 2px solid transparent; white-space: nowrap; transition: color .15s, border-color .15s; }
+.key-tabs label:hover { color: var(--code-fg); }
+.key-tabs [for="k-file"] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-weight: 500; }
+#k-default:checked ~ .tbar [for="k-default"], #k-file:checked ~ .tbar [for="k-file"] {
+  color: var(--code-fg); border-bottom-color: var(--cyan); }
+#k-default:focus-visible ~ .tbar [for="k-default"], #k-file:focus-visible ~ .tbar [for="k-file"] { outline: 2px solid var(--cyan); outline-offset: -2px; }
+.term .tfoot { margin: 0; padding: 10px 18px; background: color-mix(in srgb, var(--note), var(--code-bg));
+  border-top: 1px solid color-mix(in srgb, var(--note), var(--code-border)); color: var(--code-dim); font-size: 13px; line-height: 1.5; }
+.term .tfoot code { color: var(--code-fg); font-size: 12px; }
+.term .copy.k-file, .term pre.k-file, .term .tfoot.k-file, #k-file:checked ~ .tbar .copy.k-default, #k-file:checked ~ .k-default { display: none; }
+#k-file:checked ~ .tfoot.k-file { display: block; }
+#k-file:checked ~ .tbar .copy.k-file { display: inline-flex; }
+#k-file:checked ~ pre.k-file { display: block; }
+@media (max-width: 479px) {
+  .term .tbar { gap: 6px; padding: 12px 10px; }
+  .term .tbar i { width: 10px; height: 10px; }
+  .key-tabs { gap: 10px; margin-left: 8px; margin-right: 34px; }
+  .key-tabs .wide { display: none; }
+  .term .copy span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .term .copy { padding: 5px 7px; }
+}
 .term pre { margin: 0; padding: 18px 18px 22px; color: var(--code-fg); font-size: clamp(11px, 3.1vw, 14px); line-height: 1.75; overflow-x: auto; min-height: 15em; }
 .term .l { display: block; white-space: pre; }
 .term .typed { display: inline-block; overflow: hidden; vertical-align: bottom; width: 0; animation: type 14s steps(var(--n)) infinite; }
@@ -377,96 +448,11 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
 <body>
 <div class="sky" aria-hidden="true">
   <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
-    <circle cx="232.5" cy="349.5" r="0.8" style="animation-delay:-1.4s"/>
-    <circle cx="1157.9" cy="494.5" r="0.6" style="animation-delay:-2.1s"/>
-    <circle cx="320.9" cy="974.4" r="1" style="animation-delay:-4.3s"/>
-    <circle cx="276.3" cy="481.2" r="1.3" style="animation-delay:-2.2s"/>
-    <circle cx="1308.3" cy="382.1" r="0.8" style="animation-delay:-4.7s"/>
-    <circle cx="777.7" cy="708" r="1.3" style="animation-delay:-2s"/>
-    <circle cx="1184" cy="455.6" r="0.6" style="animation-delay:-5.4s"/>
-    <circle cx="732.2" cy="626.7" r="0.8" style="animation-delay:-1.1s"/>
-    <circle cx="434" cy="219.1" r="1.3" style="animation-delay:-1.9s"/>
-    <circle cx="428.2" cy="63.5" r="1" style="animation-delay:-4s"/>
-    <circle cx="882" cy="926.1" r="0.8" style="animation-delay:-1.9s"/>
-    <circle cx="1423.8" cy="692.9" r="0.8" style="animation-delay:-5.6s"/>
-    <circle cx="1597.6" cy="530.7" r="1.3" style="animation-delay:-3.8s"/>
-    <circle cx="1557" cy="501.1" r="1" style="animation-delay:-3.8s"/>
-    <circle cx="977.4" cy="787.5" r="0.8" style="animation-delay:-0.1s"/>
-    <circle cx="1306.3" cy="960" r="1" style="animation-delay:-0.7s"/>
-    <circle cx="1570.6" cy="11.8" r="1.3" style="animation-delay:-4.4s"/>
-    <circle cx="367.8" cy="679.4" r="1" style="animation-delay:-1.4s"/>
-    <circle cx="588.1" cy="248.1" r="1.3" style="animation-delay:-3.3s"/>
-    <circle cx="331.9" cy="898" r="0.8" style="animation-delay:-2.8s"/>
-    <circle cx="861.7" cy="51.6" r="0.8" style="animation-delay:-4.8s"/>
-    <circle cx="234.9" cy="580.6" r="0.6" style="animation-delay:-1s"/>
-    <circle cx="900.9" cy="469.7" r="0.8" style="animation-delay:-0.7s"/>
-    <circle cx="202.5" cy="431.1" r="1" style="animation-delay:-4.4s"/>
-    <circle cx="385.7" cy="923.2" r="0.8" style="animation-delay:-1.5s"/>
-    <circle cx="283.9" cy="46.7" r="0.8" style="animation-delay:-3s"/>
-    <circle cx="1247.8" cy="992.8" r="0.6" style="animation-delay:-4.2s"/>
-    <circle cx="1084.9" cy="665.5" r="1.3" style="animation-delay:-5.4s"/>
-    <circle cx="569.2" cy="376" r="1" style="animation-delay:-1.6s"/>
-    <circle cx="494.6" cy="755.8" r="0.8" style="animation-delay:-4.7s"/>
-    <circle cx="1443" cy="330" r="0.8" style="animation-delay:-4.5s"/>
-    <circle cx="241.3" cy="883.8" r="0.8" style="animation-delay:-3.2s"/>
-    <circle cx="1496.5" cy="375.8" r="1" style="animation-delay:-5.2s"/>
-    <circle cx="1512.1" cy="348.8" r="0.8" style="animation-delay:-3.4s"/>
-    <circle cx="1295.8" cy="453.2" r="1" style="animation-delay:-4.5s"/>
-    <circle cx="109.2" cy="719.9" r="1" style="animation-delay:-0.9s"/>
-    <circle cx="786.1" cy="437.7" r="1" style="animation-delay:-3.3s"/>
-    <circle cx="990.7" cy="139.1" r="0.6" style="animation-delay:-2.6s"/>
-    <circle cx="589.8" cy="871.3" r="0.8" style="animation-delay:-5s"/>
-    <circle cx="1052" cy="516" r="0.6" style="animation-delay:-1.9s"/>
-    <circle cx="319.5" cy="61.2" r="1" style="animation-delay:-1.9s"/>
-    <circle cx="867.1" cy="212.6" r="1.3" style="animation-delay:-1.4s"/>
-    <circle cx="730.9" cy="314.7" r="1" style="animation-delay:-4.1s"/>
-    <circle cx="732.3" cy="855.4" r="0.8" style="animation-delay:-3.9s"/>
-    <circle cx="171.2" cy="425.4" r="1.7" style="animation-delay:-3.6s"/>
-    <circle cx="354.7" cy="179.1" r="0.8" style="animation-delay:-4.2s"/>
-    <circle cx="1002" cy="371.1" r="1" style="animation-delay:-0.8s"/>
-    <circle cx="92.9" cy="57.9" r="0.8" style="animation-delay:-5.2s"/>
-    <circle cx="56.2" cy="337.6" r="1" style="animation-delay:-5.5s"/>
-    <circle cx="936.5" cy="296.4" r="1" style="animation-delay:-6s"/>
-    <circle cx="1114.4" cy="223" r="0.8" style="animation-delay:-3.9s"/>
-    <circle cx="677.1" cy="552.9" r="1" style="animation-delay:-5.9s"/>
-    <circle cx="1394.7" cy="645.7" r="1.7" style="animation-delay:-2.6s"/>
-    <circle cx="423.4" cy="542.2" r="0.8" style="animation-delay:-0.5s"/>
-    <circle cx="636.2" cy="153.7" r="0.8" style="animation-delay:-0.1s"/>
-    <circle cx="261.1" cy="893.9" r="0.8" style="animation-delay:-5.7s"/>
-    <circle cx="212.9" cy="932.9" r="1.7" style="animation-delay:-2.4s"/>
-    <circle cx="351.4" cy="613.9" r="1" style="animation-delay:-5.1s"/>
-    <circle cx="844.1" cy="193.1" r="0.8" style="animation-delay:-4.2s"/>
-    <circle cx="445.7" cy="139.1" r="1.3" style="animation-delay:-1.3s"/>
-    <circle cx="1100.4" cy="373.7" r="1" style="animation-delay:-1.8s"/>
-    <circle cx="634" cy="358.1" r="1.3" style="animation-delay:-2.4s"/>
-    <circle cx="782.4" cy="263.8" r="0.8" style="animation-delay:-3.9s"/>
-    <circle cx="1560" cy="727.2" r="0.6" style="animation-delay:-0.2s"/>
-    <circle cx="913.1" cy="511.3" r="1.3" style="animation-delay:-5.6s"/>
-    <circle cx="959.9" cy="551.4" r="1.7" style="animation-delay:-5.4s"/>
-    <circle cx="723.6" cy="471.3" r="1" style="animation-delay:-2s"/>
-    <circle cx="435" cy="613.2" r="0.6" style="animation-delay:-5.1s"/>
-    <circle cx="1176.2" cy="908.2" r="1" style="animation-delay:-3.2s"/>
-    <circle cx="404.7" cy="979.7" r="1" style="animation-delay:-1.8s"/>
-    <circle cx="208.1" cy="711.5" r="1" style="animation-delay:-4.6s"/>
-    <circle cx="1097.3" cy="714.3" r="1" style="animation-delay:-3.8s"/>
-    <circle cx="272.2" cy="984.1" r="0.8" style="animation-delay:-0.1s"/>
-    <circle cx="1037.3" cy="288.3" r="1.3" style="animation-delay:-2.2s"/>
-    <circle cx="567.1" cy="714.9" r="0.6" style="animation-delay:-1.5s"/>
-    <circle cx="418.6" cy="324.6" r="0.8" style="animation-delay:-4.9s"/>
-    <circle cx="807.4" cy="636" r="1" style="animation-delay:-5.9s"/>
-    <circle cx="559.3" cy="708.3" r="0.6" style="animation-delay:-4.8s"/>
-    <circle cx="1058.8" cy="433.4" r="0.8" style="animation-delay:-0.8s"/>
-    <circle cx="243.4" cy="80.2" r="1" style="animation-delay:-2.5s"/>
-    <circle cx="43.1" cy="257.7" r="1" style="animation-delay:-2.8s"/>
-    <circle cx="1454.3" cy="557.5" r="0.8" style="animation-delay:-4.1s"/>
-    <circle cx="855.1" cy="24.8" r="1.7" style="animation-delay:-1.2s"/>
-    <circle cx="99.3" cy="468.6" r="1.7" style="animation-delay:-1.2s"/>
-    <circle cx="106.9" cy="380.2" r="0.8" style="animation-delay:-3.6s"/>
-    <circle cx="631.1" cy="957.6" r="1" style="animation-delay:-3.1s"/>
-    <circle cx="766" cy="558.5" r="0.6" style="animation-delay:-5.1s"/>
-    <circle cx="1090.2" cy="154.2" r="0.8" style="animation-delay:-5.1s"/>
-    <circle cx="738.8" cy="178.8" r="0.8" style="animation-delay:-4.8s"/>
-    <circle cx="1550.5" cy="620.3" r="1" style="animation-delay:-2.5s"/>
+    <defs><linearGradient id="meteor" gradientUnits="userSpaceOnUse" x2="140"><stop offset="0" stop-color="var(--star)" stop-opacity="0"/><stop offset="1" stop-color="var(--star)"/></linearGradient></defs>
+    <g class="pan pan-1"><circle cx="232.5" cy="349.5" r="0.5" style="animation-delay:-1s"/><circle cx="1832.5" cy="349.5" r="0.5" style="animation-delay:-1s"/><circle cx="1157.9" cy="494.5" r="0.5" style="animation-delay:-0.4s"/><circle cx="2757.9" cy="494.5" r="0.5" style="animation-delay:-0.4s"/><circle cx="320.9" cy="974.4" r="0.6" style="animation-delay:-2.9s"/><circle cx="1920.9" cy="974.4" r="0.6" style="animation-delay:-2.9s"/><circle cx="276.3" cy="481.2" r="0.8" style="animation-delay:-4.1s"/><circle cx="1876.3" cy="481.2" r="0.8" style="animation-delay:-4.1s"/><circle cx="1308.3" cy="382.1" r="0.6" style="animation-delay:-1.6s"/><circle cx="2908.3" cy="382.1" r="0.6" style="animation-delay:-1.6s"/><circle cx="65.7" cy="912.3" r="0.8" style="animation-delay:-2s"/><circle cx="1665.7" cy="912.3" r="0.8" style="animation-delay:-2s"/><circle cx="1573.3" cy="749.6" r="0.6" style="animation-delay:-5.4s"/><circle cx="3173.3" cy="749.6" r="0.6" style="animation-delay:-5.4s"/><circle cx="156.2" cy="114.3" r="0.6" style="animation-delay:-1.1s"/><circle cx="1756.2" cy="114.3" r="0.6" style="animation-delay:-1.1s"/><circle cx="553.3" cy="994.7" r="0.6" style="animation-delay:-1.9s"/><circle cx="2153.3" cy="994.7" r="0.6" style="animation-delay:-1.9s"/><circle cx="281.4" cy="33" r="0.8" style="animation-delay:-4s"/><circle cx="1881.4" cy="33" r="0.8" style="animation-delay:-4s"/><circle cx="583.4" cy="47.9" r="0.8" style="animation-delay:-1.9s"/><circle cx="2183.4" cy="47.9" r="0.8" style="animation-delay:-1.9s"/><circle cx="436.3" cy="925.9" r="0.8" style="animation-delay:-6s"/><circle cx="2036.3" cy="925.9" r="0.8" style="animation-delay:-6s"/><circle cx="1282.8" cy="634" r="0.8" style="animation-delay:-5.8s"/><circle cx="2882.8" cy="634" r="0.8" style="animation-delay:-5.8s"/><circle cx="988.5" cy="517.7" r="0.8" style="animation-delay:-0.1s"/><circle cx="2588.5" cy="517.7" r="0.8" style="animation-delay:-0.1s"/><circle cx="1260" cy="905.1" r="0.6" style="animation-delay:-0.1s"/><circle cx="2860" cy="905.1" r="0.6" style="animation-delay:-0.1s"/><circle cx="196.1" cy="981.6" r="0.8" style="animation-delay:-0.1s"/><circle cx="1796.1" cy="981.6" r="0.8" style="animation-delay:-0.1s"/><circle cx="1177.8" cy="229.9" r="0.6" style="animation-delay:-4.1s"/><circle cx="2777.8" cy="229.9" r="0.6" style="animation-delay:-4.1s"/><circle cx="368.5" cy="367.6" r="0.8" style="animation-delay:-1.5s"/><circle cx="1968.5" cy="367.6" r="0.8" style="animation-delay:-1.5s"/><circle cx="883.2" cy="207.4" r="0.5" style="animation-delay:-5.4s"/><circle cx="2483.2" cy="207.4" r="0.5" style="animation-delay:-5.4s"/><circle cx="757.1" cy="538.6" r="0.6" style="animation-delay:-0.3s"/><circle cx="2357.1" cy="538.6" r="0.6" style="animation-delay:-0.3s"/><circle cx="1289.9" cy="146.8" r="0.5" style="animation-delay:-3.5s"/><circle cx="2889.9" cy="146.8" r="0.5" style="animation-delay:-3.5s"/><circle cx="277.3" cy="563.1" r="0.5" style="animation-delay:-2.8s"/><circle cx="1877.3" cy="563.1" r="0.5" style="animation-delay:-2.8s"/><circle cx="198.2" cy="126.6" r="0.6" style="animation-delay:-2.6s"/><circle cx="1798.2" cy="126.6" r="0.6" style="animation-delay:-2.6s"/><circle cx="1182.7" cy="241.1" r="0.6" style="animation-delay:-5.5s"/><circle cx="2782.7" cy="241.1" r="0.6" style="animation-delay:-5.5s"/><circle cx="401.9" cy="177.5" r="0.6" style="animation-delay:-0.3s"/><circle cx="2001.9" cy="177.5" r="0.6" style="animation-delay:-0.3s"/><circle cx="794.5" cy="779.9" r="0.5" style="animation-delay:-6s"/><circle cx="2394.5" cy="779.9" r="0.5" style="animation-delay:-6s"/><circle cx="1124.8" cy="678" r="0.8" style="animation-delay:-4s"/><circle cx="2724.8" cy="678" r="0.8" style="animation-delay:-4s"/><circle cx="1432.5" cy="355.8" r="0.8" style="animation-delay:-2.3s"/><circle cx="3032.5" cy="355.8" r="0.8" style="animation-delay:-2.3s"/><circle cx="439.7" cy="309.1" r="0.6" style="animation-delay:-4.5s"/><circle cx="2039.7" cy="309.1" r="0.6" style="animation-delay:-4.5s"/><circle cx="1254.8" cy="901.9" r="0.6" style="animation-delay:-2s"/><circle cx="2854.8" cy="901.9" r="0.6" style="animation-delay:-2s"/><circle cx="1200" cy="150.8" r="0.5" style="animation-delay:-5.3s"/><circle cx="2800" cy="150.8" r="0.5" style="animation-delay:-5.3s"/><circle cx="846" cy="935.3" r="0.8" style="animation-delay:-2.3s"/><circle cx="2446" cy="935.3" r="0.8" style="animation-delay:-2.3s"/><circle cx="1373.4" cy="945.1" r="0.5" style="animation-delay:-2.1s"/><circle cx="2973.4" cy="945.1" r="0.5" style="animation-delay:-2.1s"/><circle cx="901.6" cy="809.9" r="0.8" style="animation-delay:-2.7s"/><circle cx="2501.6" cy="809.9" r="0.8" style="animation-delay:-2.7s"/><circle cx="1200.2" cy="68.3" r="0.6" style="animation-delay:-4.3s"/><circle cx="2800.2" cy="68.3" r="0.6" style="animation-delay:-4.3s"/><circle cx="241.9" cy="491.3" r="0.6" style="animation-delay:-2.6s"/><circle cx="1841.9" cy="491.3" r="0.6" style="animation-delay:-2.6s"/><circle cx="875.6" cy="619.2" r="0.5" style="animation-delay:-0.8s"/><circle cx="2475.6" cy="619.2" r="0.5" style="animation-delay:-0.8s"/><circle cx="694.8" cy="368.6" r="0.6" style="animation-delay:-5.2s"/><circle cx="2294.8" cy="368.6" r="0.6" style="animation-delay:-5.2s"/><circle cx="1333.9" cy="657.5" r="0.5" style="animation-delay:-3.1s"/><circle cx="2933.9" cy="657.5" r="0.5" style="animation-delay:-3.1s"/><circle cx="494.8" cy="199.7" r="0.6" style="animation-delay:-0.4s"/><circle cx="2094.8" cy="199.7" r="0.6" style="animation-delay:-0.4s"/><circle cx="498.9" cy="541.9" r="0.8" style="animation-delay:-1.3s"/><circle cx="2098.9" cy="541.9" r="0.8" style="animation-delay:-1.3s"/><circle cx="360" cy="456.8" r="0.8" style="animation-delay:-1.9s"/><circle cx="1960" cy="456.8" r="0.8" style="animation-delay:-1.9s"/><circle cx="1098.1" cy="457.7" r="0.6" style="animation-delay:-5.1s"/><circle cx="2698.1" cy="457.7" r="0.6" style="animation-delay:-5.1s"/><circle cx="1029.5" cy="107" r="0.8" style="animation-delay:-2.6s"/><circle cx="2629.5" cy="107" r="0.8" style="animation-delay:-2.6s"/><circle cx="958.2" cy="404.6" r="0.8" style="animation-delay:-0.6s"/><circle cx="2558.2" cy="404.6" r="0.8" style="animation-delay:-0.6s"/><circle cx="327.4" cy="947.5" r="0.5" style="animation-delay:-1.5s"/><circle cx="1927.4" cy="947.5" r="0.5" style="animation-delay:-1.5s"/><circle cx="871.1" cy="576.9" r="0.6" style="animation-delay:-2s"/><circle cx="2471.1" cy="576.9" r="0.6" style="animation-delay:-2s"/><circle cx="1390.5" cy="35.1" r="0.6" style="animation-delay:-2s"/><circle cx="2990.5" cy="35.1" r="0.6" style="animation-delay:-2s"/><circle cx="1458.2" cy="585.3" r="0.8" style="animation-delay:-1.8s"/><circle cx="3058.2" cy="585.3" r="0.8" style="animation-delay:-1.8s"/><circle cx="1597.9" cy="696.5" r="0.5" style="animation-delay:-1.3s"/><circle cx="3197.9" cy="696.5" r="0.5" style="animation-delay:-1.3s"/><circle cx="1046.9" cy="423.2" r="0.8" style="animation-delay:-3.3s"/><circle cx="2646.9" cy="423.2" r="0.8" style="animation-delay:-3.3s"/><circle cx="1565.3" cy="871.7" r="0.6" style="animation-delay:-3.9s"/><circle cx="3165.3" cy="871.7" r="0.6" style="animation-delay:-3.9s"/><circle cx="522.3" cy="909.7" r="0.5" style="animation-delay:-5.8s"/><circle cx="2122.3" cy="909.7" r="0.5" style="animation-delay:-5.8s"/><circle cx="1367.4" cy="735.3" r="0.5" style="animation-delay:-3.5s"/><circle cx="2967.4" cy="735.3" r="0.5" style="animation-delay:-3.5s"/><circle cx="754.1" cy="634" r="0.8" style="animation-delay:-3.8s"/><circle cx="2354.1" cy="634" r="0.8" style="animation-delay:-3.8s"/></g>
+    <g class="pan pan-2"><circle cx="212.9" cy="932.9" r="1" style="animation-delay:-5.3s"/><circle cx="1812.9" cy="932.9" r="1" style="animation-delay:-5.3s"/><circle cx="142.1" cy="560.8" r="1" style="animation-delay:-5.9s"/><circle cx="1742.1" cy="560.8" r="1" style="animation-delay:-5.9s"/><circle cx="844.1" cy="193.1" r="0.8" style="animation-delay:-1.6s"/><circle cx="2444.1" cy="193.1" r="0.8" style="animation-delay:-1.6s"/><circle cx="445.7" cy="139.1" r="0.8" style="animation-delay:-5.8s"/><circle cx="2045.7" cy="139.1" r="0.8" style="animation-delay:-5.8s"/><circle cx="1390.4" cy="104.9" r="1" style="animation-delay:-0.7s"/><circle cx="2990.4" cy="104.9" r="1" style="animation-delay:-0.7s"/><circle cx="470.8" cy="396.2" r="1" style="animation-delay:-2.1s"/><circle cx="2070.8" cy="396.2" r="1" style="animation-delay:-2.1s"/><circle cx="650.7" cy="489" r="1" style="animation-delay:-1.6s"/><circle cx="2250.7" cy="489" r="1" style="animation-delay:-1.6s"/><circle cx="1037.7" cy="975" r="0.8" style="animation-delay:-4.4s"/><circle cx="2637.7" cy="975" r="0.8" style="animation-delay:-4.4s"/><circle cx="57" cy="570.7" r="1" style="animation-delay:-3.1s"/><circle cx="1657" cy="570.7" r="1" style="animation-delay:-3.1s"/><circle cx="1506.5" cy="600" r="1" style="animation-delay:-3.3s"/><circle cx="3106.5" cy="600" r="1" style="animation-delay:-3.3s"/><circle cx="723.6" cy="471.3" r="1" style="animation-delay:-2.7s"/><circle cx="2323.6" cy="471.3" r="1" style="animation-delay:-2.7s"/><circle cx="1386.7" cy="575.6" r="0.8" style="animation-delay:-0.6s"/><circle cx="2986.7" cy="575.6" r="0.8" style="animation-delay:-0.6s"/><circle cx="1176.2" cy="908.2" r="0.8" style="animation-delay:-2.3s"/><circle cx="2776.2" cy="908.2" r="0.8" style="animation-delay:-2.3s"/><circle cx="404.7" cy="979.7" r="1" style="animation-delay:-5.4s"/><circle cx="2004.7" cy="979.7" r="1" style="animation-delay:-5.4s"/><circle cx="735.7" cy="125.6" r="1" style="animation-delay:-2s"/><circle cx="2335.7" cy="125.6" r="1" style="animation-delay:-2s"/><circle cx="1118.7" cy="167.9" r="0.8" style="animation-delay:-3.8s"/><circle cx="2718.7" cy="167.9" r="0.8" style="animation-delay:-3.8s"/><circle cx="228.8" cy="250.9" r="1" style="animation-delay:-0.1s"/><circle cx="1828.8" cy="250.9" r="1" style="animation-delay:-0.1s"/><circle cx="1202.5" cy="317.3" r="1" style="animation-delay:-2.2s"/><circle cx="2802.5" cy="317.3" r="1" style="animation-delay:-2.2s"/><circle cx="897.3" cy="70.5" r="1" style="animation-delay:-1.5s"/><circle cx="2497.3" cy="70.5" r="1" style="animation-delay:-1.5s"/><circle cx="403" cy="710.2" r="1" style="animation-delay:-4.9s"/><circle cx="2003" cy="710.2" r="1" style="animation-delay:-4.9s"/><circle cx="751.3" cy="843.3" r="1" style="animation-delay:-5.9s"/><circle cx="2351.3" cy="843.3" r="1" style="animation-delay:-5.9s"/><circle cx="929.3" cy="645.1" r="1" style="animation-delay:-4.8s"/><circle cx="2529.3" cy="645.1" r="1" style="animation-delay:-4.8s"/><circle cx="358.5" cy="603.4" r="0.8" style="animation-delay:-0.8s"/><circle cx="1958.5" cy="603.4" r="0.8" style="animation-delay:-0.8s"/><circle cx="701" cy="134.7" r="0.8" style="animation-delay:-2.5s"/><circle cx="2301" cy="134.7" r="0.8" style="animation-delay:-2.5s"/><circle cx="441.7" cy="720.5" r="1" style="animation-delay:-2.8s"/><circle cx="2041.7" cy="720.5" r="1" style="animation-delay:-2.8s"/><circle cx="891.9" cy="176.4" r="1" style="animation-delay:-4s"/><circle cx="2491.9" cy="176.4" r="1" style="animation-delay:-4s"/><circle cx="39.7" cy="779.2" r="0.8" style="animation-delay:-5s"/><circle cx="1639.7" cy="779.2" r="0.8" style="animation-delay:-5s"/><circle cx="749.8" cy="827" r="1" style="animation-delay:-2.7s"/><circle cx="2349.8" cy="827" r="1" style="animation-delay:-2.7s"/><circle cx="608.3" cy="205.3" r="0.8" style="animation-delay:-3s"/><circle cx="2208.3" cy="205.3" r="0.8" style="animation-delay:-3s"/><circle cx="1532.2" cy="382" r="0.8" style="animation-delay:-0.5s"/><circle cx="3132.2" cy="382" r="0.8" style="animation-delay:-0.5s"/><circle cx="893.6" cy="42" r="0.8" style="animation-delay:-5.1s"/><circle cx="2493.6" cy="42" r="0.8" style="animation-delay:-5.1s"/><circle cx="500" cy="853.4" r="0.8" style="animation-delay:-2.8s"/><circle cx="2100" cy="853.4" r="0.8" style="animation-delay:-2.8s"/><circle cx="700.6" cy="808.3" r="1" style="animation-delay:-5.8s"/><circle cx="2300.6" cy="808.3" r="1" style="animation-delay:-5.8s"/><circle cx="599.7" cy="423.2" r="1" style="animation-delay:-1.6s"/><circle cx="2199.7" cy="423.2" r="1" style="animation-delay:-1.6s"/><circle cx="379.2" cy="428.4" r="1" style="animation-delay:-1.7s"/><circle cx="1979.2" cy="428.4" r="1" style="animation-delay:-1.7s"/></g>
+    <g class="pan pan-3"><circle cx="248.8" cy="589.7" r="1.2" style="animation-delay:-4.8s"/><circle cx="1848.8" cy="589.7" r="1.2" style="animation-delay:-4.8s"/><circle cx="104.1" cy="851.6" r="1.2" style="animation-delay:-1.4s"/><circle cx="1704.1" cy="851.6" r="1.2" style="animation-delay:-1.4s"/><circle cx="203.1" cy="876.9" r="1.4" style="animation-delay:-1.6s"/><circle cx="1803.1" cy="876.9" r="1.4" style="animation-delay:-1.6s"/><circle cx="1354.8" cy="850.4" r="1.2" style="animation-delay:-1.5s"/><circle cx="2954.8" cy="850.4" r="1.2" style="animation-delay:-1.5s"/><circle cx="832.8" cy="909.4" r="1.2" style="animation-delay:-1.2s"/><circle cx="2432.8" cy="909.4" r="1.2" style="animation-delay:-1.2s"/><circle cx="1031.8" cy="322" r="1.4" style="animation-delay:-4.8s"/><circle cx="2631.8" cy="322" r="1.4" style="animation-delay:-4.8s"/><circle cx="1040.5" cy="296.1" r="1.7" style="animation-delay:-3.6s"/><circle cx="2640.5" cy="296.1" r="1.7" style="animation-delay:-3.6s"/><circle cx="140.5" cy="297.7" r="1.4" style="animation-delay:-2.4s"/><circle cx="1740.5" cy="297.7" r="1.4" style="animation-delay:-2.4s"/><circle cx="112.4" cy="351.3" r="1.4" style="animation-delay:-0.9s"/><circle cx="1712.4" cy="351.3" r="1.4" style="animation-delay:-0.9s"/><circle cx="1157.2" cy="625.3" r="1.7" style="animation-delay:-2s"/><circle cx="2757.2" cy="625.3" r="1.7" style="animation-delay:-2s"/><circle cx="133" cy="586.9" r="1.7" style="animation-delay:-0.3s"/><circle cx="1733" cy="586.9" r="1.7" style="animation-delay:-0.3s"/><circle cx="278.7" cy="928.8" r="1.2" style="animation-delay:-2s"/><circle cx="1878.7" cy="928.8" r="1.2" style="animation-delay:-2s"/><circle cx="6.9" cy="490.7" r="1.7" style="animation-delay:-2.8s"/><circle cx="1606.9" cy="490.7" r="1.7" style="animation-delay:-2.8s"/><circle cx="209.3" cy="596" r="1.2" style="animation-delay:-5.6s"/><circle cx="1809.3" cy="596" r="1.2" style="animation-delay:-5.6s"/><circle cx="1177.9" cy="885.2" r="1.7" style="animation-delay:-3.5s"/><circle cx="2777.9" cy="885.2" r="1.7" style="animation-delay:-3.5s"/><circle cx="421.5" cy="813.6" r="1.4" style="animation-delay:-2s"/><circle cx="2021.5" cy="813.6" r="1.4" style="animation-delay:-2s"/><circle cx="619.5" cy="416.5" r="1.7" style="animation-delay:-5s"/><circle cx="2219.5" cy="416.5" r="1.7" style="animation-delay:-5s"/><circle cx="740.7" cy="411.5" r="1.4" style="animation-delay:-2s"/><circle cx="2340.7" cy="411.5" r="1.4" style="animation-delay:-2s"/><circle cx="271.9" cy="670.4" r="1.2" style="animation-delay:-4s"/><circle cx="1871.9" cy="670.4" r="1.2" style="animation-delay:-4s"/><circle cx="269.7" cy="417.3" r="1.7" style="animation-delay:-3.6s"/><circle cx="1869.7" cy="417.3" r="1.7" style="animation-delay:-3.6s"/></g>
+    <g class="meteors"><g class="meteor" style="--x:1250px;--y:90px;--a:152deg;animation-duration:11s;animation-delay:2s"><line x2="140" stroke="url(#meteor)"/></g><g class="meteor" style="--x:700px;--y:40px;--a:160deg;animation-duration:17s;animation-delay:9s"><line x2="140" stroke="url(#meteor)"/></g><g class="meteor" style="--x:1500px;--y:300px;--a:148deg;animation-duration:23s;animation-delay:15s"><line x2="140" stroke="url(#meteor)"/></g></g>
   </svg>
 </div>
 
@@ -840,12 +826,24 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
         <p>The subdomain goes in front of the port. Every request is logged as it passes.</p>
       </div>
       <div class="term">
+        <input type="radio" name="key" id="k-default" checked>
+        <input type="radio" name="key" id="k-file">
         <div class="tbar"><i></i><i></i><i></i>
-          <button class="copy" type="button" data-copy="ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com" aria-label="Copy the ssh command">
+          <div class="key-tabs" role="tablist" aria-label="Which key ssh uses">
+            <label for="k-default">Default<span class="wide">&nbsp;key</span></label>
+            <label for="k-file">-i ~/.ssh/gate2sky</label>
+          </div>
+          <button class="copy k-default" type="button" data-copy="ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com" aria-label="Copy the ssh command">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span>
+          </button>
+          <button class="copy k-file" type="button" data-copy="ssh -i ~/.ssh/gate2sky -p 2222 -R myapp:80:localhost:3000 gate.example.com" aria-label="Copy the ssh command">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span>
           </button>
         </div>
-<pre role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2sky answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2sky: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+<pre class="k-default" role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2sky answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2sky: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+<pre class="k-file" role="img" aria-label="A terminal: ssh -i ~/.ssh/gate2sky -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2sky answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:74">ssh -i ~/.ssh/gate2sky -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2sky: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+        <p class="tfoot k-default">ssh offers the keys in <code>~/.ssh</code> (<code>id_ed25519</code>, <code>id_ecdsa</code>, <code>id_rsa</code>…) and those in your agent: nothing to add when one of them is on the subdomain.</p>
+        <p class="tfoot k-file">For a key kept elsewhere, such as one made just for gate2sky with <code>ssh-keygen -t ed25519 -f ~/.ssh/gate2sky</code>. With many keys in your agent, add <code>-o IdentitiesOnly=yes</code>.</p>
       </div>
     </div>
   </section>

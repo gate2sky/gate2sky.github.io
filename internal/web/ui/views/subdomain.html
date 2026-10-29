@@ -142,8 +142,7 @@
 <div :elseif="sub">
   <div class="page-head">
     <div>
-      <h1>{{ sub.name }}<span class="muted">.{{ app.domain }}</span></h1>
-      <a :href="sub.url" target="_blank" rel="noopener noreferrer">{{ sub.url }}</a>
+      <h1><a :href="sub.url" target="_blank" rel="noopener noreferrer">{{ sub.name }}<span class="muted">.{{ app.domain }}</span></a></h1>
     </div>
     <StatusBadge :tunnel="sub.tunnel" />
   </div>
