@@ -56,13 +56,21 @@
     return { name: portName, local_port: Number(local), allow }
   }
 
+  const addDialog = () => document.querySelector("dialog.add-port")
+  const startAdd = () => {
+    choose("postgresql")
+    allowText = sub.client_ip
+    error = ""
+    addDialog().showModal()
+  }
+
   const addPort = async () => {
     error = ""
     busy = true
     try {
       const port = await api("POST", path() + "/ports", { ...body(name, localPort, restricted, allowText), preset })
+      addDialog().close()
       toast(`Added ${port.name}: ${port.address}.`)
-      choose(preset)
       $emit("changed")
     } catch (e) {
       error = e.message
@@ -128,7 +136,15 @@
 </script>
 
 <section class="card tcp-ports">
-  <div class="card-head"><h2>TCP ports</h2><span class="count">{{ sub.port_list.length }} of {{ app.tcp.max_ports }}</span></div>
+  <div class="card-head">
+    <h2>TCP ports</h2>
+    <div class="card-head-actions">
+      <span class="count">{{ sub.port_list.length }} of {{ app.tcp.max_ports }}</span>
+      <button :if="!full" type="button" class="button button-secondary button-small" @click="startAdd">
+        <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add port
+      </button>
+    </div>
+  </div>
   <p class="muted">Raw TCP on <strong>{{ app.tcp.host }}</strong> for databases, SSH, games… Each port has a public number of its own, and only the addresses you allow can connect.</p>
 
   <div :if="sub.port_list.length" class="table-wrap">
@@ -178,8 +194,13 @@
     <p class="muted small">Each <code>-R</code> names a port as <code>&lt;port&gt;.{{ sub.name }}</code>; change the local ports to yours. You can add these to the HTTP tunnel’s command.</p>
   </div>
 
+  <p :if="full" class="hint">A subdomain can have at most {{ app.tcp.max_ports }} ports: delete one to add another.</p>
+</section>
+
+<dialog class="card dialog dialog-wide add-port" aria-labelledby="add-port-title">
+  <h2 id="add-port-title">Add a port to {{ sub.name }}</h2>
   <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
-  <form :if="!full" class="form" @submit.prevent="addPort">
+  <form class="form" @submit.prevent="addPort">
     <div class="form-grid">
       <label>Service
         <select class="field" name="preset" @change="choose($event.target.value)">
@@ -213,10 +234,12 @@
         <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
       </label>
     </fieldset>
-    <div><button type="submit" class="button" :disabled="busy">Add port</button></div>
+    <div class="dialog-actions">
+      <button type="button" class="button button-secondary" @click="addDialog().close()">Cancel</button>
+      <button type="submit" class="button" :disabled="busy">Add port</button>
+    </div>
   </form>
-  <p :else class="hint">A subdomain can have at most {{ app.tcp.max_ports }} TCP ports: delete one to add another.</p>
-</section>
+</dialog>
 
 <dialog class="card dialog edit-port" aria-labelledby="edit-port-title">
   <form class="form" @submit.prevent="saveEdit">

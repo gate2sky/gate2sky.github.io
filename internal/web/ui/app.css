@@ -445,8 +445,11 @@ select.field:focus { outline: none; border-color: var(--accent); box-shadow: var
 .warn { color: var(--warn); font-weight: 600; }
 .flash-warn { --tone: var(--orange); color: var(--warn); }
 .form > .flash { margin-bottom: 0; }
-.tcp-ports fieldset { display: grid; gap: 10px; }
-.tcp-ports fieldset .hint { margin: -4px 0 0; }
+.add-port fieldset, .edit-port fieldset { display: grid; gap: 10px; }
+.add-port fieldset .hint { margin: -4px 0 0; }
+
+.card-head-actions { display: flex; align-items: center; gap: 10px; }
+.button-small { padding: 5px 12px; font-size: 13px; }
 
 .dialog-wide { width: min(620px, calc(100vw - 32px)); margin-top: max(40px, 6vh); max-height: calc(100dvh - 80px); overflow: auto; }
 @keyframes dialog-in { from { opacity: 0; transform: translateY(-8px) scale(.97); } }
@@ -458,11 +461,14 @@ select.field:focus { outline: none; border-color: var(--accent); box-shadow: var
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   font: inherit; font-size: 14px; font-weight: 600; line-height: 20px; padding: 9px 16px; border-radius: var(--radius-control);
   border: 0; color: var(--accent-fg); cursor: pointer; white-space: nowrap;
-  /* Glossy: a sheen over the top half, a glow coming up from the bottom. */
+  /* Glossy glass: a sheen over the top half and a glow coming up from the
+     bottom, on a tinted fill that lets what is behind show, blurred. */
   background:
     linear-gradient(180deg, rgb(255 255 255 / .34), rgb(255 255 255 / .12) 48%, transparent 52%),
-    radial-gradient(120% 60% at 50% 115%, color-mix(in srgb, var(--accent) 40%, #fff) 0, transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), color-mix(in srgb, var(--accent) 88%, #000));
+    radial-gradient(120% 60% at 50% 115%, color-mix(in srgb, color-mix(in srgb, var(--accent) 40%, #fff) 80%, transparent) 0, transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, color-mix(in srgb, var(--accent) 88%, #fff) 72%, transparent), color-mix(in srgb, color-mix(in srgb, var(--accent) 88%, #000) 82%, transparent));
+  -webkit-backdrop-filter: blur(12px) saturate(170%);
+  backdrop-filter: blur(12px) saturate(170%);
   box-shadow: 0 1px 0 rgb(255 255 255 / .45) inset, 0 -1px 0 rgb(0 0 0 / .12) inset,
     0 0 0 .5px color-mix(in srgb, var(--accent) 65%, #000), 0 1px 3px rgb(0 0 0 / .2);
   text-shadow: 0 -.5px 0 rgb(0 0 0 / .18);
