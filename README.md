@@ -500,7 +500,9 @@ header inlines it, without its dark tile); after changing it, copy it to both
 and run `node scripts/landing/icons.js`, which renders `favicon.ico` and
 `apple-touch-icon.png` from it and writes
 [`logo-mark.svg`](internal/web/ui/logo-mark.svg), the logo without its tile,
-for the dashboard's header and sign-in page.
+for the dashboard's header and sign-in page. Link previews show
+[`pages/og.png`](pages/og.png), the hero at 1200×630: after changing the
+hero, regenerate the landing, then run `node scripts/landing/og.js`.
 
 ## Roadmap
 
