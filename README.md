@@ -29,6 +29,9 @@ ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com
 - **Live view** of every tunnel: client address, key, requests and traffic,
   with a disconnect button. Removing a key or disabling a user closes their
   tunnels at once. The SSH session prints every request, like sish.
+- **TCP ports** for databases, SSH, game servers…: each subdomain can get
+  public ports of its own (`tcp://gate.example.com:30042`), open only to the
+  addresses you allow.
 - **Single static binary** with SQLite storage and automatic HTTPS (Let's
   Encrypt) — or Docker, or Kubernetes with Traefik.
 
@@ -57,6 +60,30 @@ ssh -p 2222 -R 80:localhost:3000 gate.example.com
 
 A new connection for a subdomain replaces the previous one, so reconnecting
 (e.g. with `autossh -M 0`) takes over at once.
+
+### TCP ports
+
+With `tcp.ports` in the configuration, a subdomain can also have raw TCP
+ports (a database, SSH, RDP, a Minecraft server…), added from its page in
+the dashboard. Each one gets a public port from the range, kept for as long
+as it exists, and an allow list: only those addresses (by default, yours)
+can connect, unless you open it to anyone. Ports are never created on
+connect, so they are protected before they are reachable.
+
+A port is forwarded by name, as `<port>.<subdomain>` with port 0; OpenSSH
+prints the public port it got. HTTP and TCP forwards can share a connection:
+
+```bash
+ssh -p 2222 -R myapp:80:localhost:3000 -R db.myapp:0:localhost:5432 gate.example.com
+# Allocated port 30042 for remote forward to localhost:5432
+# → tcp://gate.example.com:30042 reaches your localhost:5432
+```
+
+The public port works too, with or without the subdomain
+(`-R myapp:30042:localhost:5432`, `-R 30042:localhost:5432`).
+`-R myapp:0:…` stays an HTTP tunnel. The subdomain's keys open all its
+ports, and removing a key, disabling its owner or deleting the port closes
+it at once. UDP needs more than `ssh -R` and is not available yet.
 
 ## Getting started
 
@@ -147,6 +174,8 @@ docker volume create gate2sky
 docker run -it --rm -v gate2sky:/data ghcr.io/gate2sky/gate2sky config
 docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data \
   -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2sky/gate2sky
+# with tcp.ports: 30000-30019, publish the range as well:
+#   -p 30000-30019:30000-30019
 docker exec -it gate2sky gate2sky config     # manage subdomains, keys and users
 ```
 
@@ -170,7 +199,11 @@ without OCI support, such as helm-dashboard), so there is nothing to clone
   cert-manager);
 - an `IngressRouteTCP` on a dedicated Traefik entry point for SSH, with the
   PROXY protocol so gate2sky sees client addresses — or a `LoadBalancer`
-  Service instead.
+  Service instead;
+- with `tcp.enabled`, a `LoadBalancer` Service for the TCP ports
+  (`tcp.first` to `tcp.last`), with `externalTrafficPolicy: Local` so allow
+  lists see client addresses. Keep the range small: it is one Service port
+  each.
 
 ```bash
 helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky \
@@ -223,6 +256,9 @@ Highlights:
   subdomain and account but owners', owners manage everything, and
   `auth.admins` are always owners.
 - `ssh.proxy_protocol`: expect a PROXY protocol header from a load balancer.
+- `tcp.ports`: the range TCP ports are allocated from (e.g. `30000-30019`);
+  `tcp.max_ports` per subdomain (5), `tcp.public_host` for their addresses
+  (the SSH host by default) and `tcp.listen_host` to listen on one interface.
 
 For local development, `*.localhost` resolves to 127.0.0.1 in browsers:
 
@@ -256,6 +292,12 @@ auth:
   host-bound token that the tunnel host exchanges for a host-only, HttpOnly
   cookie tied to the dashboard session. Signing out revokes access to every
   tunnel. gate2sky's cookies are stripped before requests reach the app.
+  Signed-in users who may not open a tunnel see it as offline.
+- **TCP ports** check every connection's address against the port's allow
+  list, which needs the real client address: publish the range directly, or
+  keep it (`externalTrafficPolicy: Local`) behind a load balancer. Data is
+  not encrypted by gate2sky between the visitor and the server: use the
+  service's own TLS (PostgreSQL, MySQL and SSH have it).
 - **OAuth:** authorization code flow with PKCE, state and (OIDC) nonce checks.
 
 ## Development
@@ -314,7 +356,7 @@ run `node scripts/landing/icons.js`, which renders `favicon.ico` and
 
 ## Roadmap
 
-- TCP tunnels on dedicated ports.
+- UDP ports, with a `gate2sky tunnel` client.
 - Sharing private subdomains with specific users.
 - Custom domains (CNAME to a subdomain).
 - Request inspector in the dashboard.

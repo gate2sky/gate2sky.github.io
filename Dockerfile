@@ -17,6 +17,7 @@ COPY --from=build --chown=65532:65532 /out/data /data
 ENV GATE2SKY_CONFIG=/data/gate2sky.yaml \
     GATE2SKY_DATA_DIR=/data
 VOLUME /data
+# Plus the range of tcp.ports, if set (e.g. -p 30000-30019:30000-30019).
 EXPOSE 80 443 2222
 ENTRYPOINT ["gate2sky"]
 CMD ["start"]

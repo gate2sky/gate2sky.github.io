@@ -42,3 +42,34 @@ spec:
       port: {{ .Values.sshService.port }}
       targetPort: ssh
 {{- end }}
+{{- if .Values.tcp.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gate2sky.fullname" . }}-tcp
+  labels:
+    {{- include "gate2sky.labels" . | nindent 4 }}
+  {{- with .Values.tcp.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.tcp.service.type }}
+  {{- with .Values.tcp.service.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- if ne .Values.tcp.service.type "ClusterIP" }}
+  # Allow lists need the visitor's address.
+  externalTrafficPolicy: Local
+  {{- end }}
+  selector:
+    {{- include "gate2sky.selectorLabels" . | nindent 4 }}
+  ports:
+    {{- range $p := untilStep (int .Values.tcp.first) (int (add1 .Values.tcp.last)) 1 }}
+    - name: tcp-{{ $p }}
+      port: {{ $p }}
+      targetPort: {{ $p }}
+      protocol: TCP
+    {{- end }}
+{{- end }}

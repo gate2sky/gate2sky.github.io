@@ -90,5 +90,13 @@ limits:
   keys_per_subdomain: 20
   tunnels_per_connection: 5
 
+# Raw TCP ports for subdomains (databases, SSH, games...), forwarded with
+# ssh -R <port>.<subdomain>:0:localhost:<local port>. Each port gets a public
+# number from this range for good; open the range in your firewall.
+# tcp:
+#   ports: 30000-30019
+#   max_ports: 5                    # per subdomain
+#   public_host: gate.example.com   # defaults to the SSH host
+
 # Names nobody can register, on top of the built-in list (www, admin, api...).
 reserved_subdomains: []

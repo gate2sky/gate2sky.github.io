@@ -5,6 +5,9 @@
   "http" (dict "listen" ":8080" "trust_proxy_headers" true)
   "ssh" (dict "listen" ":2222" "public_host" $sshPublicHost "public_port" (int .Values.ssh.publicPort) "proxy_protocol" (eq (include "gate2sky.proxyProtocol" .) "true"))
 -}}
+{{- if .Values.tcp.enabled }}
+{{- $_ := set $defaults "tcp" (dict "ports" (printf "%d-%d" (int .Values.tcp.first) (int .Values.tcp.last)) "max_ports" (int .Values.tcp.maxPorts) "public_host" (.Values.tcp.publicHost | default $sshPublicHost)) }}
+{{- end }}
 {{- $config := mergeOverwrite $defaults (deepCopy .Values.config) -}}
 apiVersion: v1
 kind: ConfigMap

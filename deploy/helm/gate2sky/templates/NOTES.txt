@@ -18,6 +18,11 @@ exposed by its Service, e.g. with the Traefik Helm chart:
       protocol: TCP
 {{- end }}
 
+{{- if .Values.tcp.enabled }}
+TCP ports {{ .Values.tcp.first }}-{{ .Values.tcp.last }} are served by the Service {{ include "gate2sky.fullname" . }}-tcp
+({{ .Values.tcp.service.type }}). Point {{ .Values.tcp.publicHost | default (.Values.ssh.publicHost | default .Values.domain) }} at its address.
+
+{{ end -}}
 Manage subdomains, SSH keys and users from the dashboard, or from a shell:
 
   kubectl -n {{ .Release.Namespace }} exec -it deploy/{{ include "gate2sky.fullname" . }} -- gate2sky config
