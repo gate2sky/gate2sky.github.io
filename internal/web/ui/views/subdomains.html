@@ -56,7 +56,7 @@
 
 <Card :if="subdomains.length">
   <div class="table-wrap">
-    <table class="table">
+    <table class="table tiles">
       <thead><tr><th>Subdomain</th><th>Status</th><th>Access</th><th class="hide-narrow">SSH keys</th><th></th></tr></thead>
       <tbody>
         <tr :each="sub in subdomains" :key="sub.name">

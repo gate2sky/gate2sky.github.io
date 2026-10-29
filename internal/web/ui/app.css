@@ -214,16 +214,20 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 .table-wrap + * { margin-top: var(--ig-space-6); }
 .row-actions { white-space: nowrap; }
 /* A table whose rows are tiles of their own, a little apart, lined up with
-   the fields around them: a subdomain's keys. */
+   the fields around them: the subdomains, a subdomain's keys. */
 .table-wrap:has(> .tiles) { margin: 0; }
 .table.tiles { border-spacing: 0 6px; margin: -6px 0; }
 .table.tiles th { border-bottom: 0; padding-bottom: 0; }
+/* On a phone, a little less around each cell: a tile's edges show, so the
+   row has to fit where a plain table's could run a pixel or two over. */
+.table.tiles th, .table.tiles tbody tr td { padding-left: 5px; padding-right: 5px; }
+.table.tiles th:first-child, .table.tiles tbody tr td:first-child { padding-left: 10px; }
 .table.tiles tbody tr { filter: drop-shadow(var(--ig-shadow-xs)); }
 .table.tiles tbody tr td {
   background: var(--ig-row); border-top: var(--ig-hairline) solid var(--ig-line); border-bottom: var(--ig-hairline) solid var(--ig-line);
   transition: background-color var(--ig-duration-fast);
 }
-.table.tiles tbody tr td:first-child { padding-left: 14px; border-left: var(--ig-hairline) solid var(--ig-line); border-radius: var(--ig-radius-md) 0 0 var(--ig-radius-md); }
+.table.tiles tbody tr td:first-child { border-left: var(--ig-hairline) solid var(--ig-line); border-radius: var(--ig-radius-md) 0 0 var(--ig-radius-md); }
 .table.tiles tbody tr td:last-child { border-right: var(--ig-hairline) solid var(--ig-line); border-radius: 0 var(--ig-radius-md) var(--ig-radius-md) 0; }
 .table.tiles tbody tr:hover td { background: var(--ig-row-hover); }
 .table.tiles tbody tr:active td { background: var(--ig-row-active); }
@@ -415,6 +419,8 @@ input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: no
   .empty { padding: var(--ig-space-7) 0; }
   .table-wrap { margin: 0 -10px; }
   .table th, .table td { padding-left: 12px; padding-right: 12px; }
+  .table.tiles th, .table.tiles tbody tr td { padding-left: 12px; padding-right: 12px; }
+  .table.tiles th:first-child, .table.tiles tbody tr td:first-child { padding-left: 14px; }
   th.hide-narrow, td.hide-narrow { display: table-cell; }
   span.hide-narrow { display: inline; }
   div.hide-narrow { display: block; }
