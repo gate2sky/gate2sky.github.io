@@ -47,6 +47,9 @@ type harness struct {
 	web      *httptest.Server
 	sshAddr  string
 	admin    *admin.Client
+	// relays gets the email delivery each email not sent through the saved
+	// one went through: a new SMTP relay's confirmation.
+	relays chan config.EmailConfig
 }
 
 // mailbox captures sign-in emails.
@@ -125,7 +128,12 @@ func (h *harness) start() {
 	if testing.Verbose() {
 		log = slog.New(slog.NewTextHandler(testWriter{t}, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
-	h.srv, err = server.New(h.cfg, log, server.Options{Version: "test", Mailer: h.mail})
+	h.relays = make(chan config.EmailConfig, 10)
+	mailerFor := func(c config.EmailConfig) mail.Sender {
+		h.relays <- c
+		return h.mail
+	}
+	h.srv, err = server.New(h.cfg, log, server.Options{Version: "test", Mailer: h.mail, MailerFor: mailerFor})
 	if err != nil {
 		t.Fatal(err)
 	}

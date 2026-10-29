@@ -31,7 +31,7 @@ const PAGES = [
     return { page: "subdomain", name, data: ["/subdomains/" + encodeURIComponent(name)] }
   }],
   [/^\/account$/, () => ({ page: "account", data: ["/account"] })],
-  [/^\/admin$/, () => ({ page: "admin", data: ["/admin/subdomains", "/admin/users"] })],
+  [/^\/admin$/, () => ({ page: "admin", data: ["/admin/subdomains", "/admin/users", "/admin/email"] })],
   [/^\/login$/, () => ({ page: "login", data: [] })],
 ]
 

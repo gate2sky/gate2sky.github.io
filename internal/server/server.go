@@ -43,6 +43,8 @@ type Options struct {
 	Version string
 	// Mailer replaces the configured email sender.
 	Mailer mail.Sender
+	// MailerFor replaces the sender of email delivery not saved yet.
+	MailerFor func(config.EmailConfig) mail.Sender
 	// HTTPClient is used to reach OAuth providers.
 	HTTPClient *http.Client
 }
@@ -102,6 +104,7 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 		Manage:     s.manage,
 		Settings:   s.settings,
 		Mailer:     opts.Mailer,
+		MailerFor:  opts.MailerFor,
 		Secret:     secret,
 		Logger:     log.With("component", "web"),
 		HTTPClient: opts.HTTPClient,

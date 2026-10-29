@@ -1,5 +1,6 @@
 <script :setup>
-  // For administrators: every subdomain with its tunnel, and every account.
+  // For administrators: every subdomain with its tunnel, every account, and
+  // the SMTP relay, which owners can change.
   const { app, toast } = await import("@ui/lib/store.js")
   const { api } = await import("@ui/lib/api.js")
   const { ago, plural } = await import("@ui/lib/format.js")
@@ -7,7 +8,7 @@
 
   document.title = "Admin · intergate"
 
-  // Which list shows: users or subdomains.
+  // Which tab shows: users, subdomains or relay.
   let tab = "users"
   let subdomains = []
   let users = []
@@ -80,6 +81,84 @@
     load()
   }
 
+  // The SMTP relay. A change saves once the owner enters the code the new
+  // relay emailed them; until then the current one stays.
+  const TLS = { starttls: "STARTTLS", tls: "TLS", none: "None" }
+  const PORTS = { starttls: "587", tls: "465", none: "25" }
+  let relay = {}
+  const loadRelay = async () => {
+    try {
+      relay = await api("GET", "/admin/email")
+    } catch (e) {
+      toast(e.message, "error")
+    }
+  }
+  await loadRelay()
+  const passwordFrom = from =>
+    from === "stored" ? "Stored, encrypted"
+      : from === "config" ? "In the configuration file"
+      : from?.startsWith("env:") ? "Variable " + from.slice(4)
+      : from?.startsWith("file:") ? "File " + from.slice(5)
+      : "None"
+
+  let editingRelay = false
+  let relayBusy = false
+  let relayError = ""
+  let relayHost = ""
+  let relayPort = PORTS.starttls
+  let relayTLS = "starttls"
+  let relayUser = ""
+  let relayPassword = ""
+  let relayFrom = ""
+  let relayCode = ""
+  const editRelay = () => {
+    relayHost = relay.host || ""
+    relayPort = String(relay.port || PORTS.starttls)
+    relayTLS = relay.tls || "starttls"
+    relayUser = relay.username || ""
+    relayPassword = ""
+    relayFrom = relay.from || "intergate <no-reply@" + app.domain + ">"
+    relayError = ""
+    editingRelay = true
+  }
+  // The port follows the encryption, unless it was changed.
+  const setRelayTLS = value => {
+    if (relayPort === PORTS[relayTLS]) relayPort = PORTS[value]
+    relayTLS = value
+  }
+  const proposeRelay = async () => {
+    relayBusy = true
+    relayError = ""
+    try {
+      relay = await api("POST", "/admin/email", {
+        host: relayHost, port: Number(relayPort), tls: relayTLS, username: relayUser, password: relayPassword, from: relayFrom,
+      })
+      relayPassword = ""
+      relayCode = ""
+      editingRelay = false
+    } catch (e) {
+      relayError = e.message
+    }
+    relayBusy = false
+  }
+  const confirmRelay = async () => {
+    relayBusy = true
+    relayError = ""
+    try {
+      relay = await api("POST", "/admin/email/confirm", { code: relayCode })
+      toast("The new SMTP relay is saved.")
+    } catch (e) {
+      relayError = e.message
+      if (e.body.expired) await loadRelay()
+    }
+    relayBusy = false
+  }
+  const cancelRelay = async () => {
+    await api("DELETE", "/admin/email/pending").catch(() => {})
+    relayError = ""
+    await loadRelay()
+  }
+
   let email = ""
   let error = ""
   const addUser = async () => {
@@ -104,6 +183,9 @@
     <button type="button" role="tab" :aria-selected="tab === 'subdomains' ? 'true' : 'false'" @click="tab = 'subdomains'">
       Subdomains <span class="count">{{ subdomains.length }}</span>
       <span :if="online" class="count count-online" :title="online + ' online'">{{ online }} online</span>
+    </button>
+    <button type="button" role="tab" :aria-selected="tab === 'relay' ? 'true' : 'false'" @click="tab = 'relay'">
+      SMTP relay
     </button>
   </div>
 </div>
@@ -184,6 +266,74 @@
   <p :if="app.tcp" class="hint">Ports {{ app.tcp.first }}–{{ app.tcp.last }}: {{ portsUsed }} of {{ app.tcp.last - app.tcp.first + 1 }} in use, at most {{ app.tcp.max_ports }} per subdomain.</p>
 </section>
 
+<section :elseif="tab === 'relay'" class="card" role="tabpanel" aria-label="SMTP relay">
+  <div class="card-head">
+    <h2>SMTP relay</h2>
+    <span class="count">{{ relay.source === "config" ? "configuration file" : relay.source ? "set up in the dashboard" : "not set up" }}</span>
+  </div>
+  <p class="muted">The server intergate sends its emails through: sign-in codes, and the codes that confirm changes like this one.</p>
+  <p :if="relay.log_only" class="flash flash-warn">Codes go to the server’s log, not by email (<code>auth.email.log_only</code>): only for development.</p>
+  <dl :elseif="relay.host" class="stats stats-3">
+    <div class="tone-blue"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>Server</dt><dd>{{ relay.host }}:{{ relay.port }}</dd></div>
+    <div class="tone-green"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Encryption</dt><dd>{{ TLS[relay.tls] }}</dd></div>
+    <div class="tone-purple"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg>User</dt><dd>{{ relay.username || "None" }}</dd></div>
+    <div class="tone-orange"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Sender</dt><dd>{{ relay.from }}</dd></div>
+    <div class="tone-pink"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M21 12v2"/></svg>Password</dt><dd>{{ passwordFrom(relay.password) }}</dd></div>
+  </dl>
+
+  <p :if="relay.source === 'config'" class="hint">It is set in the configuration file (<code>auth.email</code>): change it there and restart intergate.</p>
+  <p :elseif="!relay.editable" class="hint">Only owners can change it.</p>
+
+  <div :elseif="relay.pending">
+    <div :if="relayError" class="flash flash-error" role="alert">{{ relayError }}</div>
+    <p>We sent a code to <strong>{{ relay.pending }}</strong> through the new SMTP relay. Enter it to save the relay; until then, the one above stays.</p>
+    <form class="form form-row" @submit.prevent="confirmRelay">
+      <input class="code-input relay-code" name="code" required inputmode="numeric" autocomplete="one-time-code"
+             pattern="[0-9 ]{6,7}" maxlength="7" placeholder="123456" aria-label="Code"
+             :value="relayCode" @input="relayCode = $event.target.value">
+      <button type="submit" class="button" :disabled="relayBusy">Save the new relay</button>
+    </form>
+    <p class="small muted">Didn’t get it? Check your spam folder, or <button type="button" class="link" @click="cancelRelay">cancel the change</button>.</p>
+  </div>
+
+  <form :elseif="editingRelay" class="form" @submit.prevent="proposeRelay">
+    <div :if="relayError" class="flash flash-error" role="alert">{{ relayError }}</div>
+    <label>SMTP server
+      <input name="host" required autocapitalize="off" spellcheck="false" placeholder="smtp.example.com"
+             :value="relayHost" @input="relayHost = $event.target.value">
+    </label>
+    <div class="form-pair">
+      <label>Encryption
+        <select class="field" name="tls" @change="setRelayTLS($event.target.value)">
+          <option value="starttls" :selected="relayTLS === 'starttls'">STARTTLS</option>
+          <option value="tls" :selected="relayTLS === 'tls'">TLS</option>
+          <option value="none" :selected="relayTLS === 'none'">None (local relay)</option>
+        </select>
+      </label>
+      <label>Port
+        <input name="port" required inputmode="numeric" pattern="[0-9]{1,5}" :value="relayPort" @input="relayPort = $event.target.value">
+      </label>
+    </div>
+    <label>Username <span class="hint">Leave it empty if the server needs no sign-in.</span>
+      <input name="username" autocomplete="off" autocapitalize="off" spellcheck="false" :value="relayUser" @input="relayUser = $event.target.value">
+    </label>
+    <label>Password <span class="hint">Empty keeps the current one, for the same server and username.</span>
+      <input name="password" type="password" autocomplete="new-password" :value="relayPassword" @input="relayPassword = $event.target.value">
+    </label>
+    <label>Sender <span class="hint">Who the emails come from: an address the server may send as.</span>
+      <input name="from" required spellcheck="false" :value="relayFrom" @input="relayFrom = $event.target.value">
+    </label>
+    <div class="actions">
+      <button type="submit" class="button" :disabled="relayBusy">{{ relayBusy ? "Checking the relay…" : "Check and email me a code" }}</button>
+      <button type="button" class="link" @click="editingRelay = false">Cancel</button>
+    </div>
+    <p class="hint">intergate signs in to the new relay, then sends a code through it to {{ app.user.email }}. The relay changes once you enter the code.</p>
+  </form>
+
+  <div :else class="actions">
+    <button type="button" class="button" @click="editRelay">{{ relay.source ? "Change the SMTP relay" : "Set up an SMTP relay" }}</button>
+  </div>
+</section>
 
 <dialog class="card dialog delete-user" aria-labelledby="delete-user-title">
   <form method="dialog">

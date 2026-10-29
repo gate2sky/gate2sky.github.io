@@ -224,26 +224,58 @@ func (m sender) Send(ctx context.Context, msg g2smail.Message) error {
 // stores it. An empty password keeps the current one when the server and
 // username are the same.
 func (s *Settings) SaveEmail(ctx context.Context, e Email, password string) error {
-	if err := e.Validate(); err != nil {
+	c, err := s.PrepareEmail(ctx, e, password)
+	if err != nil {
 		return err
+	}
+	return s.ApplyEmail(ctx, c)
+}
+
+// Change is new email delivery whose SMTP server took its credentials,
+// not saved yet.
+type Change struct {
+	email    Email
+	password string
+}
+
+// Email returns the new email delivery, its password sealed or referred to.
+func (c *Change) Email() Email { return c.email }
+
+// Config is what to send through the new email delivery with.
+func (c *Change) Config() config.EmailConfig {
+	return config.EmailConfig{From: c.email.From, SMTP: c.email.smtp(c.password)}
+}
+
+// PrepareEmail checks e, and that its SMTP server takes its credentials,
+// for ApplyEmail to save. An empty password keeps the current one when the
+// server and username are the same.
+func (s *Settings) PrepareEmail(ctx context.Context, e Email, password string) (*Change, error) {
+	if err := e.Validate(); err != nil {
+		return nil, err
 	}
 	e.Sealed, e.PasswordRef = "", ""
 	if old := s.Email(); password == "" && old != nil && old.Host == e.Host && old.Username == e.Username {
 		e.Sealed, e.PasswordRef = old.Sealed, old.PasswordRef
 		var err error
 		if password, err = s.password(old); err != nil {
-			return err
+			return nil, err
 		}
 	} else if password != "" {
 		sealed, err := s.seal(password)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		e.Sealed = sealed
 	}
 	if err := s.CheckSMTP(ctx, e.smtp(password)); err != nil {
-		return &SMTPError{err}
+		return nil, &SMTPError{err}
 	}
+	return &Change{email: e, password: password}, nil
+}
+
+// ApplyEmail saves a change PrepareEmail checked.
+func (s *Settings) ApplyEmail(ctx context.Context, c *Change) error {
+	e := c.email
 	return s.saveEmail(ctx, &e)
 }
 

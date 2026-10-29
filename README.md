@@ -227,6 +227,14 @@ file is read for every email, so a renewed secret applies at once. With
 `auth.email` and `auth.admins` in the configuration file there is no setup,
 and the file wins over what a setup saved.
 
+Later, owners change email delivery in the Admin page's **SMTP relay** tab
+(admins see it, read-only). intergate signs in to the new relay and sends a
+code through it to the owner making the change; the new relay is saved only
+once they enter that code, so a relay that can't deliver never replaces one
+that can. Code emails come as plain text and HTML, with the code leading the
+subject and standing alone in the message, the way Gmail's "Copy code" and
+Apple's AutoFill find it.
+
 ### Commands
 
 | Command | |
@@ -420,6 +428,9 @@ auth:
   starts, not when the page loads, so link previews can't burn it. Its
   session is a host-only `HttpOnly` cookie that ends after an hour without
   use or with a new link. The owner proves their address with a code.
+- **SMTP relay changes** from the Admin page are for owners only, and save
+  only after the owner enters a code the new relay delivered to their
+  address (6 digits, single use, 10 minutes, 5 tries, kept in memory).
 - **SMTP password** saved by the setup: AES-256-GCM with a key derived
   (HKDF-SHA256) from the data directory's `secret.key`, so the database alone
   (a backup, a copy) does not give it away; whoever has the whole data

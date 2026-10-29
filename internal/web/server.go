@@ -45,6 +45,9 @@ type Options struct {
 	// Mailer sends sign-in codes. Defaults to the email delivery set up,
 	// in the configuration file or from the dashboard.
 	Mailer mail.Sender
+	// MailerFor sends through email delivery that is not saved yet, to
+	// confirm it. Defaults to its SMTP server, or to Mailer when set.
+	MailerFor func(config.EmailConfig) mail.Sender
 	// Secret signs OAuth state and tunnel access cookies. Keep it stable
 	// across restarts so visitors stay signed in to private tunnels.
 	Secret []byte
@@ -66,6 +69,8 @@ type Server struct {
 	manage    *manage.Service
 	settings  *settings.Settings
 	mailer    mail.Sender
+	mailerFor func(config.EmailConfig) mail.Sender
+	relay     relayChanges
 	log       *slog.Logger
 	signer    signer
 	nonces    *nonceSet
@@ -98,18 +103,26 @@ func New(o Options) (*Server, error) {
 		client = &http.Client{Timeout: 15 * time.Second}
 	}
 	s := &Server{
-		cfg:      o.Config,
-		store:    o.Store,
-		registry: o.Registry,
-		manage:   o.Manage,
-		settings: o.Settings,
-		mailer:   o.Mailer,
-		log:      o.Logger,
-		signer:   signer{key: o.Secret},
-		nonces:   newNonceSet(),
-		codes:    newCodeStore(),
-		version:  o.Version,
-		hostKey:  o.HostKey,
+		cfg:       o.Config,
+		store:     o.Store,
+		registry:  o.Registry,
+		manage:    o.Manage,
+		settings:  o.Settings,
+		mailer:    o.Mailer,
+		mailerFor: o.MailerFor,
+		log:       o.Logger,
+		signer:    signer{key: o.Secret},
+		nonces:    newNonceSet(),
+		codes:     newCodeStore(),
+		version:   o.Version,
+		hostKey:   o.HostKey,
+	}
+	switch {
+	case s.mailerFor != nil:
+	case s.mailer != nil:
+		s.mailerFor = func(config.EmailConfig) mail.Sender { return o.Mailer }
+	default:
+		s.mailerFor = func(c config.EmailConfig) mail.Sender { return mail.New(c, s.log) }
 	}
 	if s.mailer == nil {
 		s.mailer = s.settings.Mailer(s.log)
@@ -262,6 +275,10 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("POST /api/admin/users", admin(s.handleAdminCreateUser))
 	mux.Handle("PATCH /api/admin/users/{id}", admin(s.handleAdminUpdateUser))
 	mux.Handle("DELETE /api/admin/users/{id}", admin(s.handleAdminDeleteUser))
+	mux.Handle("GET /api/admin/email", admin(s.handleAdminRelay))
+	mux.Handle("POST /api/admin/email", admin(s.relayOwner(s.handleAdminRelayChange)))
+	mux.Handle("POST /api/admin/email/confirm", admin(s.relayOwner(s.handleAdminRelayConfirm)))
+	mux.Handle("DELETE /api/admin/email/pending", admin(s.relayOwner(s.handleAdminRelayCancel)))
 
 	return s.securityHeaders(s.withSession(mux))
 }
