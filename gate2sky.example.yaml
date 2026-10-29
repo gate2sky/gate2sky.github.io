@@ -41,7 +41,8 @@ ssh:
 
 auth:
   session_ttl: 168h
-  # Who may sign in. Admins can always sign in and see the admin page.
+  # Who may sign in. Admins can always sign in and see the admin page, and
+  # users an administrator adds from the dashboard may sign in as well.
   admins: [you@example.com]
   allowed_emails: []
   allowed_domains: [example.com]

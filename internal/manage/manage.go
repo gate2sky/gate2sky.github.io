@@ -240,7 +240,9 @@ func validEmail(email string) error {
 	return nil
 }
 
-// CreateUser adds an account that can then sign in with its email.
+// CreateUser adds an account that can then sign in with its email, whatever
+// auth.allowed_* says. An account that exists but may not sign in, such as
+// one the configuration no longer allows, gets that access too.
 func (s *Service) CreateUser(ctx context.Context, email, actor string) (*store.User, error) {
 	email = store.NormalizeEmail(email)
 	if err := validEmail(email); err != nil {
@@ -248,15 +250,20 @@ func (s *Service) CreateUser(ctx context.Context, email, actor string) (*store.U
 	}
 	u, err := s.store.CreateUser(ctx, email, "")
 	if errors.Is(err, store.ErrConflict) {
-		return nil, Errorf("%s already has an account", email)
-	}
-	if err != nil {
+		if u, err = s.store.UserByEmail(ctx, email); err != nil {
+			return nil, err
+		}
+		if s.cfg.UserAllowed(u.Email, u.Added, string(u.Role)) {
+			return nil, Errorf("%s already has an account", email)
+		}
+	} else if err != nil {
 		return nil, err
 	}
-	if !s.cfg.EmailAllowed(email) {
-		s.log.Warn("created a user the auth configuration does not allow to sign in", "email", email)
+	if err := s.store.SetUserAdded(ctx, u.ID); err != nil {
+		return nil, err
 	}
-	s.log.Info("user created", "email", email, "by", actor)
+	u.Added = true
+	s.log.Info("user added", "email", email, "by", actor)
 	return u, nil
 }
 
@@ -290,6 +297,55 @@ func (s *Service) SetUserDisabled(ctx context.Context, userID int64, disabled bo
 		}
 	}
 	s.log.Info("user updated", "user_id", userID, "disabled", disabled, "by", actor)
+	return nil
+}
+
+// DeleteUser removes an account and everything it owns, and closes its
+// tunnels. Someone the configuration allows can sign in again, as a new
+// account.
+func (s *Service) DeleteUser(ctx context.Context, userID int64, actor string) error {
+	err := s.store.DeleteUser(ctx, userID)
+	if errors.Is(err, store.ErrNotFound) {
+		return Errorf("user not found")
+	}
+	if err != nil {
+		return err
+	}
+	for _, t := range s.registry.List() {
+		if t.OwnerID == userID {
+			t.Close("the owner's account was deleted")
+		}
+	}
+	s.log.Info("user deleted", "user_id", userID, "by", actor)
+	return nil
+}
+
+// SetUserRole changes the role of another user. Admins manage users and
+// admins; only owners make owners or change them, and addresses in
+// auth.admins stay owners whatever it is set to.
+func (s *Service) SetUserRole(ctx context.Context, userID int64, role store.Role, actor *store.User, actorRole store.Role) error {
+	if !role.Valid() {
+		return Errorf("unknown role %q", role)
+	}
+	u, err := s.store.UserByID(ctx, userID)
+	if errors.Is(err, store.ErrNotFound) {
+		return Errorf("user not found")
+	}
+	if err != nil {
+		return err
+	}
+	switch {
+	case u.ID == actor.ID:
+		return Errorf("you can't change your own role")
+	case s.cfg.IsAdmin(u.Email):
+		return Errorf("%s is an owner in the configuration (auth.admins)", u.Email)
+	case actorRole != store.RoleOwner && (u.Role == store.RoleOwner || role == store.RoleOwner):
+		return Errorf("only owners can make or change owners")
+	}
+	if err := s.store.SetUserRole(ctx, userID, role); err != nil {
+		return err
+	}
+	s.log.Info("user updated", "user_id", userID, "role", role, "by", actor.Email)
 	return nil
 }
 

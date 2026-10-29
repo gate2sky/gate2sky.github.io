@@ -84,7 +84,8 @@ func TestAdminSocket(t *testing.T) {
 	if err != nil || u.Email != "new@example.com" || !u.Allowed {
 		t.Fatalf("create user = %+v, %v", u, err)
 	}
-	if out, _ := c.CreateUser(ctx, "outsider@other.test"); out == nil || out.Allowed {
+	// Added users may sign in whatever auth.allowed_* says.
+	if out, _ := c.CreateUser(ctx, "outsider@other.test"); out == nil || !out.Allowed {
 		t.Errorf("outsider = %+v", out)
 	}
 	if err := c.SetUserDisabled(ctx, u.ID, true); err != nil {

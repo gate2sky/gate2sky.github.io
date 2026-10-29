@@ -179,10 +179,12 @@ def hero():
 
 def brand():
     """The logo, inline: pages/favicon.svg, the same file as the dashboard's
-    logo, with its ids prefixed so they cannot clash with the page's."""
+    logo, without its dark tile (the header is the sky) and with its ids
+    prefixed so they cannot clash with the page's."""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../pages/favicon.svg")
     svg = open(path).read()
     svg = re.sub(r"<!--.*?-->\s*", "", svg, flags=re.S)
+    svg = re.sub(r'<rect width="64" height="64"[^>]*/>\s*', "", svg)
     svg = re.sub(r'id="([\w-]+)"', r'id="logo-\1"', svg)
     svg = re.sub(r"url\(#([\w-]+)\)", r"url(#logo-\1)", svg)
     svg = svg.replace('xmlns="http://www.w3.org/2000/svg" ', "").replace("<svg ", '<svg aria-hidden="true" ', 1)

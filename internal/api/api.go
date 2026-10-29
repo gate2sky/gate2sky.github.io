@@ -67,11 +67,15 @@ type SubdomainDetail struct {
 
 // User is an account.
 type User struct {
-	ID          int64     `json:"id"`
-	Email       string    `json:"email"`
-	Name        string    `json:"name"`
-	Disabled    bool      `json:"disabled"`
-	Admin       bool      `json:"admin"`
+	ID       int64  `json:"id"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Disabled bool   `json:"disabled"`
+	Admin    bool   `json:"admin"`
+	Role     string `json:"role"`
+	// ConfigOwner is set when auth.admins makes the user an owner, which
+	// the dashboard cannot change.
+	ConfigOwner bool      `json:"config_owner"`
 	Allowed     bool      `json:"allowed"`
 	Subdomains  int       `json:"subdomains"`
 	Passkeys    int       `json:"passkeys"`
@@ -81,9 +85,10 @@ type User struct {
 
 // NewUser describes u as an administrator sees it.
 func NewUser(cfg *config.Config, u store.UserSummary) User {
+	role := cfg.UserRole(u.Email, string(u.Role))
 	return User{
 		ID: u.ID, Email: u.Email, Name: u.Name, Disabled: u.Disabled,
-		Admin: cfg.IsAdmin(u.Email), Allowed: cfg.EmailAllowed(u.Email),
+		Admin: role != "user", Role: role, ConfigOwner: cfg.IsAdmin(u.Email), Allowed: cfg.UserAllowed(u.Email, u.Added, string(u.Role)),
 		Subdomains: u.Subdomains, Passkeys: u.Passkeys, Providers: u.Providers, LastLoginAt: u.LastLoginAt,
 	}
 }

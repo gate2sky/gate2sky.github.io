@@ -104,6 +104,10 @@ var migrations = []string{
 		UNIQUE (subdomain_id, fingerprint)
 	);
 	CREATE INDEX ssh_keys_fingerprint ON ssh_keys(fingerprint);`,
+	// Access and roles granted from the dashboard or the admin socket, on
+	// top of what the configuration allows.
+	`ALTER TABLE users ADD COLUMN added INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

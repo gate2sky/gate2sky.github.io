@@ -7,6 +7,8 @@
 
   document.title = "Admin · gate2sky"
 
+  // Which list shows: users or subdomains.
+  let tab = "users"
   let subdomains = []
   let users = []
   const load = async () => {
@@ -40,6 +42,42 @@
     load()
   }
 
+  // Admins manage users and admins; owners manage everyone. Nobody changes
+  // their own role, and owners in auth.admins stay owners.
+  const owner = app.user.role === "owner"
+  const canManage = user =>
+    user.id !== app.user.id && !user.config_owner && (owner || user.role !== "owner")
+  // Owners in auth.admins keep their role but can still be disabled.
+  const canToggle = user => user.id !== app.user.id && (owner || user.role !== "owner")
+
+  const setRole = async (user, role) => {
+    try {
+      await api("PATCH", "/admin/users/" + user.id, { role })
+      toast(`${user.email} is now ${{ owner: "an owner", admin: "an admin", user: "a user" }[role]}.`)
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    load()
+  }
+
+  // The user the delete dialog asks about.
+  let deleting = null
+  const askDelete = user => {
+    deleting = user
+    document.querySelector("dialog.delete-user").showModal()
+  }
+  const deleteUser = async () => {
+    const user = deleting
+    document.querySelector("dialog.delete-user").close()
+    try {
+      await api("DELETE", "/admin/users/" + user.id)
+      toast(`Deleted ${user.email}.`)
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    load()
+  }
+
   let email = ""
   let error = ""
   const addUser = async () => {
@@ -47,10 +85,7 @@
     try {
       const user = await api("POST", "/admin/users", { email })
       email = ""
-      toast(user.allowed
-        ? `Added ${user.email}. They can now sign in with their email.`
-        : `Added ${user.email}, but auth.allowed_* in the configuration does not let them sign in yet.`,
-        user.allowed ? "ok" : "error")
+      toast(`Added ${user.email}. They can now sign in with their email.`)
       load()
     } catch (e) {
       error = e.message
@@ -60,8 +95,69 @@
 
 <div class="page-head"><h1>Admin</h1></div>
 
-<section class="card">
-  <div class="card-head"><h2>Subdomains</h2><span class="count">{{ online }} online · {{ subdomains.length }} registered</span></div>
+<div class="panel-tabs" role="tablist">
+  <button type="button" role="tab" :aria-selected="tab === 'users' ? 'true' : 'false'" @click="tab = 'users'">
+    Users <span class="count">{{ users.length }}</span>
+  </button>
+  <button type="button" role="tab" :aria-selected="tab === 'subdomains' ? 'true' : 'false'" @click="tab = 'subdomains'">
+    Subdomains <span class="count">{{ subdomains.length }}</span>
+    <span :if="online" class="count count-online" :title="online + ' online'">{{ online }} online</span>
+  </button>
+</div>
+
+<section :if="tab === 'users'" class="card" role="tabpanel" aria-label="Users">
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>User</th><th>Role</th><th class="hide-narrow">Sign-in</th><th class="hide-narrow">Subdomains</th><th class="hide-narrow">Last sign-in</th><th class="center">Enabled</th><th></th></tr></thead>
+      <tbody>
+        <tr :each="user in users" :key="user.id" :class.disabled="user.disabled">
+          <td>
+            <strong>{{ user.name || user.email }}</strong>
+            <span :if="user.id === app.user.id" class="muted small">you</span>
+            <div :if="user.name" class="muted small">{{ user.email }}</div>
+            <div :if="!user.allowed" class="small danger">not allowed by the configuration: add them again to let them in</div>
+          </td>
+          <td class="keep">
+            <select :if="canManage(user)" class="role" aria-label="Role" @change="setRole(user, $event.target.value)">
+              <button type="button"><selectedcontent></selectedcontent></button>
+                <option value="owner" :selected="user.role === 'owner'" :disabled="!owner"><svg class="role-icon role-owner" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5Z"/></svg><span>Owner</span></option>
+                <option value="admin" :selected="user.role === 'admin'"><svg class="role-icon role-admin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6Z"/><path d="m9 12 2 2 4-4"/></svg><span>Admin</span></option>
+                <option value="user" :selected="user.role === 'user'"><svg class="role-icon role-user" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg><span>User</span></option>
+            </select>
+            <span :elseif="user.role === 'owner'" class="value" :title="user.config_owner ? 'An owner in auth.admins' : null"><svg class="role-icon role-owner" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5Z"/></svg>Owner</span>
+            <span :elseif="user.role === 'admin'" class="value"><svg class="role-icon role-admin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6Z"/><path d="m9 12 2 2 4-4"/></svg>Admin</span>
+            <span :else class="value"><svg class="role-icon role-user" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg>User</span>
+          </td>
+          <td class="small hide-narrow">{{ signIn(user) }}</td>
+          <td class="hide-narrow">{{ user.subdomains }}</td>
+          <td class="hide-narrow">{{ ago(user.last_login_at) }}</td>
+          <td class="center keep">
+            <label :if="canToggle(user)" class="switch" :title="user.disabled ? 'Disabled' : 'Enabled'">
+              <input type="checkbox" role="switch" :checked="!user.disabled"
+                     :aria-label="(user.disabled ? 'Enable ' : 'Disable ') + user.email" @change="setDisabled(user, !$event.target.checked)">
+            </label>
+            <span :else class="state" :class.state-off="user.disabled" role="img" :aria-label="user.disabled ? 'Disabled' : 'Enabled'" :title="user.disabled ? 'Disabled' : 'Enabled'"></span>
+          </td>
+          <td class="right keep">
+            <button :if="canManage(user)" type="button" class="icon-button danger" :aria-label="'Delete ' + user.email" title="Delete"
+                    @click="askDelete(user)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+  <form class="form form-row" @submit.prevent="addUser">
+    <input type="email" name="email" required placeholder="new.user@example.com" aria-label="Email of the new user"
+           autocomplete="off" :value="email" @input="email = $event.target.value">
+    <button type="submit" class="button button-secondary">Add user</button>
+  </form>
+  <p class="hint">Added users sign in with that email address, whatever <code>auth.allowed_*</code> says. Admins manage every subdomain and account but owners’; owners manage everything, and those in <code>auth.admins</code> stay owners.</p>
+</section>
+
+<section :elseif="tab === 'subdomains'" class="card" role="tabpanel" aria-label="Subdomains">
   <div :if="subdomains.length" class="table-wrap">
     <table class="table">
       <thead><tr><th>Subdomain</th><th class="hide-narrow">Owner</th><th>Access</th><th class="hide-narrow">Keys</th><th>Status</th><th class="hide-narrow">Requests</th></tr></thead>
@@ -83,36 +179,14 @@
   <p :else class="empty-inline">No subdomains registered.</p>
 </section>
 
-<section class="card">
-  <div class="card-head"><h2>Users</h2><span class="count">{{ users.length }}</span></div>
-  <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>User</th><th class="hide-narrow">Sign-in</th><th class="hide-narrow">Subdomains</th><th class="hide-narrow">Last sign-in</th><th></th></tr></thead>
-      <tbody>
-        <tr :each="user in users" :key="user.id" :class.disabled="user.disabled">
-          <td>
-            <strong>{{ user.name || user.email }}</strong>
-            <span :if="user.admin" class="badge">admin</span>
-            <div :if="user.name" class="muted small">{{ user.email }}</div>
-            <div :if="!user.allowed" class="small danger">not allowed by the configuration</div>
-          </td>
-          <td class="small hide-narrow">{{ signIn(user) }}</td>
-          <td class="hide-narrow">{{ user.subdomains }}</td>
-          <td class="hide-narrow">{{ ago(user.last_login_at) }}</td>
-          <td class="right">
-            <span :if="user.id === app.user.id" class="muted small">you</span>
-            <button :elseif="user.disabled" type="button" class="link" @click="setDisabled(user, false)">Enable</button>
-            <button :else type="button" class="link danger" @click="setDisabled(user, true)">Disable</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
-  <form class="form form-row" @submit.prevent="addUser">
-    <input type="email" name="email" required placeholder="new.user@example.com" aria-label="Email of the new user"
-           autocomplete="off" :value="email" @input="email = $event.target.value">
-    <button type="submit" class="button button-secondary">Add user</button>
+
+<dialog class="card dialog delete-user" aria-labelledby="delete-user-title">
+  <form method="dialog">
+    <h2 id="delete-user-title">Delete {{ deleting ? deleting.email : "" }}?</h2>
+    <p class="muted">This removes the account{{ deleting && deleting.subdomains ? ", its " + plural(deleting.subdomains, "subdomain") + " with their SSH keys" : "" }} and its passkeys, and closes any tunnel. If the configuration allows the address, they can sign in again as a new account.</p>
+    <div class="dialog-actions">
+      <button value="cancel" class="button button-secondary" autofocus>Cancel</button>
+      <button type="button" class="button button-danger" @click="deleteUser">Delete</button>
+    </div>
   </form>
-  <p class="hint">Added users sign in with that email address. Who may sign in at all is set by <code>auth.allowed_*</code> in the configuration.</p>
-</section>
+</dialog>

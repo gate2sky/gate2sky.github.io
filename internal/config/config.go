@@ -463,6 +463,25 @@ func (c *Config) EmailAllowed(email string) bool {
 	return at >= 0 && contains(c.Auth.AllowedDomains, email[at+1:])
 }
 
+// UserRole is an account's role: "owner" for addresses in auth.admins,
+// otherwise the one stored for it ("user", "admin" or "owner").
+func (c *Config) UserRole(email, stored string) string {
+	if c.IsAdmin(email) {
+		return "owner"
+	}
+	if stored == "" {
+		return "user"
+	}
+	return stored
+}
+
+// UserAllowed reports whether an account may sign in and keep using
+// gate2sky: the configuration allows its email, or an administrator added
+// it or gave it a role.
+func (c *Config) UserAllowed(email string, added bool, stored string) bool {
+	return added || c.UserRole(email, stored) != "user" || c.EmailAllowed(email)
+}
+
 func contains(list []string, v string) bool {
 	for _, s := range list {
 		if s == v {

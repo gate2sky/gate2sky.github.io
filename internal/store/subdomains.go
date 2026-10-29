@@ -221,13 +221,15 @@ type Grant struct {
 	Access      Access
 	OwnerID     int64
 	OwnerEmail  string
+	OwnerAdded  bool
+	OwnerRole   Role
 }
 
 // GrantsForKey lists the subdomains the key with this fingerprint may use.
 // Subdomains of disabled users are skipped.
 func (s *Store) GrantsForKey(ctx context.Context, fingerprint string) ([]Grant, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT k.id, k.name, k.public_key, d.id, d.name, d.access, u.id, u.email
+		SELECT k.id, k.name, k.public_key, d.id, d.name, d.access, u.id, u.email, u.added, u.role
 		FROM ssh_keys k
 		JOIN subdomains d ON d.id = k.subdomain_id
 		JOIN users u ON u.id = d.user_id
@@ -240,7 +242,7 @@ func (s *Store) GrantsForKey(ctx context.Context, fingerprint string) ([]Grant, 
 	var out []Grant
 	for rows.Next() {
 		var g Grant
-		if err := rows.Scan(&g.KeyID, &g.KeyName, &g.PublicKey, &g.SubdomainID, &g.Subdomain, &g.Access, &g.OwnerID, &g.OwnerEmail); err != nil {
+		if err := rows.Scan(&g.KeyID, &g.KeyName, &g.PublicKey, &g.SubdomainID, &g.Subdomain, &g.Access, &g.OwnerID, &g.OwnerEmail, &g.OwnerAdded, &g.OwnerRole); err != nil {
 			return nil, err
 		}
 		out = append(out, g)

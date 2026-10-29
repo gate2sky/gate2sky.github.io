@@ -2,7 +2,6 @@
   // The page: the top bar, and the view the path names. Signed out, every
   // path shows the sign-in form, which comes back to that path.
   const { app, route, go } = await import("@ui/lib/store.js")
-  const { api } = await import("@ui/lib/api.js")
   const Login = await import("@ui/views/login.html")
   const Subdomains = await import("@ui/views/subdomains.html")
   const Subdomain = await import("@ui/views/subdomain.html")
@@ -23,11 +22,6 @@
   $: section = current.page === "subdomain" ? "subdomains" : current.page
 
   const retry = () => go(location.href, { replace: true })
-
-  const signOut = async () => {
-    await api("POST", "/logout").catch(() => {})
-    location.assign("/login")
-  }
 </script>
 
 <header class="topbar">
@@ -48,7 +42,6 @@
         <span :else class="avatar" aria-hidden="true">{{ app.user.email[0] }}</span>
         <span>{{ app.user.email }}</span>
       </a>
-      <button type="button" class="button button-plain" @click="signOut">Sign out</button>
     </nav>
   </div>
 </header>

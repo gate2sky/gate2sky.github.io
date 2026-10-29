@@ -67,6 +67,9 @@ point to the server. Then, on Linux or macOS:
 curl -fsSL https://gate2sky.github.io/setup.sh | sh
 ```
 
+Without curl, `wget -qO- https://gate2sky.github.io/setup.sh | sh` does the
+same: the installer then downloads with wget too.
+
 The installer downloads the release for your machine, checks it against the
 release's `SHA256SUMS`, runs it once before it replaces anything, opens the
 setup wizard and, on Linux with systemd, installs the service. Run it again to
@@ -214,7 +217,11 @@ Highlights:
   Microsoft Entra ID, Keycloak, Authentik...). Their callback URL is
   `<public_url>/auth/<id>/callback`.
 - `auth.admins`, `auth.allowed_emails`, `auth.allowed_domains`,
-  `auth.allow_everyone`: who may sign in.
+  `auth.allow_everyone`: who may sign in. Users an administrator adds from
+  the dashboard or `gate2sky config` may sign in too. On the dashboard's
+  Admin page each user is an owner, an admin or a user: admins manage every
+  subdomain and account but owners', owners manage everything, and
+  `auth.admins` are always owners.
 - `ssh.proxy_protocol`: expect a PROXY protocol header from a load balancer.
 
 For local development, `*.localhost` resolves to 127.0.0.1 in browsers:
