@@ -213,6 +213,20 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 .table td a:hover strong { color: var(--ig-link); }
 .table-wrap + * { margin-top: var(--ig-space-6); }
 .row-actions { white-space: nowrap; }
+/* A table whose rows are tiles of their own, a little apart, lined up with
+   the fields around them: a subdomain's keys. */
+.table-wrap:has(> .tiles) { margin: 0; }
+.table.tiles { border-spacing: 0 6px; margin: -6px 0; }
+.table.tiles th { border-bottom: 0; padding-bottom: 0; }
+.table.tiles tbody tr { filter: drop-shadow(var(--ig-shadow-xs)); }
+.table.tiles tbody tr td {
+  background: var(--ig-row); border-top: var(--ig-hairline) solid var(--ig-line); border-bottom: var(--ig-hairline) solid var(--ig-line);
+  transition: background-color var(--ig-duration-fast);
+}
+.table.tiles tbody tr td:first-child { padding-left: 14px; border-left: var(--ig-hairline) solid var(--ig-line); border-radius: var(--ig-radius-md) 0 0 var(--ig-radius-md); }
+.table.tiles tbody tr td:last-child { border-right: var(--ig-hairline) solid var(--ig-line); border-radius: 0 var(--ig-radius-md) var(--ig-radius-md) 0; }
+.table.tiles tbody tr:hover td { background: var(--ig-row-hover); }
+.table.tiles tbody tr:active td { background: var(--ig-row-active); }
 
 .name-cell { display: flex; align-items: center; gap: var(--ig-space-5); min-width: 0; }
 a.name-cell:hover { text-decoration: none; }

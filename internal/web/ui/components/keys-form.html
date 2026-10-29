@@ -1,0 +1,55 @@
+<script :setup="{ sub, cancel = false }">
+  // The form that adds SSH keys to a subdomain, and emits `added` once some
+  // are. On the page while it has none; in a dialog once it has one. With
+  // `:cancel`, it has a Cancel button that emits `cancel`, for the dialog.
+  const { toast } = await import("@ui/lib/store.js")
+  const { api } = await import("@ui/lib/api.js")
+  const { plural } = await import("@ui/lib/format.js")
+  const Alert = await import("@theme/components/alert.html")
+  const Button = await import("@theme/components/button.html")
+
+  let keys = ""
+  let name = ""
+  let busy = false
+  let error = ""
+
+  // What was added leaves the form, which may go with it (the page's, once
+  // there is a key), so a key that was not added is told in the toast; with
+  // none added, the form stays and says why.
+  const add = async () => {
+    busy = true
+    error = ""
+    try {
+      const result = await api("POST", "/subdomains/" + encodeURIComponent(sub.name) + "/keys", { keys, name })
+      const problems = result.problems || []
+      if (!result.added) error = `Added no keys: ${problems.join("; ")}.`
+      else {
+        if (problems.length) toast(`Added ${plural(result.added, "key")}, but: ${problems.join("; ")}.`, "error")
+        else toast(`Added ${plural(result.added, "key")}.`)
+        keys = ""
+        name = ""
+        $emit("added")
+      }
+    } catch (e) {
+      error = e.message
+    }
+    busy = false
+  }
+</script>
+
+<form class="form" @submit.prevent="add">
+  <Alert :if="error" tone="bad" flush>{{ error }}</Alert>
+  <label>Public keys
+    <span class="hint">One per line: the contents of <code>~/.ssh/id_ed25519.pub</code>, or of <code>https://github.com/&lt;user&gt;.keys</code>.</span>
+    <textarea name="keys" rows="3" required spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"
+              :value="keys" @input="keys = $event.target.value"></textarea>
+  </label>
+  <label>Name <span class="hint">Optional. Defaults to the key comment.</span>
+    <input name="name" maxlength="64" autocomplete="off" :value="name" @input="name = $event.target.value">
+  </label>
+  <div :if="cancel" class="form-actions">
+    <Button variant="secondary" @click="$emit('cancel')">Cancel</Button>
+    <Button type="submit" :disabled="busy">Add keys</Button>
+  </div>
+  <div :else><Button type="submit" :disabled="busy">Add keys</Button></div>
+</form>
