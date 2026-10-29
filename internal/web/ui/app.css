@@ -405,6 +405,5 @@ input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: no
   .form-row > [data-c79-box] > * { flex: none; }
   input:not([type=radio]), textarea { font-size: var(--ig-text-base); padding: 7px 11px; }
   textarea { font-size: 12.5px; }
-  .copy { font-size: var(--ig-text-sm); padding: 4px 12px; }
   .toast { bottom: var(--ig-space-9); }
 }
