@@ -340,10 +340,10 @@ a.name-cell:hover { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { .badge-online .dot { animation: none; } }
 td .badge { margin-right: 6px; }
 
-/* Dialogs: a card over the page, which dims and blurs behind it. */
+/* Dialogs: a card near the top of the page, which dims and blurs behind it. */
 
 .dialog {
-  position: fixed; inset: 0; width: min(360px, calc(100vw - 32px)); height: fit-content; margin: auto; padding: 20px;
+  position: fixed; inset: 0 0 auto; width: min(360px, calc(100vw - 32px)); margin: max(72px, 12vh) auto 0; padding: 20px;
   color: var(--fg); background: var(--material-hud); box-shadow: 0 .5px 0 var(--material-edge) inset, var(--shadow-pop);
 }
 .dialog[open] { animation: dialog-in .2s cubic-bezier(.2, .9, .3, 1.2); }
@@ -351,7 +351,7 @@ td .badge { margin-right: 6px; }
 .dialog h2 { font-size: 17px; margin-bottom: 6px; }
 .dialog p { margin: 0 0 18px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
-@keyframes dialog-in { from { opacity: 0; transform: scale(.96); } }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(-8px) scale(.97); } }
 @media (prefers-reduced-motion: reduce) { .dialog[open] { animation: none; } }
 
 /* Buttons: push buttons with a soft top highlight. */
@@ -376,6 +376,7 @@ td .badge { margin-right: 6px; }
   --accent: #d92d23;
   color: #fff;
 }
+.button-dark { --accent: #3a3f4a; }
 .button-plain { color: var(--muted); background: none; box-shadow: none; padding: 5px 10px; font-weight: 500; }
 .button-plain:hover { color: var(--fg); background: var(--fill-2); filter: none; }
 .button:disabled { opacity: .45; cursor: default; filter: none; }
