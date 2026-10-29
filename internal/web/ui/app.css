@@ -170,6 +170,14 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 code, pre, textarea { font-family: var(--mono); }
 code { font-size: .9em; }
 p code, .hint code { background: var(--mk-bg); color: var(--mk-pink); padding: 1px 6px; border-radius: 5px; box-shadow: 0 0 0 .5px var(--mk-line); }
+/* A number to edit inside a sentence, dressed as the code around it. */
+.local-port input.port-input:not([type=radio]):not([type=checkbox]) {
+  display: inline-block; width: 7ch; padding: 1px 6px; margin-left: 2px; text-align: center;
+  font-family: var(--mono); font-size: 1.05em; color: var(--mk-pink); background: var(--mk-bg);
+  border: 0; border-radius: 5px; box-shadow: 0 0 0 .5px var(--mk-line); vertical-align: baseline;
+}
+.local-port input.port-input:not([type=radio]):not([type=checkbox]):focus { box-shadow: 0 0 0 .5px var(--mk-line), var(--ring); }
+.local-port input.port-input.invalid:not([type=radio]):not([type=checkbox]) { box-shadow: 0 0 0 1.5px var(--red); }
 
 h1 { font-size: 24px; line-height: 1.2; margin: 0; letter-spacing: -.022em; font-weight: 700; }
 h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: -.01em; font-weight: 600; }

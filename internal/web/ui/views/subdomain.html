@@ -18,11 +18,32 @@
 
   const path = () => "/subdomains/" + encodeURIComponent(name)
 
+  // The local port the SSH command forwards to, 3000 until changed, and
+  // remembered per subdomain in this browser.
+  const portKey = () => "intergate.port." + name
+  const savedPort = () => {
+    try {
+      return localStorage.getItem(portKey()) || "3000"
+    } catch {
+      return "3000"
+    }
+  }
+  const validPort = port => /^[0-9]{1,5}$/.test(port) && +port >= 1 && +port <= 65535
+  let localPort = savedPort()
+  const setLocalPort = value => {
+    localPort = value.trim()
+    if (!validPort(localPort)) return
+    try {
+      localStorage.setItem(portKey(), localPort)
+    } catch {}
+  }
+
   const load = async () => {
     const asked = name
     try {
       const detail = await api("GET", "/subdomains/" + encodeURIComponent(asked))
       if (asked !== name) return
+      if (asked !== loaded) localPort = savedPort()
       sub = detail
       missing = false
     } catch (e) {
@@ -37,6 +58,8 @@
   await load()
   $: name !== loaded && load()
   $: document.title = `${name} · intergate`
+  // The server's command forwards to localhost:3000.
+  $: sshCommand = sub ? sub.ssh_command.replace(":80:localhost:3000 ", ":80:localhost:" + (validPort(localPort) ? localPort : "3000") + " ") : ""
 
   $attached(() => {
     // Not while a key is being renamed or a dialog is open: a reload would
@@ -195,9 +218,12 @@
         <p class="muted">To connect again later, or from another machine with an authorized key:</p>
       </div>
       <p :else class="muted">No client is connected. Start your service locally, then run:</p>
-      <CopyText :command="sub.ssh_command" />
-      <p class="muted small">Replace <code>3000</code> with your local port. Add <code>-N</code> to run without a console;
-        use <code>autossh -M 0</code> to reconnect automatically.</p>
+      <CopyText :command="sshCommand" />
+      <p class="muted small">
+        <label class="local-port">Your service’s local port
+          <input class="port-input" name="local-port" inputmode="numeric" maxlength="5" autocomplete="off" spellcheck="false"
+                 :class.invalid="!validPort(localPort)" :value="localPort" @input="setLocalPort($event.target.value)"></label>.
+        Add <code>-N</code> to run without a console; use <code>autossh -M 0</code> to reconnect automatically.</p>
     </section>
 
     <section class="card">

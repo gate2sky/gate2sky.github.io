@@ -453,7 +453,8 @@ func (s *Server) ssh() string {
 	return "ssh"
 }
 
-// sshCommand is the command a user runs to expose localhost:3000.
+// sshCommand is the command a user runs to expose localhost:3000. The
+// dashboard swaps in the port its user types.
 func (s *Server) sshCommand(name string) string {
 	return fmt.Sprintf("%s -R %s:80:localhost:3000 %s", s.ssh(), name, s.cfg.SSHHost())
 }
