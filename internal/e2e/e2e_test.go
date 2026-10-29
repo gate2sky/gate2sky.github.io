@@ -731,12 +731,26 @@ func TestProtectedTunnels(t *testing.T) {
 		t.Errorf("owner landed on %s", resp.Request.URL)
 	}
 
-	// Other signed-in users may open "users" tunnels but not private ones.
+	// Other signed-in users may open "users" tunnels but not private ones,
+	// which they see as offline, so they don't learn whether it is online.
 	bob := h.browser(true)
 	h.login(bob, "bob@example.com")
-	if resp, body := get(t, bob, "http://secret."+domain+"/"); resp.StatusCode != http.StatusForbidden || !strings.Contains(body, "does not have access") {
-		t.Errorf("bob on private tunnel: %d %s", resp.StatusCode, body)
+	resp, denied := get(t, bob, "http://secret."+domain+"/")
+	if resp.StatusCode != http.StatusBadGateway || resp.Request.URL.Host != "secret."+domain {
+		t.Errorf("bob on private tunnel: %d at %s\n%s", resp.StatusCode, resp.Request.URL, denied)
 	}
+	h.setup("carol@example.com", "idle", store.AccessPrivate)
+	_, offline := get(t, bob, "http://idle."+domain+"/")
+	if strings.ReplaceAll(offline, "idle.", "secret.") != denied {
+		t.Errorf("denied page differs from the offline one:\n%s\n---\n%s", denied, offline)
+	}
+	// Access is checked on every request: once the owner opens it to
+	// signed-in users, bob gets in.
+	h.registry.Get("secret").SetAccess(store.AccessUsers)
+	if resp, _ := get(t, bob, "http://secret."+domain+"/"); resp.StatusCode != http.StatusOK {
+		t.Errorf("bob after access changed to users: %d", resp.StatusCode)
+	}
+	h.registry.Get("secret").SetAccess(store.AccessPrivate)
 	if resp, _ := get(t, owner, "http://team."+domain+"/"); resp.StatusCode != http.StatusOK {
 		t.Errorf("alice on users tunnel: %d", resp.StatusCode)
 	}
