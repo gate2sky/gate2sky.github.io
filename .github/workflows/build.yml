@@ -57,14 +57,15 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Building gate2sky $version"
 
-  # The four targets pages/setup.sh installs. Pure Go (the SQLite driver too),
-  # so every one is a static binary cross-compiled here.
+  # The four targets pages/setup.sh installs, and Windows for the client
+  # (tunnel.ps1). Pure Go (the SQLite driver too), so every one is a static
+  # binary cross-compiled here.
   binary:
     needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64]
+        target: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64, windows-arm64]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,21 +73,29 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Build gate2sky-${{ matrix.target }}.tar.gz
+      - name: Build gate2sky-${{ matrix.target }}
         run: |
           set -euo pipefail
           target=${{ matrix.target }}
+          exe=gate2sky
+          case "$target" in windows-*) exe=gate2sky.exe ;; esac
           mkdir -p "dist/gate2sky-$target"
           CGO_ENABLED=0 GOOS=${target%-*} GOARCH=${target#*-} go build -trimpath \
             -ldflags "-s -w -X main.version=${{ needs.test.outputs.version }}" \
-            -o "dist/gate2sky-$target/gate2sky" ./cmd/gate2sky
+            -o "dist/gate2sky-$target/$exe" ./cmd/gate2sky
           cp README.md "dist/gate2sky-$target/"
-          # The layout pages/setup.sh unpacks: gate2sky-<target>/gate2sky.
-          tar -czf "dist/gate2sky-$target.tar.gz" -C dist "gate2sky-$target"
+          # The layout pages/setup.sh, tunnel.sh and tunnel.ps1 unpack:
+          # gate2sky-<target>/gate2sky(.exe), a zip for Windows.
+          case "$target" in
+          windows-*) (cd dist && zip -qr "gate2sky-$target.zip" "gate2sky-$target") ;;
+          *) tar -czf "dist/gate2sky-$target.tar.gz" -C dist "gate2sky-$target" ;;
+          esac
       - uses: actions/upload-artifact@v4
         with:
           name: gate2sky-${{ matrix.target }}
-          path: dist/gate2sky-${{ matrix.target }}.tar.gz
+          path: |
+            dist/gate2sky-${{ matrix.target }}.tar.gz
+            dist/gate2sky-${{ matrix.target }}.zip
           if-no-files-found: error
 
   # The one-line installer walked against builds of this tree: install,

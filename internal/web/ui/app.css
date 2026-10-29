@@ -449,6 +449,11 @@ select.field:focus { outline: none; border-color: var(--accent); box-shadow: var
 .add-port fieldset, .edit-port fieldset { display: grid; gap: 10px; }
 .add-port fieldset .hint { margin: -4px 0 0; }
 
+.command-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.command-head p { margin: 0; flex: 1 1 280px; }
+.segmented { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--fill); }
+.segmented button { font: inherit; font-size: 12px; font-weight: 600; color: var(--muted); background: none; border: 0; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.segmented button[aria-pressed="true"] { color: var(--fg); background: var(--field); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
 .card-head-actions { display: flex; align-items: center; gap: 10px; }
 .button-small { padding: 5px 12px; font-size: 13px; }
 

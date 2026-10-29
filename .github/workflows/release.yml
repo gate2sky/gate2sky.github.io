@@ -110,20 +110,23 @@ jobs:
       # was built here, from this commit.
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: dist/*.tar.gz
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           # What pages/setup.sh checks a download against before it installs it.
-          (cd dist && sha256sum *.tar.gz > SHA256SUMS && cat SHA256SUMS)
+          # tunnel.sh and tunnel.ps1 check theirs the same way.
+          (cd dist && sha256sum *.tar.gz *.zip > SHA256SUMS && cat SHA256SUMS)
           gh release create "${{ needs.version.outputs.tag }}" \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title "${{ needs.version.outputs.tag }}" \
             --generate-notes \
-            dist/*.tar.gz dist/SHA256SUMS
+            dist/*.tar.gz dist/*.zip dist/SHA256SUMS
 
   image:
     needs: [version, publish]

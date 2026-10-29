@@ -158,18 +158,20 @@ func (s *Server) handleSubdomain(w http.ResponseWriter, r *http.Request) {
 		SSHCommand string `json:"ssh_command"`
 		// PortsCommand forwards every TCP port to its local port with ssh;
 		// TunnelCommand forwards every port, UDP included, with the client.
-		PortsCommand  string `json:"ports_command"`
-		TunnelCommand string `json:"tunnel_command"`
+		PortsCommand         string `json:"ports_command"`
+		TunnelCommand        string `json:"tunnel_command"`
+		TunnelCommandWindows string `json:"tunnel_command_windows"`
 		// ClientIP is the address the dashboard sees, to fill in allow lists.
 		ClientIP string `json:"client_ip"`
 		Mine     bool   `json:"mine"`
 	}{
-		SubdomainDetail: api.SubdomainDetail{Subdomain: s.view(d), KeyList: api.NewKeys(keys), PortList: portList},
-		SSHCommand:      s.sshCommand(d.Name),
-		PortsCommand:    s.portsCommand(d.Name, list),
-		TunnelCommand:   s.tunnelCommand(d.Name, list),
-		ClientIP:        s.clientIP(r),
-		Mine:            d.UserID == currentAuth(r).User.ID,
+		SubdomainDetail:      api.SubdomainDetail{Subdomain: s.view(d), KeyList: api.NewKeys(keys), PortList: portList},
+		SSHCommand:           s.sshCommand(d.Name),
+		PortsCommand:         s.portsCommand(d.Name, list),
+		TunnelCommand:        s.tunnelCommand(d.Name, list, false),
+		TunnelCommandWindows: s.tunnelCommand(d.Name, list, true),
+		ClientIP:             s.clientIP(r),
+		Mine:                 d.UserID == currentAuth(r).User.ID,
 	})
 }
 

@@ -103,8 +103,18 @@ gate2sky tunnel --server gate.example.com:2222 myapp --udp mc=19132   # installe
 
 It signs in with ssh-agent or `~/.ssh` keys (`-i` for another), checks the
 server's host key (written into the script, or `--host-key`, or
-`~/.ssh/known_hosts`) and reconnects when the connection drops. It runs on
-Linux and macOS.
+`~/.ssh/known_hosts`) and reconnects when the connection drops.
+
+On Windows, `tunnel.ps1` does the same in PowerShell (5.1 or later), with the
+release's `gate2sky-windows-amd64.zip` or `-arm64.zip`; keys come from the
+OpenSSH Authentication Agent (`ssh-add`) or `%USERPROFILE%\.ssh`, and
+`--cache` keeps the client in `%LOCALAPPDATA%\gate2sky`:
+
+```powershell
+& ([scriptblock]::Create((irm https://gate.example.com/tunnel.ps1))) myapp --udp mc=19132
+```
+
+The dashboard shows both commands, ready to copy, for a subdomain's ports.
 
 Each remote address gets a stream of its own to your service, closed after
 two minutes of silence. UDP over a TCP connection suffers head-of-line
@@ -385,7 +395,6 @@ run `node scripts/landing/icons.js`, which renders `favicon.ico` and
 
 ## Roadmap
 
-- A Windows build of the client (`tunnel.ps1`).
 - Sharing private subdomains with specific users.
 - Custom domains (CNAME to a subdomain).
 - Request inspector in the dashboard.

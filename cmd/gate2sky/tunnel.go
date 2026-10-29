@@ -125,15 +125,13 @@ func cmdTunnel(args []string) error {
 	})
 }
 
-// authMethods offers the keys of ssh-agent, then the given key files, or
+// authMethods offers the keys of ssh-agent (Windows' too), then the given key files, or
 // the usual ones in ~/.ssh.
 func authMethods(files []string) ([]ssh.AuthMethod, error) {
 	var signers []ssh.Signer
-	if sock := os.Getenv("SSH_AUTH_SOCK"); sock != "" {
-		if c, err := net.Dial("unix", sock); err == nil {
-			if list, err := agent.NewClient(c).Signers(); err == nil {
-				signers = append(signers, list...)
-			}
+	if c, err := agentConn(); err == nil {
+		if list, err := agent.NewClient(c).Signers(); err == nil {
+			signers = append(signers, list...)
 		}
 	}
 	explicit := len(files) > 0

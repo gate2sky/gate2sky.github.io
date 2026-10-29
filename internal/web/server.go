@@ -70,6 +70,7 @@ type Server struct {
 	shell     *template.Template
 	tunnelErr *template.Template
 	tunnelSh  *texttemplate.Template
+	tunnelPs  *texttemplate.Template
 	hostKey   string
 	ui        map[string]uiFile
 	dashboard http.Handler
@@ -151,6 +152,9 @@ func New(o Options) (*Server, error) {
 	if s.tunnelSh, err = texttemplate.ParseFS(assets, "templates/tunnel.sh"); err != nil {
 		return nil, fmt.Errorf("web: %w", err)
 	}
+	if s.tunnelPs, err = texttemplate.ParseFS(assets, "templates/tunnel.ps1"); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
 	if s.ui, err = loadUI(); err != nil {
 		return nil, fmt.Errorf("web: %w", err)
 	}
@@ -186,6 +190,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /ui/", s.serveUI)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
 	mux.HandleFunc("GET /tunnel.sh", s.handleTunnelScript)
+	mux.HandleFunc("GET /tunnel.ps1", s.handleTunnelScript)
 
 	// Pages: the same shell for each, and the app draws the one its path
 	// names. Signed out, every page is the sign-in form.
@@ -440,12 +445,15 @@ func (s *Server) portsCommand(name string, list []*store.Port) string {
 }
 
 // tunnelCommand runs the gate2sky client for every port of a subdomain,
-// or is "" without any.
-func (s *Server) tunnelCommand(name string, list []*store.Port) string {
+// on Linux and macOS or, with windows, in PowerShell; it is "" without any.
+func (s *Server) tunnelCommand(name string, list []*store.Port, windows bool) string {
 	if len(list) == 0 {
 		return ""
 	}
 	cmd := "curl -fsSL " + s.cfg.DashboardURL("/tunnel.sh") + " | sh -s -- " + name
+	if windows {
+		cmd = "& ([scriptblock]::Create((irm " + s.cfg.DashboardURL("/tunnel.ps1") + "))) " + name
+	}
 	for _, p := range list {
 		cmd += fmt.Sprintf(" --%s %s=%d", p.Protocol, p.Name, p.LocalPort)
 	}
@@ -464,26 +472,31 @@ var (
 )
 
 // handleTunnelScript serves the script that runs the gate2sky client
-// without installing it, set up for this server.
+// without installing it, set up for this server: tunnel.sh for Linux and
+// macOS, tunnel.ps1 for Windows.
 func (s *Server) handleTunnelScript(w http.ResponseWriter, r *http.Request) {
+	tmpl, contentType := s.tunnelSh, "text/x-shellscript; charset=utf-8"
+	if r.URL.Path == "/tunnel.ps1" {
+		tmpl, contentType = s.tunnelPs, "text/plain; charset=utf-8"
+	}
 	version := s.version
 	if !releaseVersion.MatchString(version) {
 		version = "" // a build from source: the latest release
 	}
 	data := struct{ Dashboard, URL, Version, Server, HostKey string }{
-		s.cfg.DashboardURL("/"), s.cfg.DashboardURL("/tunnel.sh"), version, s.sshServer(), s.hostKey,
+		s.cfg.DashboardURL("/"), s.cfg.DashboardURL(r.URL.Path), version, s.sshServer(), s.hostKey,
 	}
 	if !shellSafe.MatchString(data.Server) || !shellSafe.MatchString(data.HostKey) {
 		http.Error(w, "the SSH host can't be written into a script", http.StatusInternalServerError)
 		return
 	}
 	var buf bytes.Buffer
-	if err := s.tunnelSh.Execute(&buf, data); err != nil {
-		s.log.Error("render tunnel.sh", "err", err)
+	if err := tmpl.Execute(&buf, data); err != nil {
+		s.log.Error("render "+r.URL.Path, "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Write(buf.Bytes())
 }

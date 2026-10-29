@@ -49,6 +49,12 @@ func TestTunnelScript(t *testing.T) {
 		!strings.Contains(script, "VERSION=''") {
 		t.Fatalf("tunnel.sh: %d\n%s", resp.StatusCode, script)
 	}
+	resp, ps := get(t, h.browser(false), "http://"+domain+"/tunnel.ps1")
+	if resp.StatusCode != http.StatusOK || !strings.Contains(ps, "$HostKey = '"+fp+"'") || !strings.Contains(ps, "$Server = '"+domain+":2222'") ||
+		!strings.Contains(ps, "irm http://"+domain+"/tunnel.ps1") || !strings.Contains(ps, "gate2sky-$target.zip") {
+		t.Errorf("tunnel.ps1: %d\n%s", resp.StatusCode, ps)
+	}
+
 	path := filepath.Join(t.TempDir(), "tunnel.sh")
 	os.WriteFile(path, []byte(script), 0o644)
 
