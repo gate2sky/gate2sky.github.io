@@ -7,7 +7,7 @@
    Close to current macOS: a slowly drifting wallpaper behind translucent,
    blurred materials. **Two tones**, by what a thing sits on:
 
-   - `dark`, the default on `:root`: light text on the mid-gray wallpaper
+   - `dark`, the default on `:root`: light text on the dark wallpaper
      and on the toolbar's dark glass.
    - `light`: dark text on the light materials — a card, a dialog, the toast.
 
@@ -19,8 +19,8 @@
 :root {
   /* ---- the page ----------------------------------------------------------- */
 
-  /* The wallpaper: a mid gray, and four glows that drift over it. */
-  --ig-bg: #4b5060;
+  /* The wallpaper: near black, and four glows that drift over it. */
+  --ig-bg: #121212;
   --ig-wall-1: rgb(10 132 255 / .5);
   --ig-wall-2: rgb(191 90 242 / .42);
   --ig-wall-3: rgb(64 200 224 / .38);
