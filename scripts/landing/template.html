@@ -307,6 +307,31 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 .term .copy { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); padding: 4px 9px; font-size: 12px; border-radius: 8px; }
 .term .tbar i { width: 11px; height: 11px; border-radius: 50%; background: var(--code-button-border); }
 .term .tbar i:nth-child(1) { background: #ff5f57; } .term .tbar i:nth-child(2) { background: #febc2e; } .term .tbar i:nth-child(3) { background: #28c840; }
+/* Two ways to name the key: whatever ssh offers by default, or a file
+   with -i. Each tab shows its own command, copy button and session. */
+.term input { position: absolute; opacity: 0; pointer-events: none; }
+.term .tbar { align-items: center; }
+.term .tbar i { flex: none; }
+.key-tabs { display: flex; gap: 4px; margin-left: 10px; margin-right: 76px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.key-tabs label { flex: none; padding: 2px 9px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--code-dim);
+  border: 1px solid transparent; white-space: nowrap; }
+.key-tabs label:hover { color: var(--code-fg); }
+.key-tabs [for="k-file"] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-weight: 500; }
+#k-default:checked ~ .tbar [for="k-default"], #k-file:checked ~ .tbar [for="k-file"] {
+  color: var(--code-fg); background: var(--code-button); border-color: var(--code-button-border); }
+#k-default:focus-visible ~ .tbar [for="k-default"], #k-file:focus-visible ~ .tbar [for="k-file"] { outline: 2px solid var(--cyan); }
+.term .copy.k-file, .term pre.k-file, #k-file:checked ~ .tbar .copy.k-default, #k-file:checked ~ pre.k-default { display: none; }
+#k-file:checked ~ .tbar .copy.k-file { display: inline-flex; }
+#k-file:checked ~ pre.k-file { display: block; }
+@media (max-width: 479px) {
+  .term .tbar { gap: 6px; padding: 12px 10px; }
+  .term .tbar i { width: 10px; height: 10px; }
+  .key-tabs { margin-left: 4px; margin-right: 34px; }
+  .key-tabs label { padding: 2px 7px; }
+  .key-tabs .wide { display: none; }
+  .term .copy span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .term .copy { padding: 5px 7px; }
+}
 .term pre { margin: 0; padding: 18px 18px 22px; color: var(--code-fg); font-size: clamp(11px, 3.1vw, 14px); line-height: 1.75; overflow-x: auto; min-height: 15em; }
 .term .l { display: block; white-space: pre; }
 .term .typed { display: inline-block; overflow: hidden; vertical-align: bottom; width: 0; animation: type 14s steps(var(--n)) infinite; }
@@ -592,12 +617,22 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
         <p>The subdomain goes in front of the port. Every request is logged as it passes.</p>
       </div>
       <div class="term">
+        <input type="radio" name="key" id="k-default" checked>
+        <input type="radio" name="key" id="k-file">
         <div class="tbar"><i></i><i></i><i></i>
-          <button class="copy" type="button" data-copy="ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com" aria-label="Copy the ssh command">
+          <div class="key-tabs" role="tablist" aria-label="Which key ssh uses">
+            <label for="k-default">Default<span class="wide"> key</span></label>
+            <label for="k-file">-i ~/.ssh/gate2sky</label>
+          </div>
+          <button class="copy k-default" type="button" data-copy="ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com" aria-label="Copy the ssh command">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span>
+          </button>
+          <button class="copy k-file" type="button" data-copy="ssh -i ~/.ssh/gate2sky -p 2222 -R myapp:80:localhost:3000 gate.example.com" aria-label="Copy the ssh command">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span>
           </button>
         </div>
-<pre role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2sky answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2sky: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+<pre class="k-default" role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2sky answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2sky: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+<pre class="k-file" role="img" aria-label="A terminal: ssh -i ~/.ssh/gate2sky -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2sky answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:74">ssh -i ~/.ssh/gate2sky -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2sky: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
       </div>
     </div>
   </section>
