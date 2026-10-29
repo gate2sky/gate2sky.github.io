@@ -1,0 +1,281 @@
+<script :setup="{ name = '', open = false }">
+  // A component of the theme, inspected, in a dialog with two tabs:
+  //
+  // - **Usage**: the file of a parent component that uses it (`usage.js`).
+  // - **Source**: the component's own code, editable, beside a preview of
+  //   that parent drawn with the code as edited — jq79 builds both from
+  //   their text, and hands the parent the edited component in place of
+  //   the one it imports (`modules`). Nothing else on the page changes.
+  //
+  // A draft stays in this browser (`localStorage`) until it is reset, and
+  // leaves it as the code itself or as a patch that `git apply` takes from
+  // the repository's root. The demo's, not the theme's.
+  //
+  //   <Inspector :open="inspecting" :name="component" @close="inspecting = false" />
+  const { C79 } = await import("/ui/vendor/jq79.js")
+  const Modal = await import("@theme/components/modal.html")
+  const Tabs = await import("@theme/components/tabs.html")
+  const Button = await import("@theme/components/button.html")
+  const Alert = await import("@theme/components/alert.html")
+  const CodeEditor = await import("@theme/demo/code-editor.html")
+  const { USAGE, TITLES } = await import("@theme/demo/usage.js")
+  const { unifiedDiff } = await import("@theme/demo/diff.js")
+
+  // Where the theme is served, and where it is in the repository.
+  const SERVED = "/ui/theme/default/"
+  const REPO = "internal/web/ui/theme/default/"
+  const KEY = "intergate.theme-draft."
+
+  const flag = v => v === "" || v === true || v === "true"
+  $: isOpen = flag(open)
+
+  let tab = "usage"
+  // The component whose code is loaded; its code as served; the code the
+  // draft started from (older, if the file changed since); the draft.
+  let shown = ""
+  let original = ""
+  let base = ""
+  let draft = ""
+  let problems = []
+  let copied = ""
+
+  $: usage = USAGE[name] || { file: "", lead: "", code: "" }
+  $: file = name + ".html"
+  $: changed = draft !== base
+  $: stale = !!original && base !== original
+  $: tabs = [
+    { value: "usage", label: "Usage" },
+    { value: "source", label: "Source", extra: changed ? "edited" : "" },
+  ]
+
+  const saved = () => {
+    try {
+      return JSON.parse(localStorage.getItem(KEY + name))
+    } catch {
+      return null
+    }
+  }
+  const keep = () => {
+    try {
+      if (changed) localStorage.setItem(KEY + name, JSON.stringify({ base, draft }))
+      else localStorage.removeItem(KEY + name)
+    } catch {}
+  }
+
+  const load = async which => {
+    shown = which
+    tab = "usage"
+    problems = []
+    drop()
+    const text = await (await fetch(SERVED + "components/" + which + ".html")).text()
+    if (which !== name) return
+    const draftOf = saved()
+    original = text
+    base = draftOf?.base ?? text
+    draft = draftOf?.draft ?? text
+  }
+
+  const reset = () => {
+    base = original
+    draft = original
+    keep()
+    build()
+  }
+
+  // ---- the preview ------------------------------------------------------------
+
+  // The parent, built from its text with the edited component, mounted in
+  // a host of its own. What goes wrong while it is built and drawn — a
+  // parse error, a script that throws, jq79's own warnings — is listed
+  // under it.
+  //
+  // Its bookkeeping lives in a closure, out of jq79's reach: the effects
+  // below call these, and a variable of the component's they read and
+  // wrote would wake them again.
+  const previewer = (() => {
+    let mounted = null
+    let timer = 0
+    let watchUntil = 0
+    const drop = () => {
+      mounted?.destroy()
+      mounted = null
+      $self(".preview-host")?.replaceChildren()
+    }
+    const build = () => {
+      const host = $self(".preview-host")
+      if (!host || !draft || !usage.code) return
+      drop()
+      problems = []
+      watchUntil = Date.now() + 1500
+      try {
+        const component = new C79(draft, { filename: SERVED + "components/" + file + "#edited" })
+        const parent = new C79(usage.code, {
+          filename: SERVED + "demo/usage/" + usage.file + "#preview",
+          modules: { ["@theme/components/" + file]: component },
+        })
+        const box = document.createElement("div")
+        host.append(box)
+        mounted = parent.mount(box)
+      } catch (e) {
+        problems = [e.message]
+      }
+    }
+    const schedule = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        keep()
+        build()
+      }, 250)
+    }
+    return { drop, build, schedule, watching: () => Date.now() < watchUntil, stop: () => clearTimeout(timer) }
+  })()
+  const drop = previewer.drop
+  const build = previewer.build
+
+  // Noted after the moment it happens: a warning can come from inside an
+  // effect, which must not read and write the list.
+  const note = (...args) => {
+    // The same error comes as a window's "Uncaught …" and as jq79's own.
+    const text = args.map(a => a instanceof Error ? a.message : typeof a === "string" ? a : "").filter(Boolean).join(" ")
+      .replace(/^Uncaught (?:\w*Error: )?/, "")
+    if (!text || !(/#edited|#preview/.test(text) || previewer.watching())) return
+    setTimeout(() => {
+      if (!problems.includes(text)) problems = [...problems, text]
+    })
+  }
+  const consoleError = console.error
+  const consoleWarn = console.warn
+  const onError = event => note(event.message || event.reason?.message || String(event.reason || ""))
+  const listen = on => {
+    console.error = on ? (...args) => { consoleError.apply(console, args); note(...args) } : consoleError
+    console.warn = on ? (...args) => { consoleWarn.apply(console, args); note(...args) } : consoleWarn
+    for (const type of ["error", "unhandledrejection"]) (on ? addEventListener : removeEventListener)(type, onError)
+  }
+
+  // `close` bubbles, and the preview can draw dialogs of its own: theirs
+  // stop at its frame, so only this dialog's own asks close the inspector.
+  const stop = event => event.stopPropagation()
+
+  // What reads the page waits for it to be drawn.
+  await $mounted()
+  $: isOpen && name && name !== shown && load(name)
+  $: (draft, isOpen && tab === "source" ? previewer.schedule() : drop())
+  $: listen(isOpen)
+  $destroyed(() => {
+    previewer.stop()
+    listen(false)
+    drop()
+  })
+
+  // ---- copying ----------------------------------------------------------------
+
+  const patch = () => unifiedDiff(base, draft, REPO + "components/" + file)
+  const copy = async (what, text) => {
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // No clipboard (plain HTTP): copy from a field inside the dialog,
+      // the only place a modal dialog lets the focus go.
+      const area = document.createElement("textarea")
+      area.value = text
+      $self(".inspect").append(area)
+      area.select()
+      document.execCommand("copy")
+      area.remove()
+    }
+    copied = what
+    setTimeout(() => { if (copied === what) copied = "" }, 1600)
+  }
+</script>
+
+<Modal :open="isOpen" size="xl" :title="TITLES[name] || name" @close="$emit('close')">
+  <div class="inspect">
+    <div class="top">
+      <Tabs label="Inspect" :model="tab" :items="tabs" />
+      <code class="path">{{ REPO }}components/{{ file }}</code>
+    </div>
+
+    <section :if="tab === 'usage'" role="tabpanel" aria-label="Usage">
+      <p class="lead">{{ usage.lead }}</p>
+      <div class="bar">
+        <span>A parent component, <code>{{ usage.file }}</code></span>
+        <Button variant="secondary" size="sm" :icon="copied === 'usage' ? 'check' : 'copy'" @click="copy('usage', usage.code)">{{ copied === "usage" ? "Copied" : "Copy" }}</Button>
+      </div>
+      <CodeEditor readonly :model="usage.code" />
+    </section>
+
+    <section :else class="source" role="tabpanel" aria-label="Source">
+      <div class="pane">
+        <div class="bar">
+          <span><code>{{ file }}</code>{{ changed ? " · edited" : "" }}</span>
+          <span class="tools">
+            <Button variant="plain" size="sm" :disabled="!changed && !stale" @click="reset()">Reset</Button>
+            <Button variant="secondary" size="sm" :icon="copied === 'code' ? 'check' : 'copy'" @click="copy('code', draft)">{{ copied === "code" ? "Copied" : "Copy code" }}</Button>
+            <Button size="sm" :icon="copied === 'patch' ? 'check' : 'copy'" :disabled="!changed" @click="copy('patch', patch())">{{ copied === "patch" ? "Copied" : "Copy patch" }}</Button>
+          </span>
+        </div>
+        <Alert :if="stale" tone="warn">{{ file }} has changed since this draft started: its patch is against the older one. <strong>Reset</strong> starts again from the new one.</Alert>
+        <div class="editing"><CodeEditor :label="file" :model="draft" /></div>
+        <p class="hint">Tab indents. The draft stays in this browser until it is reset; <strong>Copy patch</strong> gives the change as a diff that <code>git apply</code> takes from the repository’s root.</p>
+      </div>
+      <div class="pane">
+        <div class="bar"><span>Preview: <code>{{ usage.file }}</code> with this <code>{{ file }}</code></span></div>
+        <div class="preview" data-tone="dark" @close="stop($event)" @closed="stop($event)"><div class="preview-host"></div></div>
+        <Alert :if="problems.length" tone="bad" flush>
+          <p :each="problem in problems" :key="problem" class="problem">{{ problem }}</p>
+        </Alert>
+      </div>
+    </section>
+  </div>
+</Modal>
+
+<style scoped>
+  /* One column no wider than the dialog, however long a line of code is. */
+  .inspect { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ig-space-7); }
+  .top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ig-space-3) var(--ig-space-7);
+  }
+  .path { color: var(--ig-fg-muted); font-family: var(--ig-font-mono); font-size: var(--ig-text-sm); overflow-wrap: anywhere; }
+  .lead { max-width: 760px; margin: 0 0 var(--ig-space-6); color: var(--ig-fg-muted); }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ig-space-3) var(--ig-space-5);
+    min-height: var(--ig-control-sm);
+    margin-bottom: var(--ig-space-3);
+    color: var(--ig-fg-muted);
+    font-size: var(--ig-text-md);
+  }
+  .bar code, .hint code { color: var(--ig-fg); font-family: var(--ig-font-mono); font-size: .92em; }
+  .tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ig-space-3); }
+  .source { display: grid; gap: var(--ig-space-8); }
+  .pane { display: flex; flex-direction: column; min-width: 0; }
+  .editing, .preview { height: min(58vh, 560px); min-height: 280px; }
+  .preview {
+    margin-bottom: var(--ig-space-4);
+    padding: var(--ig-space-8);
+    overflow: auto;
+    border-radius: var(--ig-radius-md);
+    color: var(--ig-fg);
+    background:
+      radial-gradient(60% 50% at 20% 15%, var(--ig-wall-1), transparent 70%),
+      radial-gradient(50% 45% at 85% 80%, var(--ig-wall-2), transparent 70%),
+      var(--ig-bg);
+    box-shadow: inset 0 0 0 var(--ig-hairline) var(--ig-line);
+    font-family: var(--ig-font-sans);
+    font-size: var(--ig-text-base);
+    line-height: var(--ig-leading);
+  }
+  .hint { margin: var(--ig-space-3) 0 0; color: var(--ig-fg-muted); font-size: var(--ig-text-sm); }
+  .problem { margin: 0; font-family: var(--ig-font-mono); font-size: var(--ig-text-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .problem + .problem { margin-top: var(--ig-space-3); }
+  @media (min-width: 980px) {
+    .source { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  }
+</style>

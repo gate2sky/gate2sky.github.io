@@ -483,8 +483,10 @@ radii, shadows, motion), `icons.js` the icons, and `components/` the
 building blocks — `Button`, `Modal`, `Tabs`, `Card`, `Badge`, `Alert`,
 `Facts`, `Switch`, `Segmented`, `ChoiceCards`, `Icon` — which draw with those
 tokens alone. `app.css` declares no colour of its own. Every component, in
-both tones and with how it is used, is on one page at `/ui/theme/default/`
-of any running dashboard.
+both tones, is on one page at `/ui/theme/default/` of any running
+dashboard; **Inspect** beside each shows a parent component that uses it,
+and its own code, editable, with a live preview and a button that copies
+the change as a patch for `git apply`.
 
 `internal/e2e` runs the whole system: SSH clients opening tunnels, browsers
 signing in with email codes, a software WebAuthn authenticator and a fake

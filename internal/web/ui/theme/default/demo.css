@@ -24,3 +24,13 @@ a { color: var(--ig-link); }
 code, pre { font-family: var(--ig-font-mono); }
 code { font-size: .9em; }
 :focus-visible { outline: none; box-shadow: var(--ig-ring); }
+
+/* The inspector's code colours. Its spans arrive through jq79's `:html`,
+   which a component's scoped style does not reach, so the rules are the
+   page's; the values are the light Monokai the dashboard draws code in. */
+.hl-comment { color: var(--ig-code-comment); font-style: italic; }
+.hl-keyword, .hl-tag, .hl-selector { color: var(--ig-code-pink); }
+.hl-string { color: var(--ig-code-yellow); }
+.hl-number, .hl-directive, .hl-variable, .hl-interpolation { color: var(--ig-code-purple); }
+.hl-attr, .hl-property, .hl-builtin { color: var(--ig-code-green); }
+.hl-component { color: var(--ig-code-teal); }

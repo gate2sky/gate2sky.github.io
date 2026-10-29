@@ -1,0 +1,93 @@
+<script :setup="{ model = '', readonly = false, label = 'Code' }">
+  // A component's code, coloured, and editable unless `readonly`: a
+  // textarea whose text is transparent, over a highlighted copy of it in
+  // the same font, scrolled together — the caret and the selection are the
+  // textarea's, the colours the copy's. The text goes up through `:model`
+  // and as `input`. Tab indents by two spaces; Escape still closes the
+  // dialog around it.
+  //
+  //   <CodeEditor :model="draft" label="button.html" />
+  //   <CodeEditor readonly :model="usage.code" />
+  //
+  // The demo's, not the theme's: it is how the inspector edits a
+  // component, and nothing the dashboard draws.
+  const { highlight } = await import("@theme/demo/highlight.js")
+
+  const flag = v => v === "" || v === true || v === "true"
+  $: isReadonly = flag(readonly)
+  // The copy needs the line a textarea keeps after a final newline.
+  $: html = highlight(model) + "\n"
+
+  const input = event => {
+    $updateModel(event.target.value)
+    $emit("input", event.target.value)
+  }
+  const scroll = event => {
+    const copy = $self("pre")
+    copy.scrollTop = event.target.scrollTop
+    copy.scrollLeft = event.target.scrollLeft
+  }
+  const key = event => {
+    if (event.key !== "Tab" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return
+    event.preventDefault()
+    // As typing would: the browser's undo keeps it, and `input` fires.
+    if (document.execCommand("insertText", false, "  ")) return
+    const area = event.target
+    area.setRangeText("  ", area.selectionStart, area.selectionEnd, "end")
+    area.dispatchEvent(new Event("input", { bubbles: true }))
+  }
+</script>
+
+<div class="editor" :class.readonly="isReadonly">
+  <pre class="code" :aria-hidden="isReadonly ? null : 'true'"><code :html="html"></code></pre>
+  <textarea :if="!isReadonly" class="code input" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off"
+            :aria-label="label" :value="model" @input="input($event)" @scroll="scroll($event)" @keydown="key($event)"></textarea>
+</div>
+
+<style scoped>
+  .editor {
+    position: relative;
+    height: 100%;
+    min-height: 200px;
+    border-radius: var(--ig-radius-md);
+    background: var(--ig-code-bg);
+    box-shadow: 0 0 0 var(--ig-hairline) var(--ig-code-line);
+    overflow: hidden;
+  }
+  .editor:focus-within { box-shadow: 0 0 0 var(--ig-hairline) var(--ig-code-line), var(--ig-ring); }
+  /* The copy and the textarea: the same box, font and spacing to the pixel,
+     or the caret drifts off the text it is in. */
+  .code {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: var(--ig-space-5) var(--ig-space-6);
+    border: 0;
+    background: transparent;
+    color: var(--ig-code-fg);
+    font-family: var(--ig-font-mono);
+    font-size: var(--ig-text-sm);
+    font-weight: var(--ig-weight-regular);
+    line-height: 1.6;
+    letter-spacing: 0;
+    tab-size: 2;
+    white-space: pre;
+    overflow: auto;
+  }
+  pre.code { overflow: hidden; pointer-events: none; }
+  code { font: inherit; }
+  .input {
+    resize: none;
+    outline: none;
+    color: transparent;
+    caret-color: var(--ig-code-fg);
+  }
+  .input::selection { background: color-mix(in srgb, var(--ig-accent) 22%, transparent); }
+  /* Read only: the copy alone, as tall as its code up to most of the
+     window, scrolling past that, and selectable. */
+  .readonly { height: auto; max-height: min(62vh, 620px); }
+  .readonly pre.code { position: static; height: auto; max-height: inherit; overflow: auto; pointer-events: auto; }
+</style>

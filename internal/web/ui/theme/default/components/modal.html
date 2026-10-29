@@ -21,8 +21,9 @@
   // false, and plays its way out first, then emits `closed`. `dismissible`
   // false refuses all three and hides the close button — for a question with
   // no way back. `size` is its width: `sm` (360px) for a question, `md`
-  // (480px), `lg` (620px) for a form; never wider than the window, and its
-  // body scrolls when it is taller.
+  // (480px), `lg` (620px) for a form, `xl` (1180px) for a workspace — the
+  // demo's inspector; never wider than the window, and its body scrolls
+  // when it is taller.
   //
   // A form in the body submits from a button in the foot with that button's
   // `form` set to the form's id: the foot is outside the form.
@@ -134,6 +135,11 @@
     width: min(620px, calc(100vw - 32px));
     margin-top: max(40px, 6vh);
     max-height: calc(100dvh - 80px);
+  }
+  .size-xl {
+    width: min(1180px, calc(100vw - 32px));
+    margin-top: max(24px, 4vh);
+    max-height: calc(100dvh - 48px);
   }
   .modal[open] { animation: arrive var(--ig-duration-slow) var(--ig-ease-spring); }
   .modal.leaving { animation: leave var(--ig-duration-slow) var(--ig-ease-in) forwards; }

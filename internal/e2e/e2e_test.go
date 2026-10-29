@@ -599,7 +599,8 @@ func TestPageSecurity(t *testing.T) {
 		resp.Header.Get("Location") != "/ui/theme/default/" {
 		t.Errorf("theme demo without its slash: %d %q", resp.StatusCode, resp.Header.Get("Location"))
 	}
-	for _, f := range []string{"/ui/theme/default/tokens.css", "/ui/theme/default/icons.js", "/ui/theme/default/components/modal.html"} {
+	for _, f := range []string{"/ui/theme/default/tokens.css", "/ui/theme/default/icons.js", "/ui/theme/default/components/modal.html",
+		"/ui/theme/default/demo/inspector.html", "/ui/theme/default/demo/usage.js"} {
 		if resp, _ := get(t, b, "http://"+domain+f); resp.StatusCode != http.StatusOK {
 			t.Errorf("%s: %d", f, resp.StatusCode)
 		}
