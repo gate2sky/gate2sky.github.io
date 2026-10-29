@@ -245,7 +245,7 @@ svg.duo { width: 100%; height: auto; display: block; overflow: visible; }
   padding: 5px 12px; border-radius: 999px; }
 .eyebrow b { color: var(--amber); font-weight: 600; }
 h1 { font-size: clamp(36px, 9vw, 64px); line-height: 1.04; letter-spacing: -.035em; margin: 16px 0 12px; }
-h1 .glow { background: linear-gradient(90deg, var(--cyan), var(--blue) 60%, var(--cyan)); background-size: 200% 100%;
+h1 .glow, .brand .glow { background: linear-gradient(90deg, var(--cyan), var(--blue) 60%, var(--cyan)); background-size: 200% 100%;
   -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 6s linear infinite; }
 @keyframes shine { to { background-position: -200% 0 } }
 .lede { color: var(--muted); font-size: clamp(16px, 4.2vw, 19px); margin: 0 auto 22px; max-width: 34em; }
@@ -490,7 +490,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
   <div class="wrap bar">
     <a class="brand" href="#top" aria-label="intergate home">
       @@BRAND@@
-      intergate
+      <span class="glow">intergate</span>
     </a>
     <nav aria-label="Sections">
       <a href="#how">How it works</a>
