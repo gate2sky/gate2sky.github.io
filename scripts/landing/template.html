@@ -120,9 +120,50 @@ code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "
 .sky { position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background: radial-gradient(1200px 700px at 75% -10%, color-mix(in srgb, var(--blue) 22%, transparent), transparent 70%),
               radial-gradient(900px 600px at 0% 110%, color-mix(in srgb, var(--cyan) 10%, transparent), transparent 70%), var(--bg); }
-.sky svg { width: 100%; height: 100%; }
+.sky { overflow: hidden; }
+.sky svg { position: relative; width: 100%; height: 100%; }
 .sky circle { fill: var(--star); animation: twinkle 6s ease-in-out infinite; }
 @keyframes twinkle { 0%, 100% { opacity: .25 } 50% { opacity: .9 } }
+/* The layers pan by one sky width, so they end where they started. */
+.pan { animation: pan linear infinite; }
+.pan-1 { animation-duration: 420s; }
+.pan-2 { animation-duration: 260s; }
+.pan-3 { animation-duration: 160s; }
+@keyframes pan { to { transform: translateX(-1600px) } }
+.meteor { opacity: 0; animation: meteor linear infinite; }
+.meteor line { stroke-width: 1.6; stroke-linecap: round; }
+@keyframes meteor {
+  0% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--a)) translateX(0); }
+  1% { opacity: 1; }
+  6%, 100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--a)) translateX(520px); }
+}
+[data-theme="light"] .meteors { display: none; }
+/* By day, the sky is color glows that wander like the dashboard's
+   wallpaper, each on its own path and clock. */
+.sky::before, .sky::after { content: ""; position: absolute; inset: -25%; display: none; will-change: transform; }
+[data-theme="light"] .sky::before, [data-theme="light"] .sky::after { display: block; }
+.sky::before {
+  background: radial-gradient(40% 36% at 24% 22%, rgb(45 91 255 / .2), transparent 70%),
+              radial-gradient(34% 32% at 78% 26%, rgb(175 90 242 / .16), transparent 70%);
+  animation: drift-a 26s ease-in-out infinite;
+}
+.sky::after {
+  background: radial-gradient(42% 34% at 66% 78%, rgb(11 159 216 / .2), transparent 70%),
+              radial-gradient(30% 28% at 22% 76%, rgb(255 159 10 / .14), transparent 70%);
+  animation: drift-b 33s ease-in-out infinite;
+}
+@keyframes drift-a {
+  0%, 100% { transform: translate(-12%, -8%) rotate(0deg) scale(1); }
+  25% { transform: translate(14%, -4%) rotate(28deg) scale(1.15); }
+  50% { transform: translate(16%, 14%) rotate(52deg) scale(.92); }
+  75% { transform: translate(-8%, 15%) rotate(22deg) scale(1.1); }
+}
+@keyframes drift-b {
+  0%, 100% { transform: translate(12%, 8%) rotate(0deg) scale(1.06); }
+  30% { transform: translate(-15%, 10%) rotate(-30deg) scale(.92); }
+  60% { transform: translate(-16%, -14%) rotate(-54deg) scale(1.16); }
+  80% { transform: translate(9%, -12%) rotate(-18deg) scale(1); }
+}
 
 /* Header */
 header { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
