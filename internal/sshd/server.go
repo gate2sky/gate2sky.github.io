@@ -1,5 +1,6 @@
-// Package sshd accepts SSH connections and turns remote forwards
-// (ssh -R name:80:localhost:3000) into HTTP tunnels.
+// Package sshd accepts SSH connections and turns remote forwards into HTTP
+// tunnels (ssh -R name:80:localhost:3000) and TCP ports
+// (ssh -R db.name:0:localhost:5432).
 package sshd
 
 import (
@@ -14,15 +15,16 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/names"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
-	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/names"
+	"github.com/gate2net/gate2net.github.io/internal/ports"
+	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/tunnel"
 )
 
 const (
-	extFingerprint = "gate2sky-fingerprint"
-	extPublicKey   = "gate2sky-public-key"
+	extFingerprint = "gate2net-fingerprint"
+	extPublicKey   = "gate2net-public-key"
 
 	handshakeTimeout = 30 * time.Second
 )
@@ -32,6 +34,7 @@ type Server struct {
 	cfg      *config.Config
 	store    *store.Store
 	registry *tunnel.Registry
+	ports    *ports.Registry
 	log      *slog.Logger
 	sshCfg   *ssh.ServerConfig
 
@@ -46,16 +49,17 @@ type Server struct {
 }
 
 // New returns a Server that authenticates with hostKey.
-func New(cfg *config.Config, st *store.Store, reg *tunnel.Registry, hostKey ssh.Signer, log *slog.Logger) *Server {
+func New(cfg *config.Config, st *store.Store, reg *tunnel.Registry, pr *ports.Registry, hostKey ssh.Signer, log *slog.Logger) *Server {
 	s := &Server{
 		cfg:      cfg,
 		store:    st,
 		registry: reg,
+		ports:    pr,
 		log:      log,
 		conns:    map[*clientConn]struct{}{},
 	}
 	s.sshCfg = &ssh.ServerConfig{
-		ServerVersion:               "SSH-2.0-gate2sky",
+		ServerVersion:               "SSH-2.0-gate2net",
 		MaxAuthTries:                6,
 		PublicKeyCallback:           s.authenticate,
 		KeyboardInteractiveCallback: s.explainUnknownKey,
@@ -74,7 +78,7 @@ func (s *Server) explainUnknownKey(meta ssh.ConnMetadata, _ ssh.KeyboardInteract
 		return nil, errNoKey
 	}
 	return nil, &ssh.BannerError{Err: errNoKey, Message: fmt.Sprintf(
-		"gate2sky: none of your SSH keys is registered.\r\n"+
+		"gate2net: none of your SSH keys is registered.\r\n"+
 			"Add your public key (e.g. ~/.ssh/id_ed25519.pub) to a subdomain at\r\n  %s\r\nthen try again.\r\n",
 		s.cfg.DashboardURL("/"))}
 }
@@ -185,6 +189,7 @@ func (s *Server) handleConn(nc net.Conn) {
 		publicKey:   sconn.Permissions.Extensions[extPublicKey],
 		console:     newConsole(),
 		forwards:    map[string]*tunnel.Tunnel{},
+		ports:       map[string]*ports.Forward{},
 		done:        make(chan struct{}),
 	}
 	c.log = s.log.With("remote", sconn.RemoteAddr().String(), "fingerprint", c.fingerprint)
@@ -214,19 +219,24 @@ func (s *Server) handleConn(nc net.Conn) {
 	c.log.Info("ssh client disconnected", "err", err)
 }
 
-// subdomainFromBind extracts the subdomain from the bind address of
-// `ssh -R <bind>:80:...`. It returns "" when the client did not name one.
-func (s *Server) subdomainFromBind(addr string) (string, error) {
+// parseBind reads the bind address of `ssh -R <bind>:<port>:...`: a
+// subdomain (myapp), or a TCP port of one by name (db.myapp), with or
+// without the domain. Both are "" when the client named none.
+func (s *Server) parseBind(addr string) (port, subdomain string, err error) {
 	h := names.Normalize(addr)
 	switch h {
 	case "", "localhost", "*", "0.0.0.0", "::", "127.0.0.1", "::1":
-		return "", nil
+		return "", "", nil
 	}
 	h = strings.TrimSuffix(h, "."+s.cfg.Domain())
-	if strings.Contains(h, ".") {
-		return "", fmt.Errorf("%q is not a subdomain of %s", addr, s.cfg.Domain())
+	labels := strings.Split(h, ".")
+	switch {
+	case len(labels) == 1:
+		return "", h, nil
+	case len(labels) == 2 && labels[0] != "" && labels[1] != "":
+		return labels[0], labels[1], nil
 	}
-	return h, nil
+	return "", "", fmt.Errorf("%q is not a subdomain of %s, nor a port of one (<port>.<subdomain>)", addr, s.cfg.Domain())
 }
 
 // pickGrant chooses the subdomain for a forward: the one in the bind

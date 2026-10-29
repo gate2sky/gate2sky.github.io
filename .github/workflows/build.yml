@@ -44,8 +44,11 @@ jobs:
       - run: go test -race ./...
       - name: Compiles for every platform
         run: |
-          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
-            GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/gate2sky
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/gate2net
+          done
+          for target in windows/amd64 windows/arm64 linux/amd64; do
+            CGO_ENABLED=0 GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/gate2net-gui
           done
       - name: Version
         id: version
@@ -55,16 +58,17 @@ jobs:
             version="$(cat VERSION)-dev+$(git rev-parse --short HEAD)"
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Building gate2sky $version"
+          echo "Building gate2net $version"
 
-  # The four targets pages/setup.sh installs. Pure Go (the SQLite driver too),
-  # so every one is a static binary cross-compiled here.
+  # The four targets pages/setup.sh installs, and Windows for the client
+  # (tunnel.ps1). Pure Go (the SQLite driver too), so every one is a static
+  # binary cross-compiled here.
   binary:
     needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64]
+        target: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64, windows-arm64]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,21 +76,37 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Build gate2sky-${{ matrix.target }}.tar.gz
+      - name: Build gate2net-${{ matrix.target }}
         run: |
           set -euo pipefail
           target=${{ matrix.target }}
-          mkdir -p "dist/gate2sky-$target"
+          exe=gate2net
+          case "$target" in windows-*) exe=gate2net.exe ;; esac
+          mkdir -p "dist/gate2net-$target"
           CGO_ENABLED=0 GOOS=${target%-*} GOARCH=${target#*-} go build -trimpath \
             -ldflags "-s -w -X main.version=${{ needs.test.outputs.version }}" \
-            -o "dist/gate2sky-$target/gate2sky" ./cmd/gate2sky
-          cp README.md "dist/gate2sky-$target/"
-          # The layout pages/setup.sh unpacks: gate2sky-<target>/gate2sky.
-          tar -czf "dist/gate2sky-$target.tar.gz" -C dist "gate2sky-$target"
+            -o "dist/gate2net-$target/$exe" ./cmd/gate2net
+          case "$target" in
+          windows-*)
+            # The desktop app: a window and a tray icon, no console.
+            CGO_ENABLED=0 GOOS=windows GOARCH=${target#*-} go build -trimpath \
+              -ldflags "-s -w -H windowsgui -X main.version=${{ needs.test.outputs.version }}" \
+              -o "dist/gate2net-$target/gate2net-gui.exe" ./cmd/gate2net-gui
+            ;;
+          esac
+          cp README.md "dist/gate2net-$target/"
+          # The layout pages/setup.sh, tunnel.sh and tunnel.ps1 unpack:
+          # gate2net-<target>/gate2net(.exe), a zip for Windows.
+          case "$target" in
+          windows-*) (cd dist && zip -qr "gate2net-$target.zip" "gate2net-$target") ;;
+          *) tar -czf "dist/gate2net-$target.tar.gz" -C dist "gate2net-$target" ;;
+          esac
       - uses: actions/upload-artifact@v4
         with:
-          name: gate2sky-${{ matrix.target }}
-          path: dist/gate2sky-${{ matrix.target }}.tar.gz
+          name: gate2net-${{ matrix.target }}
+          path: |
+            dist/gate2net-${{ matrix.target }}.tar.gz
+            dist/gate2net-${{ matrix.target }}.zip
           if-no-files-found: error
 
   # The one-line installer walked against builds of this tree: install,
@@ -117,8 +137,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
-      - run: docker build --build-arg VERSION=${{ needs.test.outputs.version }} -t gate2sky:build .
-      - run: docker run --rm gate2sky:build version
+      - run: docker build --build-arg VERSION=${{ needs.test.outputs.version }} -t gate2net:build .
+      - run: docker run --rm gate2net:build version
 
   helm:
     runs-on: ubuntu-latest
@@ -127,15 +147,16 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
       - uses: azure/setup-helm@v4
-      - run: helm lint deploy/helm/gate2sky
+      - run: helm lint deploy/helm/gate2net
       - name: Render with the default values
-        run: helm template g2s deploy/helm/gate2sky > default.yaml
+        run: helm template g2s deploy/helm/gate2net > default.yaml
       - name: Render with a LoadBalancer for SSH, cert-manager and secrets
         run: |
-          helm template g2s deploy/helm/gate2sky \
+          helm template g2s deploy/helm/gate2net \
             --set domain=tunnels.example.org \
             --set traefik.ssh.enabled=false --set sshService.enabled=true \
             --set certManager.enabled=true \
+            --set tcp.enabled=true --set tcp.first=31000 --set tcp.last=31002 \
             --set secretEnv.SMTP_PASSWORD=x > alt.yaml
       - name: Check the rendered configuration
         run: |
@@ -145,7 +166,11 @@ jobs:
           grep -q 'kind: IngressRouteTCP' default.yaml
           ! grep -q 'kind: IngressRouteTCP' alt.yaml
           grep -q 'kind: Certificate' alt.yaml
-          grep -q "image: \"ghcr.io/gate2sky/gate2sky:$(cat VERSION)\"" default.yaml
+          grep -q 'ports: 31000-31002' alt.yaml
+          grep -q 'port: 31002' alt.yaml
+          grep -q 'name: udp-31002' alt.yaml
+          ! grep -q 'g2s-gate2net-tcp' default.yaml
+          grep -q "image: \"ghcr.io/gate2net/gate2net:$(cat VERSION)\"" default.yaml
 
   # What Pages serves: pages/ as it is, the landing and setup.sh. Every push
   # checks it; only a release deploys it, with the Helm repository's index.
@@ -158,7 +183,7 @@ jobs:
       - name: The landing is self-contained and built from its template
         run: |
           set -euo pipefail
-          if grep -rInE '(src|href)="https?://' pages/ | grep -vE 'https://(github\.com|gate2sky\.github\.io)/'; then
+          if grep -rInE '(src|href)="https?://' pages/ | grep -vE 'https://(github\.com|gate2net\.github\.io)/'; then
             echo "::error::pages/ must not load anything from another host"
             exit 1
           fi

@@ -15,10 +15,11 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/names"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
-	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/names"
+	"github.com/gate2net/gate2net.github.io/internal/ports"
+	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/tunnel"
 )
 
 // Error is a problem the caller can fix. Its message is safe to show.
@@ -34,13 +35,14 @@ type Service struct {
 	cfg      *config.Config
 	store    *store.Store
 	registry *tunnel.Registry
+	ports    *ports.Registry
 	names    *names.Checker
 	log      *slog.Logger
 }
 
 // New returns a Service.
-func New(cfg *config.Config, st *store.Store, reg *tunnel.Registry, checker *names.Checker, log *slog.Logger) *Service {
-	return &Service{cfg: cfg, store: st, registry: reg, names: checker, log: log}
+func New(cfg *config.Config, st *store.Store, reg *tunnel.Registry, pr *ports.Registry, checker *names.Checker, log *slog.Logger) *Service {
+	return &Service{cfg: cfg, store: st, registry: reg, ports: pr, names: checker, log: log}
 }
 
 // Tunnel returns the live tunnel of a subdomain, if connected.
@@ -173,6 +175,7 @@ func (s *Service) RemoveKey(ctx context.Context, d *store.Subdomain, keyID int64
 		return nil, err
 	}
 	s.registry.CloseKey(d.Name, k.ID, "its SSH key was removed")
+	s.ports.CloseKey(d.ID, k.ID, "its SSH key was removed")
 	s.log.Info("ssh key removed", "subdomain", d.Name, "fingerprint", k.Fingerprint, "by", actor)
 	return k, nil
 }
@@ -190,6 +193,7 @@ func (s *Service) RenameKey(ctx context.Context, d *store.Subdomain, keyID int64
 		return "", err
 	}
 	s.registry.RenameKey(d.Name, keyID, name)
+	s.ports.RenameKey(d.ID, keyID, name)
 	s.log.Info("ssh key renamed", "subdomain", d.Name, "key_id", keyID, "name", name, "by", actor)
 	return name, nil
 }
@@ -209,15 +213,18 @@ func (s *Service) SetAccess(ctx context.Context, d *store.Subdomain, access stor
 	return nil
 }
 
-// Disconnect closes the live tunnel of d. It reports whether there was one.
+// Disconnect closes the live tunnel and the forwarded ports of d. It
+// reports whether there were any.
 func (s *Service) Disconnect(d *store.Subdomain, actor string) bool {
-	t := s.registry.Get(d.Name)
-	if t == nil {
-		return false
+	n := s.ports.CloseSubdomain(d.ID, "disconnected by "+actor)
+	if t := s.registry.Get(d.Name); t != nil {
+		t.Close("disconnected by " + actor)
+		n++
 	}
-	t.Close("disconnected by " + actor)
-	s.log.Info("tunnel disconnected", "subdomain", d.Name, "by", actor)
-	return true
+	if n > 0 {
+		s.log.Info("tunnel disconnected", "subdomain", d.Name, "by", actor)
+	}
+	return n > 0
 }
 
 // DeleteSubdomain removes d and its keys and closes its tunnel.
@@ -228,6 +235,7 @@ func (s *Service) DeleteSubdomain(ctx context.Context, d *store.Subdomain, actor
 	if t := s.registry.Get(d.Name); t != nil {
 		t.Close("the subdomain was deleted")
 	}
+	s.ports.CloseSubdomain(d.ID, "the subdomain was deleted")
 	s.log.Info("subdomain deleted", "subdomain", d.Name, "by", actor)
 	return nil
 }
@@ -295,6 +303,7 @@ func (s *Service) SetUserDisabled(ctx context.Context, userID int64, disabled bo
 				t.Close("the owner's account was disabled")
 			}
 		}
+		s.ports.CloseOwner(userID, "the owner's account was disabled")
 	}
 	s.log.Info("user updated", "user_id", userID, "disabled", disabled, "by", actor)
 	return nil
@@ -316,6 +325,7 @@ func (s *Service) DeleteUser(ctx context.Context, userID int64, actor string) er
 			t.Close("the owner's account was deleted")
 		}
 	}
+	s.ports.CloseOwner(userID, "the owner's account was deleted")
 	s.log.Info("user deleted", "user_id", userID, "by", actor)
 	return nil
 }

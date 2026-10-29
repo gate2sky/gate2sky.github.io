@@ -14,7 +14,7 @@ type Access string
 const (
 	// AccessPublic lets anyone with the URL in.
 	AccessPublic Access = "public"
-	// AccessUsers requires signing in to gate2sky.
+	// AccessUsers requires signing in to gate2net.
 	AccessUsers Access = "users"
 	// AccessPrivate only lets the subdomain owner in.
 	AccessPrivate Access = "private"
@@ -35,17 +35,19 @@ type Subdomain struct {
 	Access     Access
 	CreatedAt  time.Time
 	Keys       int
+	Ports      int
 }
 
 const subdomainQuery = `
 	SELECT d.id, d.name, d.user_id, u.email, d.access, d.created_at,
-		(SELECT COUNT(*) FROM ssh_keys k WHERE k.subdomain_id = d.id)
+		(SELECT COUNT(*) FROM ssh_keys k WHERE k.subdomain_id = d.id),
+		(SELECT COUNT(*) FROM tcp_ports p WHERE p.subdomain_id = d.id)
 	FROM subdomains d JOIN users u ON u.id = d.user_id `
 
 func scanSubdomain(row scanner) (*Subdomain, error) {
 	var d Subdomain
 	var created int64
-	if err := row.Scan(&d.ID, &d.Name, &d.UserID, &d.OwnerEmail, &d.Access, &created, &d.Keys); err != nil {
+	if err := row.Scan(&d.ID, &d.Name, &d.UserID, &d.OwnerEmail, &d.Access, &created, &d.Keys, &d.Ports); err != nil {
 		return nil, notFound(err)
 	}
 	d.CreatedAt = fromUnix(created)

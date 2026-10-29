@@ -3,6 +3,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"embed"
@@ -14,16 +15,18 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
 	"strings"
+	texttemplate "text/template"
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/mail"
-	"github.com/gate2sky/gate2sky.github.io/internal/manage"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
-	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/mail"
+	"github.com/gate2net/gate2net.github.io/internal/manage"
+	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/tunnel"
 )
 
 //go:embed templates ui
@@ -46,6 +49,8 @@ type Options struct {
 	HTTPClient *http.Client
 	// Version is shown in the dashboard's footer.
 	Version string
+	// HostKey is the SSH host key's fingerprint, for /tunnel.sh.
+	HostKey string
 }
 
 // Server is the HTTP handler for the dashboard and all tunnels.
@@ -64,6 +69,9 @@ type Server struct {
 	providers []provider
 	shell     *template.Template
 	tunnelErr *template.Template
+	tunnelSh  *texttemplate.Template
+	tunnelPs  *texttemplate.Template
+	hostKey   string
 	ui        map[string]uiFile
 	dashboard http.Handler
 	proxy     *httputil.ReverseProxy
@@ -94,6 +102,7 @@ func New(o Options) (*Server, error) {
 		nonces:   newNonceSet(),
 		codes:    newCodeStore(),
 		version:  o.Version,
+		hostKey:  o.HostKey,
 	}
 	if s.mailer == nil {
 		s.mailer = mail.New(s.cfg.Auth.Email, s.log)
@@ -105,16 +114,16 @@ func New(o Options) (*Server, error) {
 		prefix = "__Host-"
 	}
 	s.cookies = cookieNames{
-		session:    prefix + "gate2sky",
-		oauth:      prefix + "gate2sky-oauth",
-		access:     prefix + "gate2sky-access",
-		emailLogin: prefix + "gate2sky-email",
-		passkey:    prefix + "gate2sky-passkey",
+		session:    prefix + "gate2net",
+		oauth:      prefix + "gate2net-oauth",
+		access:     prefix + "gate2net-access",
+		emailLogin: prefix + "gate2net-email",
+		passkey:    prefix + "gate2net-passkey",
 	}
 	if s.cfg.PasskeysEnabled() {
 		wa, err := webauthn.New(&webauthn.Config{
 			RPID:          s.cfg.Domain(),
-			RPDisplayName: "gate2sky",
+			RPDisplayName: "gate2net",
 			// Tunnel subdomains may claim this RP ID too, so assertions
 			// are only accepted from the dashboard's exact origin.
 			RPOrigins: []string{s.cfg.DashboardURL("")},
@@ -138,6 +147,12 @@ func New(o Options) (*Server, error) {
 		return nil, fmt.Errorf("web: %w", err)
 	}
 	if s.tunnelErr, err = template.ParseFS(assets, "templates/tunnel_error.html"); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
+	if s.tunnelSh, err = texttemplate.ParseFS(assets, "templates/tunnel.sh"); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
+	if s.tunnelPs, err = texttemplate.ParseFS(assets, "templates/tunnel.ps1"); err != nil {
 		return nil, fmt.Errorf("web: %w", err)
 	}
 	if s.ui, err = loadUI(); err != nil {
@@ -174,6 +189,9 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /ui/", s.serveUI)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
+	mux.HandleFunc("GET /tunnel.sh", s.handleTunnelScript)
+	mux.HandleFunc("GET /tunnel.ps1", s.handleTunnelScript)
+	mux.HandleFunc("GET /client.json", s.handleClientInfo)
 
 	// Pages: the same shell for each, and the app draws the one its path
 	// names. Signed out, every page is the sign-in form.
@@ -221,6 +239,9 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("PATCH /api/subdomains/{name}/keys/{id}", user(s.handleRenameKey))
 	mux.Handle("DELETE /api/subdomains/{name}/keys/{id}", user(s.handleDeleteKey))
 	mux.Handle("POST /api/subdomains/{name}/disconnect", user(s.handleDisconnect))
+	mux.Handle("POST /api/subdomains/{name}/ports", user(s.handleAddPort))
+	mux.Handle("PATCH /api/subdomains/{name}/ports/{id}", user(s.handleUpdatePort))
+	mux.Handle("DELETE /api/subdomains/{name}/ports/{id}", user(s.handleDeletePort))
 
 	admin := func(h http.HandlerFunc) http.Handler { return s.requireUser(s.requireAdmin(h)) }
 	mux.Handle("GET /api/admin/subdomains", admin(s.handleAdminSubdomains))
@@ -395,13 +416,103 @@ func (s *Server) clearCookie(w http.ResponseWriter, name string) {
 	})
 }
 
+func (s *Server) ssh() string {
+	if p := s.cfg.SSHPort(); p != 22 {
+		return fmt.Sprintf("ssh -p %d", p)
+	}
+	return "ssh"
+}
+
 // sshCommand is the command a user runs to expose localhost:3000.
 func (s *Server) sshCommand(name string) string {
-	cmd := "ssh"
-	if p := s.cfg.SSHPort(); p != 22 {
-		cmd += fmt.Sprintf(" -p %d", p)
+	return fmt.Sprintf("%s -R %s:80:localhost:3000 %s", s.ssh(), name, s.cfg.SSHHost())
+}
+
+// portsCommand is the command that forwards every TCP port of a
+// subdomain to its local port, or "" without any.
+func (s *Server) portsCommand(name string, list []*store.Port) string {
+	cmd := s.ssh()
+	n := 0
+	for _, p := range list {
+		if p.Protocol == store.ProtocolTCP {
+			cmd += fmt.Sprintf(" -R %s.%s:0:localhost:%d", p.Name, name, p.LocalPort)
+			n++
+		}
 	}
-	return fmt.Sprintf("%s -R %s:80:localhost:3000 %s", cmd, name, s.cfg.SSHHost())
+	if n == 0 {
+		return ""
+	}
+	return cmd + " " + s.cfg.SSHHost()
+}
+
+// tunnelCommand runs the gate2net client for every port of a subdomain,
+// on Linux and macOS or, with windows, in PowerShell; it is "" without any.
+func (s *Server) tunnelCommand(name string, list []*store.Port, windows bool) string {
+	if len(list) == 0 {
+		return ""
+	}
+	cmd := "curl -fsSL " + s.cfg.DashboardURL("/tunnel.sh") + " | sh -s -- " + name
+	if windows {
+		cmd = "& ([scriptblock]::Create((irm " + s.cfg.DashboardURL("/tunnel.ps1") + "))) " + name
+	}
+	for _, p := range list {
+		cmd += fmt.Sprintf(" --%s %s=%d", p.Protocol, p.Name, p.LocalPort)
+	}
+	return cmd
+}
+
+// sshServer is HOST:PORT of the SSH endpoint, for the gate2net client.
+func (s *Server) sshServer() string {
+	return net.JoinHostPort(s.cfg.SSHHost(), fmt.Sprint(s.cfg.SSHPort()))
+}
+
+// The values written into tunnel.sh between single quotes.
+var (
+	releaseVersion = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+	shellSafe      = regexp.MustCompile(`^[A-Za-z0-9.:+/=\[\]_-]*$`)
+)
+
+// handleClientInfo tells the gate2net app, given only the dashboard's
+// address, where to connect and which host key to expect.
+func (s *Server) handleClientInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	writeJSON(w, http.StatusOK, struct {
+		Server    string `json:"server"`
+		HostKey   string `json:"host_key"`
+		Domain    string `json:"domain"`
+		Dashboard string `json:"dashboard"`
+		Version   string `json:"version"`
+	}{s.sshServer(), s.hostKey, s.cfg.Domain(), s.cfg.DashboardURL("/"), s.version})
+}
+
+// handleTunnelScript serves the script that runs the gate2net client
+// without installing it, set up for this server: tunnel.sh for Linux and
+// macOS, tunnel.ps1 for Windows.
+func (s *Server) handleTunnelScript(w http.ResponseWriter, r *http.Request) {
+	tmpl, contentType := s.tunnelSh, "text/x-shellscript; charset=utf-8"
+	if r.URL.Path == "/tunnel.ps1" {
+		tmpl, contentType = s.tunnelPs, "text/plain; charset=utf-8"
+	}
+	version := s.version
+	if !releaseVersion.MatchString(version) {
+		version = "" // a build from source: the latest release
+	}
+	data := struct{ Dashboard, URL, Version, Server, HostKey string }{
+		s.cfg.DashboardURL("/"), s.cfg.DashboardURL(r.URL.Path), version, s.sshServer(), s.hostKey,
+	}
+	if !shellSafe.MatchString(data.Server) || !shellSafe.MatchString(data.HostKey) {
+		http.Error(w, "the SSH host can't be written into a script", http.StatusInternalServerError)
+		return
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		s.log.Error("render "+r.URL.Path, "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Write(buf.Bytes())
 }
 
 // localPath returns rd if it is a path on this host, else "/". It stops

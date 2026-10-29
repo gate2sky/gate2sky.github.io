@@ -1,4 +1,4 @@
-// Package server wires gate2sky together and runs its listeners.
+// Package server wires gate2net together and runs its listeners.
 package server
 
 import (
@@ -25,15 +25,16 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/admin"
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/mail"
-	"github.com/gate2sky/gate2sky.github.io/internal/manage"
-	"github.com/gate2sky/gate2sky.github.io/internal/names"
-	"github.com/gate2sky/gate2sky.github.io/internal/sshd"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
-	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
-	"github.com/gate2sky/gate2sky.github.io/internal/web"
+	"github.com/gate2net/gate2net.github.io/internal/admin"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/mail"
+	"github.com/gate2net/gate2net.github.io/internal/manage"
+	"github.com/gate2net/gate2net.github.io/internal/names"
+	"github.com/gate2net/gate2net.github.io/internal/ports"
+	"github.com/gate2net/gate2net.github.io/internal/sshd"
+	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/tunnel"
+	"github.com/gate2net/gate2net.github.io/internal/web"
 )
 
 // Options customize a Server, mostly for tests.
@@ -45,13 +46,14 @@ type Options struct {
 	HTTPClient *http.Client
 }
 
-// Server is a configured gate2sky instance.
+// Server is a configured gate2net instance.
 type Server struct {
 	cfg      *config.Config
 	log      *slog.Logger
 	version  string
 	store    *store.Store
 	registry *tunnel.Registry
+	ports    *ports.Registry
 	manage   *manage.Service
 	hostKey  ssh.Signer
 	ssh      *sshd.Server
@@ -64,9 +66,12 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return nil, err
 	}
-	s := &Server{cfg: cfg, log: log, version: opts.Version, registry: tunnel.NewRegistry()}
+	s := &Server{cfg: cfg, log: log, version: opts.Version, registry: tunnel.NewRegistry(), ports: ports.NewRegistry(cfg.TCP.ListenHost)}
 	var err error
-	if s.store, err = store.Open(filepath.Join(cfg.DataDir, "gate2sky.db")); err != nil {
+	if err := adoptLegacyDatabase(cfg.DataDir); err != nil {
+		return nil, err
+	}
+	if s.store, err = store.Open(filepath.Join(cfg.DataDir, "gate2net.db")); err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 	secret, err := loadOrCreateSecret(filepath.Join(cfg.DataDir, "secret.key"))
@@ -82,8 +87,8 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 		s.store.Close()
 		return nil, fmt.Errorf("load SSH host key: %w", err)
 	}
-	s.manage = manage.New(cfg, s.store, s.registry, names.NewChecker(cfg.ReservedSubdomains), log.With("component", "manage"))
-	s.ssh = sshd.New(cfg, s.store, s.registry, s.hostKey, log.With("component", "ssh"))
+	s.manage = manage.New(cfg, s.store, s.registry, s.ports, names.NewChecker(cfg.ReservedSubdomains), log.With("component", "manage"))
+	s.ssh = sshd.New(cfg, s.store, s.registry, s.ports, s.hostKey, log.With("component", "ssh"))
 	s.web, err = web.New(web.Options{
 		Config:     cfg,
 		Store:      s.store,
@@ -94,6 +99,7 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 		Logger:     log.With("component", "web"),
 		HTTPClient: opts.HTTPClient,
 		Version:    opts.Version,
+		HostKey:    ssh.FingerprintSHA256(s.hostKey.PublicKey()),
 	})
 	if err != nil {
 		s.store.Close()
@@ -111,6 +117,12 @@ func (s *Server) Store() *store.Store { return s.store }
 
 // Registry returns the live tunnels.
 func (s *Server) Registry() *tunnel.Registry { return s.registry }
+
+// HostKey returns the SSH host key.
+func (s *Server) HostKey() ssh.PublicKey { return s.hostKey.PublicKey() }
+
+// Ports returns the forwarded TCP ports.
+func (s *Server) Ports() *ports.Registry { return s.ports }
 
 // SSH returns the SSH server.
 func (s *Server) SSH() *sshd.Server { return s.ssh }
@@ -225,7 +237,7 @@ func (s *Server) Run(ctx context.Context) error {
 	for _, p := range cfg.Auth.Providers {
 		methods = append(methods, p.ID)
 	}
-	log.Info("gate2sky started",
+	log.Info("gate2net started",
 		"version", s.version,
 		"dashboard", cfg.DashboardURL("/"),
 		"tunnels", cfg.TunnelURL("*"),
@@ -233,6 +245,9 @@ func (s *Server) Run(ctx context.Context) error {
 		"ssh_host_key", ssh.FingerprintSHA256(s.hostKey.PublicKey()),
 		"sign_in", strings.Join(methods, ","),
 		"admin_socket", cfg.Admin.Socket)
+	if cfg.TCP.Enabled() {
+		log.Info("tcp ports enabled", "range", cfg.TCP.Ports, "per_subdomain", cfg.TCP.MaxPorts, "address", cfg.TCPAddress(0))
+	}
 	if cfg.Auth.Email.LogOnly {
 		log.Warn("auth.email.log_only is set: sign-in codes are written to this log instead of being emailed")
 	}
@@ -251,6 +266,7 @@ func (s *Server) Run(ctx context.Context) error {
 	cancel()
 	<-adminDone
 	s.ssh.Close()
+	s.ports.Close()
 	shutdownCtx, done := context.WithTimeout(context.Background(), 5*time.Second)
 	defer done()
 	for _, srv := range servers {
@@ -259,8 +275,28 @@ func (s *Server) Run(ctx context.Context) error {
 	return runErr
 }
 
+// adoptLegacyDatabase renames the database of gate2sky, gate2net's former
+// name, when the data directory has it and no gate2net.db yet.
+func adoptLegacyDatabase(dir string) error {
+	db := filepath.Join(dir, "gate2net.db")
+	old := filepath.Join(dir, "gate2sky.db")
+	if _, err := os.Stat(db); err == nil {
+		return nil
+	}
+	if _, err := os.Stat(old); err != nil {
+		return nil
+	}
+	// SQLite's write-ahead log and index go with it.
+	for _, suffix := range []string{"-wal", "-shm", ""} {
+		if err := os.Rename(old+suffix, db+suffix); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("rename %s: %w", old+suffix, err)
+		}
+	}
+	return nil
+}
+
 // PIDFile is where a running server writes its process ID.
-func PIDFile(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "gate2sky.pid") }
+func PIDFile(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "gate2net.pid") }
 
 // RunningPID returns the PID of a server running on this data directory,
 // or 0.
@@ -277,10 +313,10 @@ func RunningPID(cfg *config.Config) int {
 }
 
 func writePIDFile(dataDir string) (string, error) {
-	path := filepath.Join(dataDir, "gate2sky.pid")
+	path := filepath.Join(dataDir, "gate2net.pid")
 	if b, err := os.ReadFile(path); err == nil {
 		if pid, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && pid != os.Getpid() && processAlive(pid) {
-			return "", fmt.Errorf("gate2sky is already running with PID %d (%s)", pid, path)
+			return "", fmt.Errorf("gate2net is already running with PID %d (%s)", pid, path)
 		}
 	}
 	return path, os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o644)
@@ -305,7 +341,7 @@ func hostPolicy(cfg *config.Config, st *store.Store) autocert.HostPolicy {
 		}
 		name, ok := strings.CutSuffix(host, "."+cfg.Domain())
 		if !ok || strings.Contains(name, ".") {
-			return fmt.Errorf("acme: host %q is not served by gate2sky", host)
+			return fmt.Errorf("acme: host %q is not served by gate2net", host)
 		}
 		if _, err := st.SubdomainByName(ctx, name); err != nil {
 			return fmt.Errorf("acme: subdomain %q is not registered", name)
@@ -374,7 +410,7 @@ func loadOrCreateHostKey(path string) (ssh.Signer, error) {
 	if err != nil {
 		return nil, err
 	}
-	block, err := ssh.MarshalPrivateKey(priv, "gate2sky host key")
+	block, err := ssh.MarshalPrivateKey(priv, "gate2net host key")
 	if err != nil {
 		return nil, err
 	}

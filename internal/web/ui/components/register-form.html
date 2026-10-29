@@ -1,0 +1,54 @@
+<script :setup="{ cancel = false }">
+  // The form that registers a subdomain, starting public, and opens its
+  // page once registered. With `:cancel`, it has a Cancel button that
+  // emits `cancel`, for a dialog.
+  const { app, go, toast } = await import("@ui/lib/store.js")
+  const { api } = await import("@ui/lib/api.js")
+  const AccessOptions = await import("@ui/components/access-options.html")
+
+  let name = ""
+  let access = "public"
+  let keys = ""
+  let busy = false
+  let error = ""
+
+  const register = async () => {
+    busy = true
+    error = ""
+    try {
+      const result = await api("POST", "/subdomains", { name, access, keys })
+      const host = `${result.subdomain.name}.${app.domain}`
+      const problems = result.keys.problems || []
+      if (problems.length) toast(`${host} is registered, but some keys were not added: ${problems.join("; ")}.`, "error")
+      else toast(`${host} is registered with ${result.keys.added} SSH key(s).`)
+      $emit("registered")
+      go("/subdomains/" + encodeURIComponent(result.subdomain.name))
+    } catch (e) {
+      error = e.message
+    }
+    busy = false
+  }
+</script>
+
+<div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+<form class="form" @submit.prevent="register">
+  <label>Name
+    <span class="input-suffix">
+      <input name="name" required maxlength="63" pattern="[A-Za-z0-9]([A-Za-z0-9\-]{0,61}[A-Za-z0-9])?" placeholder="myapp"
+             autocomplete="off" spellcheck="false" :value="name" @input="name = $event.target.value">
+      <span>.{{ app.domain }}</span>
+    </span>
+  </label>
+  <fieldset>
+    <legend>Who can open it <span class="hint">You can change it later on the subdomain’s page.</span></legend>
+    <AccessOptions :model="access" @pick="access = $event.detail" />
+  </fieldset>
+  <label>SSH public keys <span class="hint">Optional, one per line. You can add more later.</span>
+    <textarea name="keys" rows="3" spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"
+              :value="keys" @input="keys = $event.target.value"></textarea>
+  </label>
+  <div class="dialog-actions">
+    <button :if="cancel" type="button" class="button button-secondary" @click="$emit('cancel')">Cancel</button>
+    <button type="submit" class="button" :disabled="busy">Register</button>
+  </div>
+</form>

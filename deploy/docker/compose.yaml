@@ -1,30 +1,34 @@
-# gate2sky with Docker Compose, terminating TLS itself (Let's Encrypt).
+# gate2net with Docker Compose, terminating TLS itself (Let's Encrypt).
 #
-#   docker compose run --rm gate2sky config    # create /data/gate2sky.yaml
+#   docker compose run --rm gate2net config    # create /data/gate2net.yaml
 #   docker compose up -d
-#   docker compose exec gate2sky gate2sky config   # manage subdomains, keys, users
+#   docker compose exec gate2net gate2net config   # manage subdomains, keys, users
 #
 # Point gate.example.com and *.gate.example.com to this host. In the setup,
 # choose Let's Encrypt and keep the default ports (80, 443 and 2222).
 services:
-  gate2sky:
-    image: ghcr.io/gate2sky/gate2sky:latest
+  gate2net:
+    image: ghcr.io/gate2net/gate2net:latest
     build: ../..
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
       - "2222:2222"
+      # With tcp.ports: 30000-30019 in the configuration, publish its range,
+      # over UDP too for UDP ports:
+      # - "30000-30019:30000-30019"
+      # - "30000-30019:30000-30019/udp"
     volumes:
-      - gate2sky:/data
+      - gate2net:/data
     # Secrets referenced as ${VAR} in the configuration:
     # environment:
     #   SMTP_PASSWORD: change-me
     healthcheck:
-      test: ["CMD", "gate2sky", "status"]
+      test: ["CMD", "gate2net", "status"]
       interval: 30s
       timeout: 5s
       retries: 3
 
 volumes:
-  gate2sky:
+  gate2net:

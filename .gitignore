@@ -1,6 +1,6 @@
-/gate2sky
+/gate2net
 /data/
-/gate2sky.yaml
+/gate2net.yaml
 *.db
 *.db-shm
 *.db-wal

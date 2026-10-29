@@ -1,10 +1,10 @@
-# gate2sky
+# gate2net
 
-**[gate2sky.github.io](https://gate2sky.github.io/)** ·
-[releases](https://github.com/gate2sky/gate2sky.github.io/releases)
+**[gate2net.github.io](https://gate2net.github.io/)** ·
+[releases](https://github.com/gate2net/gate2net.github.io/releases)
 
 ```sh
-curl -fsSL https://gate2sky.github.io/setup.sh | sh
+curl -fsSL https://gate2net.github.io/setup.sh | sh
 ```
 
 Expose local HTTP services on your own domain through SSH, like
@@ -17,7 +17,7 @@ ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com
 ```
 
 - **Subdomains and SSH keys are registered in the dashboard** (or with
-  `gate2sky config`). Each subdomain has its own authorized SSH keys: a key
+  `gate2net config`). Each subdomain has its own authorized SSH keys: a key
   can only open tunnels on the subdomains it was added to, and unknown keys
   are rejected during the SSH handshake.
 - **Sign-in without passwords:** a one-time code sent by email, then
@@ -25,28 +25,32 @@ ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com
   provider can be added as optional sign-in methods.
 - **Access control per subdomain:** *public*, *signed-in users* or *private*
   (owner only). Protected tunnels send visitors to sign in and work with any
-  app behind them; the app never sees gate2sky's cookies.
+  app behind them; the app never sees gate2net's cookies.
 - **Live view** of every tunnel: client address, key, requests and traffic,
   with a disconnect button. Removing a key or disabling a user closes their
   tunnels at once. The SSH session prints every request, like sish.
+- **TCP and UDP ports** for databases, SSH, game servers…: each subdomain
+  can get public ports of its own (`tcp://gate.example.com:30042`), open
+  only to the addresses you allow. UDP goes through the `gate2net tunnel`
+  client, which runs without installing anything.
 - **Single static binary** with SQLite storage and automatic HTTPS (Let's
   Encrypt) — or Docker, or Kubernetes with Traefik.
 
 ## How it works
 
 ```
- browser ──HTTPS──▶ gate2sky ──SSH channel──▶ ssh -R client ──▶ localhost:3000
+ browser ──HTTPS──▶ gate2net ──SSH channel──▶ ssh -R client ──▶ localhost:3000
                      │  myapp.gate.example.com → tunnel "myapp"
                      │  gate.example.com       → dashboard
 ```
 
 The dashboard is served on the host of `public_url`; every direct subdomain
 of it is a tunnel. When a client runs `ssh -R myapp:80:localhost:3000`,
-gate2sky checks that the key is authorized for `myapp` and routes
+gate2net checks that the key is authorized for `myapp` and routes
 `myapp.<domain>` to that SSH connection. Each HTTP request (WebSockets and
 streaming included) opens a channel back to the client.
 
-The `80` only tells gate2sky that this is an HTTP tunnel: OpenSSH requires
+The `80` only tells gate2net that this is an HTTP tunnel: OpenSSH requires
 a port there. The subdomain can also come from the SSH user name, or be left
 out when the key belongs to a single subdomain:
 
@@ -58,16 +62,91 @@ ssh -p 2222 -R 80:localhost:3000 gate.example.com
 A new connection for a subdomain replaces the previous one, so reconnecting
 (e.g. with `autossh -M 0`) takes over at once.
 
+### TCP ports
+
+With `tcp.ports` in the configuration, a subdomain can also have raw TCP
+ports (a database, SSH, RDP, a Minecraft server…), added from its page in
+the dashboard. Each one gets a public port from the range, kept for as long
+as it exists, and an allow list: only those addresses (by default, yours)
+can connect, unless you open it to anyone. Ports are never created on
+connect, so they are protected before they are reachable.
+
+A port is forwarded by name, as `<port>.<subdomain>` with port 0; OpenSSH
+prints the public port it got. HTTP and TCP forwards can share a connection:
+
+```bash
+ssh -p 2222 -R myapp:80:localhost:3000 -R db.myapp:0:localhost:5432 gate.example.com
+# Allocated port 30042 for remote forward to localhost:5432
+# → tcp://gate.example.com:30042 reaches your localhost:5432
+```
+
+The public port works too, with or without the subdomain
+(`-R myapp:30042:localhost:5432`, `-R 30042:localhost:5432`).
+`-R myapp:0:…` stays an HTTP tunnel. The subdomain's keys open all its
+ports, and removing a key, disabling its owner or deleting the port closes
+it at once.
+
+### UDP ports and the gate2net client
+
+SSH only carries TCP, so UDP ports (a Minecraft Bedrock or Valheim server,
+WireGuard, DNS…) go through the gate2net client, the same binary as the
+server. The dashboard serves a script that downloads the client of its
+release, checks it against the release's `SHA256SUMS`, runs it and deletes
+it when it ends:
+
+```bash
+curl -fsSL https://gate.example.com/tunnel.sh | sh -s -- myapp --udp mc=19132
+curl -fsSL https://gate.example.com/tunnel.sh | sh -s -- --cache myapp \
+  --http 3000 --tcp db=5432 --udp mc=19132     # everything, client kept in ~/.cache
+gate2net tunnel --server gate.example.com:2222 myapp --udp mc=19132   # installed
+```
+
+It signs in with ssh-agent or `~/.ssh` keys (`-i` for another), checks the
+server's host key (written into the script, or `--host-key`, or
+`~/.ssh/known_hosts`) and reconnects when the connection drops.
+
+On Windows, `tunnel.ps1` does the same in PowerShell (5.1 or later), with the
+release's `gate2net-windows-amd64.zip` or `-arm64.zip`; keys come from the
+OpenSSH Authentication Agent (`ssh-add`) or `%USERPROFILE%\.ssh`, and
+`--cache` keeps the client in `%LOCALAPPDATA%\gate2net`:
+
+```powershell
+& ([scriptblock]::Create((irm https://gate.example.com/tunnel.ps1))) myapp --udp mc=19132
+```
+
+The dashboard shows both commands, ready to copy, for a subdomain's ports.
+
+### The desktop app
+
+The Windows release zips also hold `gate2net-gui.exe`, the client with a
+window and a tray icon. Give it your dashboard's address and it looks up the
+SSH endpoint and host key (`/client.json`); then the subdomain, an optional
+key file, and what to forward (the HTTP tunnel and ports, by name). It shows
+each forward's state and public address and a log, connects and disconnects
+from the tray, can start with Windows (minimized to the tray, from the
+user's `Run` key) and connect on start. Its settings live in
+`%APPDATA%\gate2net\app.json`. The window is WebView2, which Windows 10 and
+11 have; without it the app opens in the browser. On Linux the same program
+runs with its window in the browser and no tray (`go build ./cmd/gate2net-gui`).
+
+Each remote address gets a stream of its own to your service, closed after
+two minutes of silence. UDP over a TCP connection suffers head-of-line
+blocking: fine for DNS, MQTT-SN or a quiet game server, jittery for
+fast-paced games or calls. Source addresses can be spoofed over UDP, so
+allow lists protect less than for TCP, and gate2net caps what a port sends
+back to an address at ten times what it received (plus 64 KiB), so it
+can't be used to amplify attacks.
+
 ## Getting started
 
 You need a domain where both `gate.example.com` and `*.gate.example.com`
 point to the server. Then, on Linux or macOS:
 
 ```sh
-curl -fsSL https://gate2sky.github.io/setup.sh | sh
+curl -fsSL https://gate2net.github.io/setup.sh | sh
 ```
 
-Without curl, `wget -qO- https://gate2sky.github.io/setup.sh | sh` does the
+Without curl, `wget -qO- https://gate2net.github.io/setup.sh | sh` does the
 same: the installer then downloads with wget too.
 
 The installer downloads the release for your machine, checks it against the
@@ -76,9 +155,9 @@ setup wizard and, on Linux with systemd, installs the service. Run it again to
 update (the service is restarted), reconfigure or uninstall:
 
 ```sh
-curl -fsSL https://gate2sky.github.io/setup.sh | sh -s -- reinstall
-curl -fsSL https://gate2sky.github.io/setup.sh | sh -s -- configure
-curl -fsSL https://gate2sky.github.io/setup.sh | sh -s -- uninstall --purge
+curl -fsSL https://gate2net.github.io/setup.sh | sh -s -- reinstall
+curl -fsSL https://gate2net.github.io/setup.sh | sh -s -- configure
+curl -fsSL https://gate2net.github.io/setup.sh | sh -s -- uninstall --purge
 ```
 
 Every release archive, the Docker image and the Helm chart also carry a
@@ -87,26 +166,26 @@ this repository's release workflow, from the tagged commit. With the
 [GitHub CLI](https://cli.github.com/):
 
 ```sh
-gh attestation verify gate2sky-linux-amd64.tar.gz --repo gate2sky/gate2sky.github.io
-gh attestation verify oci://ghcr.io/gate2sky/gate2sky:latest --repo gate2sky/gate2sky.github.io
+gh attestation verify gate2net-linux-amd64.tar.gz --repo gate2net/gate2net.github.io
+gh attestation verify oci://ghcr.io/gate2net/gate2net:latest --repo gate2net/gate2net.github.io
 ```
 
 | Option | |
 | --- | --- |
-| `--dir DIR` | Where the binary goes. Default `/usr/local/bin`, or `GATE2SKY_INSTALL_DIR`. |
-| `--version TAG` | A release such as `v0.2.0`. Default the latest, or `GATE2SKY_VERSION`. |
-| `--config FILE` | Default `/etc/gate2sky/gate2sky.yaml`. |
+| `--dir DIR` | Where the binary goes. Default `/usr/local/bin`, or `GATE2NET_INSTALL_DIR`. |
+| `--version TAG` | A release such as `v0.2.0`. Default the latest, or `GATE2NET_VERSION`. |
+| `--config FILE` | Default `/etc/gate2net/gate2net.yaml`. |
 | `--no-service` | Neither install nor restart the systemd service. |
 | `--purge` | With `uninstall`: also delete the configuration, data and service user. |
 | `-y`, `--yes` | Do not ask; `--purge` needs it when there is no terminal. |
-| `GATE2SKY_DOWNLOAD_URL` | A directory with `gate2sky-<os>-<arch>.tar.gz` and `SHA256SUMS`, used instead of GitHub. |
+| `GATE2NET_DOWNLOAD_URL` | A directory with `gate2net-<os>-<arch>.tar.gz` and `SHA256SUMS`, used instead of GitHub. |
 
 From source:
 
 ```bash
-go build -o gate2sky ./cmd/gate2sky     # Go 1.26+
-sudo ./gate2sky config                     # interactive setup
-sudo ./gate2sky service --install          # run it as a systemd service
+go build -o gate2net ./cmd/gate2net     # Go 1.26+
+sudo ./gate2net config                     # interactive setup
+sudo ./gate2net service --install          # run it as a systemd service
 ```
 
 Then sign in at `https://gate.example.com` with an administrator email,
@@ -117,15 +196,15 @@ connect with the `ssh -R` command the dashboard shows.
 
 | Command | |
 |---|---|
-| `gate2sky config` | Interactive wizard. Creates the configuration on first run; then manages subdomains, SSH keys, users and server settings. `--accessible` uses plain prompts (also for screen readers and scripts: it accepts piped answers). |
-| `gate2sky start` | Run in the foreground. `--detached` runs in the background, logging to `<data_dir>/gate2sky.log`. |
-| `gate2sky stop` / `status` | Stop a detached server / show whether it runs, with live counters. |
-| `gate2sky service --install` | Install a hardened systemd service: binary in `/usr/local/bin`, a dedicated `gate2sky` user owning the data directory, `CAP_NET_BIND_SERVICE` for ports 80/443. `--uninstall` and `--status` too; `--dry-run` shows what would happen. |
+| `gate2net config` | Interactive wizard. Creates the configuration on first run; then manages subdomains, SSH keys, users and server settings. `--accessible` uses plain prompts (also for screen readers and scripts: it accepts piped answers). |
+| `gate2net start` | Run in the foreground. `--detached` runs in the background, logging to `<data_dir>/gate2net.log`. |
+| `gate2net stop` / `status` | Stop a detached server / show whether it runs, with live counters. |
+| `gate2net service --install` | Install a hardened systemd service: binary in `/usr/local/bin`, a dedicated `gate2net` user owning the data directory, `CAP_NET_BIND_SERVICE` for ports 80/443. `--uninstall` and `--status` too; `--dry-run` shows what would happen. |
 
-Every command takes `--config FILE`; otherwise `$GATE2SKY_CONFIG`,
-`./gate2sky.yaml` or `/etc/gate2sky/gate2sky.yaml` is used.
+Every command takes `--config FILE`; otherwise `$GATE2NET_CONFIG`,
+`./gate2net.yaml` or `/etc/gate2net/gate2net.yaml` is used.
 
-`gate2sky config` and `status` talk to the running server through a Unix
+`gate2net config` and `status` talk to the running server through a Unix
 socket in the data directory (mode 0600: root or the service user), so changes
 apply to live tunnels immediately.
 
@@ -133,9 +212,9 @@ apply to live tunnels immediately.
 
 ### Binary and systemd
 
-As above: `gate2sky config`, then `gate2sky service --install`. Secrets
+As above: `gate2net config`, then `gate2net service --install`. Secrets
 can stay out of the configuration file: write `${SMTP_PASSWORD}` and put
-`SMTP_PASSWORD=...` in `/etc/gate2sky/gate2sky.env`, which systemd reads
+`SMTP_PASSWORD=...` in `/etc/gate2net/gate2net.env`, which systemd reads
 as root.
 
 ### Docker
@@ -143,49 +222,55 @@ as root.
 The image keeps the configuration and all state in `/data`:
 
 ```bash
-docker volume create gate2sky
-docker run -it --rm -v gate2sky:/data ghcr.io/gate2sky/gate2sky config
-docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data \
-  -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2sky/gate2sky
-docker exec -it gate2sky gate2sky config     # manage subdomains, keys and users
+docker volume create gate2net
+docker run -it --rm -v gate2net:/data ghcr.io/gate2net/gate2net config
+docker run -d --name gate2net --restart unless-stopped -v gate2net:/data \
+  -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2net/gate2net
+# with tcp.ports: 30000-30019, publish the range as well, TCP and UDP:
+#   -p 30000-30019:30000-30019 -p 30000-30019:30000-30019/udp
+docker exec -it gate2net gate2net config     # manage subdomains, keys and users
 ```
 
-Every release publishes the image to `ghcr.io/gate2sky/gate2sky`; before
-the first one, build it with `docker build -t gate2sky .`. See
+Every release publishes the image to `ghcr.io/gate2net/gate2net`; before
+the first one, build it with `docker build -t gate2net .`. See
 [`deploy/docker/compose.yaml`](deploy/docker/compose.yaml) for Compose.
-With Docker alone, choose Let's Encrypt in the setup: gate2sky gets a
+With Docker alone, choose Let's Encrypt in the setup: gate2net gets a
 certificate for each registered subdomain on demand, so no DNS challenge is
 needed.
 
 ### Kubernetes with Traefik
 
-[`deploy/helm/gate2sky`](deploy/helm/gate2sky) installs gate2sky behind
-Traefik v3. Every release publishes it to `oci://ghcr.io/gate2sky/charts`
-and to the classic repository `https://gate2sky.github.io/charts` (for tools
+[`deploy/helm/gate2net`](deploy/helm/gate2net) installs gate2net behind
+Traefik v3. Every release publishes it to `oci://ghcr.io/gate2net/charts`
+and to the classic repository `https://gate2net.github.io/charts` (for tools
 without OCI support, such as helm-dashboard), so there is nothing to clone
-(from a clone, `deploy/helm/gate2sky` works the same):
+(from a clone, `deploy/helm/gate2net` works the same):
 
 - an `IngressRoute` for `gate.example.com` and its subdomains (TLS from a
   Traefik resolver with a DNS-01 challenge, an existing wildcard secret, or
   cert-manager);
 - an `IngressRouteTCP` on a dedicated Traefik entry point for SSH, with the
-  PROXY protocol so gate2sky sees client addresses — or a `LoadBalancer`
-  Service instead.
+  PROXY protocol so gate2net sees client addresses — or a `LoadBalancer`
+  Service instead;
+- with `tcp.enabled`, a `LoadBalancer` Service for the ports (`tcp.first`
+  to `tcp.last`, TCP and, with `tcp.udp`, UDP), with
+  `externalTrafficPolicy: Local` so allow lists see client addresses. Keep
+  the range small: it is one or two Service ports each.
 
 ```bash
-helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky \
+helm install gate2net oci://ghcr.io/gate2net/charts/gate2net \
   --set domain=gate.example.com \
   --set traefik.tls.certResolver=letsencrypt-dns \
   --set secretEnv.SMTP_PASSWORD=... \
   -f my-values.yaml      # config.auth.admins, SMTP settings...
-kubectl exec -it deploy/gate2sky -- gate2sky config
+kubectl exec -it deploy/gate2net -- gate2net config
 ```
 
 Or from the classic repository:
 
 ```bash
-helm repo add gate2sky https://gate2sky.github.io/charts
-helm install gate2sky gate2sky/gate2sky --set domain=gate.example.com ...
+helm repo add gate2net https://gate2net.github.io/charts
+helm install gate2net gate2net/gate2net --set domain=gate.example.com ...
 ```
 
 Traefik needs a TCP entry point for SSH, e.g. in the Traefik chart's values:
@@ -199,12 +284,37 @@ ports:
     protocol: TCP
 ```
 
-gate2sky runs as a single replica: tunnels live in the memory of the
+gate2net runs as a single replica: tunnels live in the memory of the
 process that holds the SSH connections.
+
+### Upgrading from gate2sky
+
+gate2net was called gate2sky. A gate2sky configuration and database keep
+working: without a configuration under the new name, gate2net reads
+`$GATE2SKY_CONFIG`, `./gate2sky.yaml` or `/etc/gate2sky/gate2sky.yaml` (and,
+in Docker, `/data/gate2sky.yaml`), and renames `gate2sky.db` in the data
+directory to `gate2net.db`. Everyone signs in again once: the cookies have
+new names. To move a systemd install to the new names:
+
+```bash
+sudo systemctl disable --now gate2sky
+sudo mv /etc/gate2sky /etc/gate2net
+sudo mv /etc/gate2net/gate2sky.yaml /etc/gate2net/gate2net.yaml
+sudo mv /etc/gate2net/gate2sky.env /etc/gate2net/gate2net.env 2>/dev/null
+sudo mv /var/lib/gate2sky /var/lib/gate2net
+sudo sed -i 's#/var/lib/gate2sky#/var/lib/gate2net#g' /etc/gate2net/gate2net.yaml
+curl -fsSL https://gate2net.github.io/setup.sh | sh   # installs gate2net and its service
+sudo rm /etc/systemd/system/gate2sky.service /usr/local/bin/gate2sky
+sudo systemctl daemon-reload && sudo userdel gate2sky
+```
+
+With Docker, use the `ghcr.io/gate2net/gate2net` image on the same volume.
+With Helm, the chart is now `gate2net`: install it under a new release and
+move the data of the old release's volume.
 
 ## Configuration
 
-See [`gate2sky.example.yaml`](gate2sky.example.yaml) for every option.
+See [`gate2net.example.yaml`](gate2net.example.yaml) for every option.
 Highlights:
 
 - `public_url`: the dashboard URL. Tunnels live on its subdomains.
@@ -218,11 +328,14 @@ Highlights:
   `<public_url>/auth/<id>/callback`.
 - `auth.admins`, `auth.allowed_emails`, `auth.allowed_domains`,
   `auth.allow_everyone`: who may sign in. Users an administrator adds from
-  the dashboard or `gate2sky config` may sign in too. On the dashboard's
+  the dashboard or `gate2net config` may sign in too. On the dashboard's
   Admin page each user is an owner, an admin or a user: admins manage every
   subdomain and account but owners', owners manage everything, and
   `auth.admins` are always owners.
 - `ssh.proxy_protocol`: expect a PROXY protocol header from a load balancer.
+- `tcp.ports`: the range TCP and UDP ports are allocated from (e.g. `30000-30019`);
+  `tcp.max_ports` per subdomain (5), `tcp.public_host` for their addresses
+  (the SSH host by default) and `tcp.listen_host` to listen on one interface.
 
 For local development, `*.localhost` resolves to 127.0.0.1 in browsers:
 
@@ -255,7 +368,13 @@ auth:
 - **Protected tunnels:** the dashboard issues a short-lived, single-use,
   host-bound token that the tunnel host exchanges for a host-only, HttpOnly
   cookie tied to the dashboard session. Signing out revokes access to every
-  tunnel. gate2sky's cookies are stripped before requests reach the app.
+  tunnel. gate2net's cookies are stripped before requests reach the app.
+  Signed-in users who may not open a tunnel see it as offline.
+- **TCP ports** check every connection's address against the port's allow
+  list, which needs the real client address: publish the range directly, or
+  keep it (`externalTrafficPolicy: Local`) behind a load balancer. Data is
+  not encrypted by gate2net between the visitor and the server: use the
+  service's own TLS (PostgreSQL, MySQL and SSH have it).
 - **OAuth:** authorization code flow with PKCE, state and (OIDC) nonce checks.
 
 ## Development
@@ -287,7 +406,7 @@ Two workflows:
 
 - **Build** (`.github/workflows/build.yml`) runs on every push: downloads
   and verifies the dependencies, runs the tests, builds
-  `gate2sky-<os>-<arch>.tar.gz` for Linux and macOS (amd64, arm64), walks
+  `gate2net-<os>-<arch>.tar.gz` for Linux and macOS (amd64, arm64), walks
   the installer against this tree, builds the Docker image, renders the Helm
   chart and checks the landing.
 - **Release** (`.github/workflows/release.yml`) is started by hand from the
@@ -307,13 +426,13 @@ then run `python3 scripts/landing/gen.py scripts/landing/template.html
 pages/index.html`. Build checks that the two agree. The icon is
 [`pages/favicon.svg`](pages/favicon.svg), the same file as the dashboard's
 [`internal/web/ui/logo.svg`](internal/web/ui/logo.svg) (the landing's header
-inlines it); after changing it, copy it to both and run `node
-scripts/landing/icons.js`, which renders `favicon.ico` and
-`apple-touch-icon.png` from it.
+inlines it, without its dark tile); after changing it, copy it to both and
+run `node scripts/landing/icons.js`, which renders `favicon.ico` and
+`apple-touch-icon.png` from it and writes the dashboard header's
+[`logo-mark.svg`](internal/web/ui/logo-mark.svg), the logo without its tile.
 
 ## Roadmap
 
-- TCP tunnels on dedicated ports.
 - Sharing private subdomains with specific users.
 - Custom domains (CNAME to a subdomain).
 - Request inspector in the dashboard.

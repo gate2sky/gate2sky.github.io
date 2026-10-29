@@ -38,6 +38,7 @@ type boot struct {
 	Passkeys  bool        `json:"passkeys"`
 	Providers []bootLink  `json:"providers"`
 	Limits    bootLimits  `json:"limits"`
+	TCP       *bootTCP    `json:"tcp"`
 	User      *me         `json:"user"`
 	CSRF      string      `json:"csrf,omitempty"`
 	EmailFlow string      `json:"email_flow,omitempty"`
@@ -52,6 +53,14 @@ type bootLink struct {
 type bootLimits struct {
 	Subdomains int `json:"subdomains"`
 	Keys       int `json:"keys"`
+}
+
+// bootTCP describes TCP ports, when the server has them.
+type bootTCP struct {
+	First    int    `json:"first"`
+	Last     int    `json:"last"`
+	MaxPorts int    `json:"max_ports"`
+	Host     string `json:"host"`
 }
 
 // me is the signed-in user.
@@ -82,6 +91,10 @@ func (s *Server) serveApp(w http.ResponseWriter, r *http.Request, status int, pe
 		Providers: []bootLink{},
 		Limits:    bootLimits{Subdomains: s.cfg.Limits.SubdomainsPerUser, Keys: s.cfg.Limits.KeysPerSubdomain},
 		Error:     perr,
+	}
+	if s.cfg.TCP.Enabled() {
+		first, last := s.cfg.TCP.Range()
+		b.TCP = &bootTCP{First: first, Last: last, MaxPorts: s.cfg.TCP.MaxPorts, Host: s.cfg.TCPHost()}
 	}
 	for _, p := range s.providers {
 		b.Providers = append(b.Providers, bootLink{p.Name(), "/auth/" + url.PathEscape(p.ID()) + "/login"})

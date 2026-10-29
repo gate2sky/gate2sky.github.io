@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
-	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
+	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/tunnel"
 )
 
 // authPath is reserved on every tunnel host: it receives the hand-off token
 // from the dashboard and turns it into an access cookie for that host.
-const authPath = "/__gate2sky/auth"
+const authPath = "/__gate2net/auth"
 
 const (
 	handoffTTL   = 2 * time.Minute
@@ -109,8 +109,7 @@ func (s *Server) serveTunnel(w http.ResponseWriter, r *http.Request, name string
 	t := s.registry.Get(name)
 	if t == nil {
 		if _, err := s.store.SubdomainByName(r.Context(), name); err == nil {
-			s.renderTunnelError(w, http.StatusBadGateway, "Tunnel offline",
-				"Nobody is connected to "+s.cfg.TunnelHost(name)+" right now.")
+			s.renderOffline(w, name)
 		} else {
 			s.renderTunnelError(w, http.StatusNotFound, "Not found",
 				s.cfg.TunnelHost(name)+" is not registered.")
@@ -131,18 +130,24 @@ func (s *Server) serveTunnel(w http.ResponseWriter, r *http.Request, name string
 			return
 		}
 		if !canAccess(access, t.OwnerID, user) {
-			s.renderTunnelError(w, http.StatusForbidden, "Access denied",
-				user.Email+" does not have access to "+s.cfg.TunnelHost(name)+".")
+			// Whoever may not open it doesn't learn that it is online.
+			s.renderOffline(w, name)
 			return
 		}
 	}
 
-	// The service behind the tunnel must never see gate2sky's cookies.
+	// The service behind the tunnel must never see gate2net's cookies.
 	stripCookies(r, s.cookies.access, s.cookies.session, s.cookies.oauth, s.cookies.emailLogin, s.cookies.passkey)
 	t.CountRequest()
 	ctx := tunnel.WithOrigin(r.Context(), r.RemoteAddr)
 	ctx = context.WithValue(ctx, proxyCtxKey{}, &proxyCtx{tunnel: t, start: time.Now()})
 	s.proxy.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// renderOffline answers as for a subdomain nobody is connected to.
+func (s *Server) renderOffline(w http.ResponseWriter, name string) {
+	s.renderTunnelError(w, http.StatusBadGateway, "Tunnel offline",
+		"Nobody is connected to "+s.cfg.TunnelHost(name)+" right now.")
 }
 
 func canAccess(access store.Access, ownerID int64, user *store.User) bool {
@@ -190,8 +195,8 @@ func stripCookies(r *http.Request, names ...string) {
 	}
 }
 
-// handleTunnelAuth runs on the dashboard: it checks that the signed-in user
-// may open a protected tunnel and sends them back with a hand-off token.
+// handleTunnelAuth runs on the dashboard: it sends the signed-in user back
+// to a protected tunnel with a hand-off token.
 func (s *Server) handleTunnelAuth(w http.ResponseWriter, r *http.Request) {
 	rd := r.URL.Query().Get("rd")
 	name, target, ok := s.parseTunnelURL(rd)
@@ -204,26 +209,15 @@ func (s *Server) handleTunnelAuth(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?rd="+url.QueryEscape(r.URL.RequestURI()), http.StatusFound)
 		return
 	}
-	d, err := s.store.SubdomainByName(r.Context(), name)
-	if errors.Is(err, store.ErrNotFound) {
-		s.pageError(w, r, http.StatusNotFound, s.cfg.TunnelHost(name)+" is not registered.")
-		return
-	}
-	if err != nil {
-		s.log.Error("load subdomain", "err", err)
-		s.pageError(w, r, http.StatusInternalServerError, msgInternal)
-		return
-	}
-	if !canAccess(d.Access, d.UserID, a.User) {
-		s.pageError(w, r, http.StatusForbidden, a.User.Email+" does not have access to "+s.cfg.TunnelHost(name)+".")
-		return
-	}
+	// Every signed-in user gets the hand-off: it only says who they are.
+	// The tunnel checks access on each request, and shows those who may
+	// not open it the same page as when it is offline.
 	token := s.signer.sign("handoff", handoff{Host: name, SessionID: a.Session.ID, Nonce: randomString(16)}, handoffTTL)
 	q := url.Values{"token": {token}, "rd": {target.RequestURI()}}
 	http.Redirect(w, r, s.cfg.TunnelURL(name)+authPath+"?"+q.Encode(), http.StatusFound)
 }
 
-// parseTunnelURL accepts only URLs of tunnels on this gate2sky.
+// parseTunnelURL accepts only URLs of tunnels on this gate2net.
 func (s *Server) parseTunnelURL(raw string) (string, *url.URL, bool) {
 	u, err := url.Parse(raw)
 	if err != nil || u.User != nil || u.Scheme != s.cfg.Scheme() {

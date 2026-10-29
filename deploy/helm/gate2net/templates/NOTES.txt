@@ -1,0 +1,28 @@
+gate2net is starting.
+
+  Dashboard: https://{{ .Values.domain }}
+  Tunnels:   https://<name>.{{ .Values.domain }}
+  SSH:       ssh -p {{ .Values.ssh.publicPort }} -R <name>:80:localhost:3000 {{ .Values.ssh.publicHost | default .Values.domain }}
+
+Point {{ .Values.domain }} and *.{{ .Values.domain }} to Traefik in DNS.
+{{- if and .Values.traefik.enabled .Values.traefik.ssh.enabled }}
+
+Traefik needs a TCP entry point named "{{ .Values.traefik.ssh.entryPoint }}" listening on the SSH port and
+exposed by its Service, e.g. with the Traefik Helm chart:
+
+  ports:
+    {{ .Values.traefik.ssh.entryPoint }}:
+      port: 2222
+      expose: {default: true}
+      exposedPort: {{ .Values.ssh.publicPort }}
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.tcp.enabled }}
+TCP ports {{ .Values.tcp.first }}-{{ .Values.tcp.last }} are served by the Service {{ include "gate2net.fullname" . }}-tcp
+({{ .Values.tcp.service.type }}). Point {{ .Values.tcp.publicHost | default (.Values.ssh.publicHost | default .Values.domain) }} at its address.
+
+{{ end -}}
+Manage subdomains, SSH keys and users from the dashboard, or from a shell:
+
+  kubectl -n {{ .Release.Namespace }} exec -it deploy/{{ include "gate2net.fullname" . }} -- gate2net config

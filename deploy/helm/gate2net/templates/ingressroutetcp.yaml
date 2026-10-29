@@ -1,0 +1,21 @@
+{{- if and .Values.traefik.enabled .Values.traefik.ssh.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: {{ include "gate2net.fullname" . }}-ssh
+  labels:
+    {{- include "gate2net.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - {{ .Values.traefik.ssh.entryPoint }}
+  routes:
+    # SSH is not TLS, so the entry point must be dedicated to gate2net.
+    - match: HostSNI(`*`)
+      services:
+        - name: {{ include "gate2net.fullname" . }}
+          port: ssh
+          {{- if eq (include "gate2net.proxyProtocol" .) "true" }}
+          proxyProtocol:
+            version: 2
+          {{- end }}
+{{- end }}

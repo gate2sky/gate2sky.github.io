@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gate2net</title>
+<style>
+  :root {
+    color-scheme: light;
+    --fg: #2d3338; --muted: #646c72; --bg: #e9ebf0; --card: #fff; --line: rgb(0 0 0 / .1);
+    --fill: rgb(0 0 0 / .05); --field: #fff; --field-line: rgb(0 0 0 / .16);
+    --accent: #0071e3; --green: #28b24b; --orange: #e08600; --red: #d92d23;
+    --ring: 0 0 0 3.5px rgb(64 156 255 / .45);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { color-scheme: dark; --fg: #eef0f4; --muted: #a9b0b8; --bg: #1c1f26; --card: #262a33; --line: rgb(255 255 255 / .1);
+      --fill: rgb(255 255 255 / .07); --field: #1d2028; --field-line: rgb(255 255 255 / .18); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 12px 18px;
+    background: linear-gradient(135deg, #1d2b55, #3b2a5c); color: #fff; }
+  header img { width: 30px; height: 30px; }
+  header h1 { font-size: 16px; margin: 0; flex: 1; letter-spacing: -.01em; }
+  main { padding: 16px 18px 28px; display: grid; gap: 14px; max-width: 760px; margin: 0 auto; }
+  section { background: var(--card); border-radius: 12px; padding: 16px; box-shadow: 0 0 0 .5px var(--line), 0 1px 3px rgb(0 0 0 / .06); }
+  h2 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  label { display: grid; gap: 4px; font-weight: 600; font-size: 12.5px; }
+  .hint { font-weight: normal; color: var(--muted); font-size: 12px; }
+  input, select { font: inherit; font-size: 14px; color: var(--fg); background: var(--field); border: .5px solid var(--field-line);
+    border-radius: 7px; padding: 7px 10px; width: 100%; min-width: 0; }
+  input:focus, select:focus, button:focus-visible { outline: none; box-shadow: var(--ring); }
+  input:disabled { opacity: .45; }
+  .row { display: flex; gap: 8px; align-items: end; }
+  .row > * { flex: 1; }
+  .grid2 { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .suffix { display: flex; } .suffix input { border-radius: 7px 0 0 7px; }
+  .suffix span { display: flex; align-items: center; padding: 0 10px; border: .5px solid var(--field-line); border-left: 0;
+    border-radius: 0 7px 7px 0; background: var(--fill); color: var(--muted); font-weight: normal; white-space: nowrap; }
+  button { font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 7px; padding: 7px 14px; cursor: pointer; white-space: nowrap;
+    color: #fff; background: linear-gradient(180deg, rgb(255 255 255 / .22), rgb(255 255 255 / 0)), var(--accent);
+    box-shadow: 0 1px 0 rgb(255 255 255 / .4) inset, 0 0 0 .5px rgb(0 0 0 / .25), 0 1px 2px rgb(0 0 0 / .15); }
+  button:hover { filter: brightness(1.06); } button:active { filter: brightness(.94); }
+  button:disabled { opacity: .45; cursor: default; filter: none; }
+  button.secondary { color: var(--fg); background: var(--field); box-shadow: 0 0 0 .5px var(--field-line), 0 1px 2px rgb(0 0 0 / .08); }
+  button.danger { --accent: var(--red); }
+  button.icon { background: none; box-shadow: none; color: var(--muted); padding: 4px 7px; font-size: 16px; line-height: 1; }
+  button.icon:hover { background: var(--fill); color: var(--red); filter: none; }
+  .pill { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgb(255 255 255 / .16); }
+  .pill.connected { background: var(--green); } .pill.connecting, .pill.waiting { background: var(--orange); } .pill.failed { background: var(--red); }
+  .found { margin-top: 8px; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+  .found code { color: var(--fg); }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 0 6px 6px; }
+  td { padding: 4px 6px; vertical-align: middle; }
+  td.kind { width: 92px; } td.local { width: 26%; } td.x { width: 34px; text-align: right; }
+  .state { font-size: 12px; color: var(--muted); }
+  .state.open { color: var(--green); font-weight: 600; } .state.refused { color: var(--red); font-weight: 600; }
+  .address { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; cursor: copy; color: var(--accent); background: none; border: 0; padding: 0; box-shadow: none; font-weight: normal; }
+  .adds { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .check { display: flex; align-items: center; gap: 8px; font-weight: normal; font-size: 13.5px; }
+  .check input { width: auto; }
+  .error { color: var(--red); font-size: 13px; margin: 8px 0 0; }
+  .note { color: var(--muted); font-size: 12.5px; margin: 8px 0 0; }
+  pre { margin: 0; max-height: 220px; overflow: auto; font: 12px/1.5 ui-monospace, "SF Mono", Consolas, monospace; white-space: pre-wrap;
+    background: var(--fill); border-radius: 8px; padding: 10px; }
+  .saved { font-size: 12px; color: var(--green); font-weight: 600; opacity: 0; transition: opacity .3s; }
+  .saved.on { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <img src="/logo.svg" alt="">
+  <h1>gate2net</h1>
+  <span id="status" class="pill">disconnected</span>
+  <button id="toggle" type="button">Connect</button>
+</header>
+<main>
+  <p id="error" class="error" hidden></p>
+
+  <section>
+    <h2>Your gate2net</h2>
+    <div class="row">
+      <label>Dashboard address <span class="hint">As in your browser, e.g. gate.example.com</span>
+        <input id="dashboard" placeholder="gate.example.com" autocomplete="off" spellcheck="false"></label>
+      <div style="flex:none"><button id="discover" type="button" class="secondary">Look up</button></div>
+    </div>
+    <p id="found" class="found" hidden></p>
+    <div class="grid2" style="margin-top:12px">
+      <label>Subdomain
+        <span class="suffix"><input id="subdomain" placeholder="myapp" autocomplete="off" spellcheck="false"><span id="domain">.gate.example.com</span></span></label>
+      <label>SSH key <span class="hint">Optional: the agent's keys and ~/.ssh are tried first</span>
+        <input id="keyfile" placeholder="C:\Users\me\.ssh\gate2net" autocomplete="off" spellcheck="false"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Forwards <span id="saved" class="saved">Saved</span></h2>
+    <table>
+      <thead><tr><th>Type</th><th>Port name</th><th>Local service</th><th>State</th><th></th></tr></thead>
+      <tbody id="forwards"></tbody>
+    </table>
+    <div class="adds">
+      <button type="button" class="secondary" data-add="http">+ HTTP tunnel</button>
+      <button type="button" class="secondary" data-add="tcp">+ TCP port</button>
+      <button type="button" class="secondary" data-add="udp">+ UDP port</button>
+    </div>
+    <p class="note">Create TCP and UDP ports on the subdomain's page of the dashboard first, then add them here by name. The local service is a port (3000) or host:port.</p>
+  </section>
+
+  <section>
+    <h2>Options</h2>
+    <label class="check"><input id="autostart" type="checkbox"> <span id="autostart-label">Start gate2net when I sign in</span></label>
+    <label class="check" style="margin-top:6px"><input id="connectOnStart" type="checkbox"> Connect as soon as gate2net starts</label>
+  </section>
+
+  <section>
+    <h2>Log</h2>
+    <pre id="log"></pre>
+  </section>
+</main>
+<script>
+  const TOKEN = {{.Token}}
+  const $ = id => document.getElementById(id)
+  let state = null
+  let settings = null
+  let editing = false
+
+  const api = async (method, path, body) => {
+    const r = await fetch(path, { method, headers: { "X-Token": TOKEN, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body) })
+    const data = await r.json().catch(() => null)
+    if (!r.ok) throw new Error((data && data.error) || "Something went wrong")
+    return data
+  }
+  const showError = msg => { $("error").hidden = !msg; $("error").textContent = msg || "" }
+
+  // Settings are saved a moment after each change.
+  let saveTimer = null
+  const save = () => {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(async () => {
+      try {
+        apply(await api("PUT", "/api/settings", settings), true)
+        $("saved").classList.add("on")
+        setTimeout(() => $("saved").classList.remove("on"), 1200)
+      } catch (e) { showError(e.message) }
+    }, 400)
+  }
+
+  const renderForwards = () => {
+    const tbody = $("forwards")
+    tbody.textContent = ""
+    settings.forwards.forEach((f, i) => {
+      const live = state && state.forwards && state.forwards[i]
+      const tr = document.createElement("tr")
+      const kind = document.createElement("select")
+      for (const k of ["http", "tcp", "udp"]) kind.add(new Option(k.toUpperCase(), k, false, f.kind === k))
+      kind.onchange = () => { f.kind = kind.value; if (f.kind === "http") f.name = ""; renderForwards(); save() }
+      const name = document.createElement("input")
+      name.value = f.name; name.placeholder = f.kind === "http" ? "—" : "db"; name.disabled = f.kind === "http"
+      name.oninput = () => { f.name = name.value; save() }
+      const local = document.createElement("input")
+      local.value = f.local; local.placeholder = f.kind === "http" ? "3000" : "5432"
+      local.oninput = () => { f.local = local.value; save() }
+      const st = document.createElement("span")
+      st.className = "state " + (live ? live.state : "")
+      st.textContent = live ? (live.state === "open" ? "open" : live.state === "refused" ? "refused" : "waiting") : "—"
+      const cellState = document.createElement("td")
+      cellState.append(st)
+      if (live && live.address) {
+        const a = document.createElement("button")
+        a.className = "address"; a.type = "button"; a.title = "Copy"; a.textContent = " " + live.address
+        a.onclick = () => navigator.clipboard && navigator.clipboard.writeText(live.address)
+        cellState.append(a)
+      }
+      const del = document.createElement("button")
+      del.className = "icon"; del.type = "button"; del.title = "Remove"; del.textContent = "×"
+      del.onclick = () => { settings.forwards.splice(i, 1); renderForwards(); save() }
+      const cells = [[kind, "kind"], [name, ""], [local, "local"]].map(([el, cls]) => {
+        const td = document.createElement("td"); td.className = cls; td.append(el); return td })
+      const x = document.createElement("td"); x.className = "x"; x.append(del)
+      tr.append(...cells, cellState, x)
+      tbody.append(tr)
+    })
+  }
+
+  // apply shows a state; fields being typed in keep their value.
+  const apply = (s, fromSave) => {
+    state = s
+    if (!settings || fromSave === undefined && !editing) settings = structuredClone(s.settings)
+    if (!settings.forwards) settings.forwards = []
+    const running = ["connecting", "connected", "waiting"].includes(s.status)
+    $("status").textContent = s.status
+    $("status").className = "pill " + s.status
+    $("toggle").textContent = running ? "Disconnect" : "Connect"
+    $("toggle").className = running ? "secondary" : ""
+    if (document.activeElement !== $("dashboard")) $("dashboard").value = settings.dashboard || ""
+    if (document.activeElement !== $("subdomain")) $("subdomain").value = settings.subdomain || ""
+    if (document.activeElement !== $("keyfile")) $("keyfile").value = settings.key_file || ""
+    $("domain").textContent = "." + (s.settings.domain || "your gate2net")
+    $("found").hidden = !s.settings.server
+    $("found").innerHTML = s.settings.server ? `SSH <code></code> · host key <code></code>` : ""
+    if (s.settings.server) {
+      const codes = $("found").querySelectorAll("code")
+      codes[0].textContent = s.settings.server; codes[1].textContent = s.settings.host_key
+    }
+    $("autostart").checked = s.autostart
+    $("autostart").disabled = !s.can_autostart
+    $("connectOnStart").checked = !!settings.connect_on_start
+    if (!document.activeElement || document.activeElement.tagName !== "INPUT" || !$("forwards").contains(document.activeElement)) renderForwards()
+    if (s.status === "failed" || s.status === "waiting") showError(s.error)
+    else if (s.status === "connected") showError("")
+    const log = $("log"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 4
+    log.textContent = (s.log || []).join("\n")
+    if (atEnd) log.scrollTop = log.scrollHeight
+  }
+
+  $("toggle").onclick = async () => {
+    showError("")
+    try {
+      clearTimeout(saveTimer)
+      if (["connecting", "connected", "waiting"].includes(state.status)) apply(await api("POST", "/api/disconnect"))
+      else {
+        await api("PUT", "/api/settings", settings)
+        apply(await api("POST", "/api/connect"))
+      }
+    } catch (e) { showError(e.message) }
+  }
+  $("discover").onclick = async () => {
+    showError("")
+    $("discover").disabled = true
+    try {
+      settings.dashboard = $("dashboard").value
+      const s = await api("POST", "/api/discover", { dashboard: settings.dashboard })
+      settings = structuredClone(s.settings)
+      apply(s)
+    } catch (e) { showError(e.message) }
+    $("discover").disabled = false
+  }
+  $("dashboard").onkeydown = e => { if (e.key === "Enter") $("discover").click() }
+  $("dashboard").oninput = () => { settings.dashboard = $("dashboard").value }
+  $("subdomain").oninput = () => { settings.subdomain = $("subdomain").value; save() }
+  $("keyfile").oninput = () => { settings.key_file = $("keyfile").value; save() }
+  $("connectOnStart").onchange = () => { settings.connect_on_start = $("connectOnStart").checked; save() }
+  $("autostart").onchange = async () => {
+    try { apply(await api("PUT", "/api/autostart", { on: $("autostart").checked })) } catch (e) { showError(e.message) }
+  }
+  for (const b of document.querySelectorAll("[data-add]")) b.onclick = () => {
+    settings.forwards.push({ kind: b.dataset.add, name: "", local: "" })
+    renderForwards(); save()
+  }
+  if (/Windows/.test(navigator.userAgent)) $("autostart-label").textContent = "Start gate2net with Windows"
+  document.addEventListener("focusin", () => { editing = true })
+  document.addEventListener("focusout", () => { editing = false })
+
+  // Follow the app: each answer comes at its next change.
+  const follow = async () => {
+    for (;;) {
+      try { apply(await api("GET", "/api/state?wait=1")) } catch { await new Promise(r => setTimeout(r, 2000)) }
+    }
+  }
+  api("GET", "/api/state").then(s => { apply(s); follow() }).catch(e => showError(e.message))
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@
   const { ago, plural } = await import("@ui/lib/format.js")
   const StatusBadge = await import("@ui/components/status-badge.html")
 
-  document.title = "Admin · gate2sky"
+  document.title = "Admin · gate2net"
 
   // Which list shows: users or subdomains.
   let tab = "users"
@@ -20,6 +20,8 @@
   }
   await load()
   $: online = subdomains.filter(sub => sub.tunnel).length
+  // How much of tcp.ports the subdomains hold.
+  $: portsUsed = subdomains.reduce((n, sub) => n + sub.ports, 0)
 
   $attached(() => {
     const timer = setInterval(() => document.hidden || load(), 5000)
@@ -93,16 +95,17 @@
   }
 </script>
 
-<div class="page-head"><h1>Admin</h1></div>
-
-<div class="panel-tabs" role="tablist">
-  <button type="button" role="tab" :aria-selected="tab === 'users' ? 'true' : 'false'" @click="tab = 'users'">
-    Users <span class="count">{{ users.length }}</span>
-  </button>
-  <button type="button" role="tab" :aria-selected="tab === 'subdomains' ? 'true' : 'false'" @click="tab = 'subdomains'">
-    Subdomains <span class="count">{{ subdomains.length }}</span>
-    <span :if="online" class="count count-online" :title="online + ' online'">{{ online }} online</span>
-  </button>
+<div class="page-head">
+  <h1>Admin</h1>
+  <div class="panel-tabs" role="tablist">
+    <button type="button" role="tab" :aria-selected="tab === 'users' ? 'true' : 'false'" @click="tab = 'users'">
+      Users <span class="count">{{ users.length }}</span>
+    </button>
+    <button type="button" role="tab" :aria-selected="tab === 'subdomains' ? 'true' : 'false'" @click="tab = 'subdomains'">
+      Subdomains <span class="count">{{ subdomains.length }}</span>
+      <span :if="online" class="count count-online" :title="online + ' online'">{{ online }} online</span>
+    </button>
+  </div>
 </div>
 
 <section :if="tab === 'users'" class="card" role="tabpanel" aria-label="Users">
@@ -160,13 +163,14 @@
 <section :elseif="tab === 'subdomains'" class="card" role="tabpanel" aria-label="Subdomains">
   <div :if="subdomains.length" class="table-wrap">
     <table class="table">
-      <thead><tr><th>Subdomain</th><th class="hide-narrow">Owner</th><th>Access</th><th class="hide-narrow">Keys</th><th>Status</th><th class="hide-narrow">Requests</th></tr></thead>
+      <thead><tr><th>Subdomain</th><th class="hide-narrow">Owner</th><th>Access</th><th class="hide-narrow">Keys</th><th :if="app.tcp" class="hide-narrow">Ports</th><th>Status</th><th class="hide-narrow">Requests</th></tr></thead>
       <tbody>
         <tr :each="sub in subdomains" :key="sub.name">
           <td><a class="name-cell" :href="'/subdomains/' + encodeURIComponent(sub.name)"><span class="tile" :class="'tile-' + sub.access" aria-hidden="true">{{ sub.name[0] }}</span><strong>{{ sub.name }}</strong></a></td>
           <td class="hide-narrow">{{ sub.owner }}</td>
           <td><span class="badge" :class="'badge-' + sub.access">{{ sub.access }}</span></td>
           <td class="hide-narrow">{{ sub.keys }}</td>
+          <td :if="app.tcp" class="hide-narrow">{{ sub.ports || "—" }}<span :if="sub.ports_online" class="muted small"> · {{ sub.ports_online }} online</span></td>
           <td>
             <StatusBadge :tunnel="sub.tunnel" />
             <div :if="sub.tunnel" class="muted small hide-narrow">{{ sub.tunnel.client_addr }} · {{ ago(sub.tunnel.created_at) }}</div>
@@ -177,6 +181,7 @@
     </table>
   </div>
   <p :else class="empty-inline">No subdomains registered.</p>
+  <p :if="app.tcp" class="hint">Ports {{ app.tcp.first }}–{{ app.tcp.last }}: {{ portsUsed }} of {{ app.tcp.last - app.tcp.first + 1 }} in use, at most {{ app.tcp.max_ports }} per subdomain.</p>
 </section>
 
 

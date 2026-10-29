@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/config"
 )
 
 // fakeSMTP accepts one message and records the conversation.
@@ -87,7 +87,7 @@ func TestSMTPSender(t *testing.T) {
 	host, port, _ := net.SplitHostPort(f.addr)
 	p, _ := strconv.Atoi(port)
 	s := New(config.EmailConfig{
-		From: "gate2sky <no-reply@gate.example.com>",
+		From: "gate2net <no-reply@gate.example.com>",
 		SMTP: config.SMTPConfig{Host: host, Port: p, TLS: "none", Username: "user", Password: "pw"},
 	}, nil)
 	err := s.Send(context.Background(), Message{To: "alice@example.com", Subject: "Your code: 123456", Body: "Code:\n\n    123456\n"})

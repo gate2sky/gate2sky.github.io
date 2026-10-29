@@ -16,6 +16,8 @@ import (
 var (
 	ErrNotFound = errors.New("not found")
 	ErrConflict = errors.New("already exists")
+	// ErrFull is returned when a range has no free port left.
+	ErrFull = errors.New("no free port")
 )
 
 // Store wraps the SQLite database.
@@ -108,6 +110,21 @@ var migrations = []string{
 	// top of what the configuration allows.
 	`ALTER TABLE users ADD COLUMN added INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';`,
+	// Raw TCP (and later UDP) ports of subdomains, each with a public port
+	// allocated from tcp.ports for good.
+	`CREATE TABLE tcp_ports (
+		id           INTEGER PRIMARY KEY,
+		subdomain_id INTEGER NOT NULL REFERENCES subdomains(id) ON DELETE CASCADE,
+		name         TEXT NOT NULL,
+		protocol     TEXT NOT NULL DEFAULT 'tcp',
+		port         INTEGER NOT NULL UNIQUE,
+		allow        TEXT NOT NULL DEFAULT '',
+		preset       TEXT NOT NULL DEFAULT '',
+		local_port   INTEGER NOT NULL DEFAULT 0,
+		created_at   INTEGER NOT NULL,
+		UNIQUE (subdomain_id, name)
+	);
+	CREATE INDEX tcp_ports_subdomain ON tcp_ports(subdomain_id);`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

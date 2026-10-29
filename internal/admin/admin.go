@@ -1,5 +1,5 @@
 // Package admin exposes management operations on a local Unix socket, for
-// `gate2sky config` and `gate2sky status`. Access is controlled by the
+// `gate2net config` and `gate2net status`. Access is controlled by the
 // socket's file permissions: only the service user and root can connect.
 package admin
 
@@ -15,10 +15,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gate2sky/gate2sky.github.io/internal/api"
-	"github.com/gate2sky/gate2sky.github.io/internal/config"
-	"github.com/gate2sky/gate2sky.github.io/internal/manage"
-	"github.com/gate2sky/gate2sky.github.io/internal/store"
+	"github.com/gate2net/gate2net.github.io/internal/api"
+	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/gate2net/gate2net.github.io/internal/manage"
+	"github.com/gate2net/gate2net.github.io/internal/store"
 )
 
 // Status describes the running server.
@@ -100,7 +100,7 @@ func (h *Handler) Serve(ctx context.Context) error {
 	// another server is answering on it.
 	if c, err := net.DialTimeout("unix", path, time.Second); err == nil {
 		c.Close()
-		return fmt.Errorf("admin socket %s is in use: is gate2sky already running?", path)
+		return fmt.Errorf("admin socket %s is in use: is gate2net already running?", path)
 	}
 	os.Remove(path)
 	ln, err := net.Listen("unix", path)

@@ -1,0 +1,300 @@
+<script :setup="{ sub = null }">
+  // A subdomain's TCP and UDP ports: each with its public address, who may connect
+  // and whether a client forwards it now; the command that forwards them
+  // all; and a form to add one from a preset. Tells its page to reload
+  // with a `changed` event.
+  //
+  //   <TcpPorts :sub="sub" @changed="load()" />
+  const { app, toast } = await import("@ui/lib/store.js")
+  const { api } = await import("@ui/lib/api.js")
+  const { ago, bytes, plural } = await import("@ui/lib/format.js")
+  const CopyText = await import("@ui/components/copy-text.html")
+
+  // The local port only builds the command; restricted ports start with
+  // the visitor's own address in their allow list.
+  const PRESETS = [
+    { id: "postgresql", label: "PostgreSQL", name: "postgres", port: 5432, restricted: true },
+    { id: "mysql", label: "MySQL / MariaDB", name: "mysql", port: 3306, restricted: true },
+    { id: "redis", label: "Redis", name: "redis", port: 6379, restricted: true,
+      warn: "Redis accepts anyone without a password by default: set one, and keep this port restricted." },
+    { id: "mongodb", label: "MongoDB", name: "mongo", port: 27017, restricted: true },
+    { id: "ssh", label: "SSH", name: "ssh", port: 22, restricted: false },
+    { id: "rdp", label: "Remote Desktop (RDP)", name: "rdp", port: 3389, restricted: true },
+    { id: "vnc", label: "VNC", name: "vnc", port: 5900, restricted: true,
+      warn: "VNC is usually unencrypted: keep this port restricted to addresses you trust." },
+    { id: "minecraft", label: "Minecraft (Java)", name: "minecraft", port: 25565, restricted: false },
+    { id: "mqtt", label: "MQTT", name: "mqtt", port: 1883, restricted: true,
+      warn: "Plain MQTT is unencrypted; use port 8883 if your broker has TLS." },
+    { id: "minecraft-bedrock", label: "Minecraft Bedrock (UDP)", name: "bedrock", port: 19132, restricted: false, udp: true },
+    { id: "valheim", label: "Valheim (UDP)", name: "valheim", port: 2456, restricted: false, udp: true },
+    { id: "wireguard", label: "WireGuard (UDP)", name: "wireguard", port: 51820, restricted: false, udp: true },
+    { id: "", label: "Custom TCP", name: "", port: "", restricted: true },
+    { id: "custom-udp", label: "Custom UDP", name: "", port: "", restricted: true, udp: true },
+  ]
+  const presetOf = id => PRESETS.find(p => p.id === id) || PRESETS.find(p => p.id === "")
+
+  const path = () => "/subdomains/" + encodeURIComponent(sub.name)
+  const lines = text => text.split(/[\s,]+/).filter(Boolean)
+
+  // The add form.
+  let preset = "postgresql"
+  let name = "postgres"
+  let localPort = 5432
+  let restricted = true
+  let allowText = sub.client_ip
+  let error = ""
+  let busy = false
+
+  const choose = id => {
+    const p = presetOf(id)
+    preset = p.id
+    name = p.name
+    localPort = p.port
+    restricted = p.restricted
+    if (restricted && !allowText) allowText = sub.client_ip
+  }
+
+  const body = (portName, local, isRestricted, text) => {
+    const allow = isRestricted ? lines(text) : []
+    if (isRestricted && !allow.length) throw new Error("Add at least one address, or let anyone connect.")
+    return { name: portName, local_port: Number(local), allow }
+  }
+
+  const addDialog = () => document.querySelector("dialog.add-port")
+  const startAdd = () => {
+    choose("postgresql")
+    allowText = sub.client_ip
+    error = ""
+    addDialog().showModal()
+  }
+
+  const addPort = async () => {
+    error = ""
+    busy = true
+    try {
+      const protocol = presetOf(preset).udp ? "udp" : "tcp"
+      const port = await api("POST", path() + "/ports", { ...body(name, localPort, restricted, allowText), preset, protocol })
+      addDialog().close()
+      toast(`Added ${port.name}: ${port.address}.`)
+      $emit("changed")
+    } catch (e) {
+      error = e.message
+    }
+    busy = false
+  }
+
+  // The port being edited, and its new settings.
+  let editing = null
+  let editName = ""
+  let editLocal = ""
+  let editRestricted = true
+  let editAllow = ""
+  let editError = ""
+
+  const startEdit = port => {
+    editing = port
+    editName = port.name
+    editLocal = port.local_port
+    editRestricted = port.allow.length > 0
+    editAllow = port.allow.length ? port.allow.join("\n") : sub.client_ip
+    editError = ""
+    document.querySelector("dialog.edit-port").showModal()
+  }
+
+  const saveEdit = async () => {
+    editError = ""
+    try {
+      const port = await api("PATCH", `${path()}/ports/${editing.id}`, body(editName, editLocal, editRestricted, editAllow))
+      document.querySelector("dialog.edit-port").close()
+      toast(`Saved ${port.name}.`)
+      $emit("changed")
+    } catch (e) {
+      editError = e.message
+    }
+  }
+
+  const removePort = async port => {
+    if (!confirm(`Delete the port "${port.name}" (${port.address})? Its number goes back to the pool, and a new port may get it.`)) return
+    try {
+      await api("DELETE", `${path()}/ports/${port.id}`)
+      toast(`Deleted ${port.name}.`)
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    $emit("changed")
+  }
+
+  // Which client command shows: Linux and macOS, or Windows.
+  let os = /Windows/.test(navigator.userAgent) ? "windows" : "unix"
+
+  let copied = 0
+  const copyAddress = async port => {
+    try {
+      await navigator.clipboard.writeText(port.address)
+      copied = port.id
+      setTimeout(() => { copied = 0 }, 1600)
+    } catch {
+      toast(port.address)
+    }
+  }
+
+  const access = port => port.allow.length ? port.allow.join(", ") : "Anyone"
+  $: full = sub.port_list.length >= app.tcp.max_ports
+  $: warning = presetOf(preset).warn
+  $: udp = !!presetOf(preset).udp
+  $: hasUDP = sub.port_list.some(port => port.protocol === "udp")
+</script>
+
+<section class="card tcp-ports">
+  <div class="card-head">
+    <h2>Ports</h2>
+    <div class="card-head-actions">
+      <span class="count">{{ sub.port_list.length }} of {{ app.tcp.max_ports }}</span>
+      <button :if="!full" type="button" class="button button-secondary button-small" @click="startAdd">
+        <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add port
+      </button>
+    </div>
+  </div>
+  <p class="muted">Raw TCP and UDP on <strong>{{ app.tcp.host }}</strong> for databases, SSH, games… Each port has a public number of its own, and only the addresses you allow can connect.</p>
+
+  <div :if="sub.port_list.length" class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Name</th><th>Address</th><th class="hide-narrow">Access</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <tr :each="port in sub.port_list" :key="port.id">
+          <td>
+            <strong>{{ port.name }}</strong>
+            <div class="muted small"><span class="proto">{{ port.protocol }}</span> {{ presetOf(port.preset).id && !presetOf(port.preset).label.startsWith("Custom") ? presetOf(port.preset).label.replace(" (UDP)", "") + " · " : "" }}localhost:{{ port.local_port }}</div>
+          </td>
+          <td class="keep">
+            <span class="address">
+              <code>{{ port.address }}</code>
+              <button type="button" class="icon-button" :aria-label="'Copy ' + port.address" :title="copied === port.id ? 'Copied' : 'Copy'" @click="copyAddress(port)">
+                <svg :if="copied === port.id" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+                <svg :else viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+              </button>
+            </span>
+          </td>
+          <td class="hide-narrow small">
+            <span :if="port.allow.length">{{ access(port) }}</span>
+            <span :else class="warn">Anyone</span>
+          </td>
+          <td>
+            <span :if="port.forward" class="badge badge-online"><i class="dot"></i>online</span>
+            <span :else class="badge"><i class="dot"></i>idle</span>
+            <div :if="port.forward" class="muted small hide-narrow">{{ plural(port.forward.connections, "connection") }} · {{ bytes(port.forward.bytes_in + port.forward.bytes_out) }}<span :if="port.forward.refused"> · {{ port.forward.refused }} refused</span></div>
+          </td>
+          <td class="right row-actions">
+            <button type="button" class="icon-button" :aria-label="'Edit ' + port.name" title="Edit" @click="startEdit(port)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg>
+            </button>
+            <button type="button" class="icon-button danger" :aria-label="'Delete ' + port.name" title="Delete" @click="removePort(port)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p :else class="empty-inline">No ports yet.</p>
+
+  <div :if="hasUDP && sub.tunnel_command">
+    <div class="command-head">
+      <p class="muted">To forward them, UDP included, with the gate2net client and an authorized key (ssh-agent or <code>-i</code>):</p>
+      <div class="segmented" role="group" aria-label="Operating system">
+        <button type="button" :aria-pressed="os === 'unix' ? 'true' : 'false'" @click="os = 'unix'">Linux / macOS</button>
+        <button type="button" :aria-pressed="os === 'windows' ? 'true' : 'false'" @click="os = 'windows'">Windows</button>
+      </div>
+    </div>
+    <CopyText :if="os === 'unix'" :command="sub.tunnel_command" />
+    <CopyText :else :command="sub.tunnel_command_windows" />
+    <p class="muted small">Plain <code>ssh</code> only carries TCP. The script downloads the client for this server, checks it and deletes it when it ends (<code>--cache</code> first keeps it). Add <code>--http 3000</code> for the HTTP tunnel.<span :if="os === 'windows'"> In PowerShell; keys come from the OpenSSH agent (<code>ssh-add</code>) or <code>%USERPROFILE%\.ssh</code>. Rather a window and a tray icon? <a href="https://github.com/gate2net/gate2net.github.io/releases/latest" target="_blank" rel="noopener">The gate2net app</a> (<code>gate2net-gui.exe</code>, in the same download) does the same.</span> UDP over SSH suits games and DNS-like traffic; fast-paced games and calls may feel jittery.</p>
+  </div>
+  <div :elseif="sub.ports_command">
+    <p class="muted">To forward them, with an authorized key:</p>
+    <CopyText :command="sub.ports_command" />
+    <p class="muted small">Each <code>-R</code> names a port as <code>&lt;port&gt;.{{ sub.name }}</code>; change the local ports to yours. You can add these to the HTTP tunnel’s command.</p>
+  </div>
+
+  <p :if="full" class="hint">A subdomain can have at most {{ app.tcp.max_ports }} ports: delete one to add another.</p>
+</section>
+
+<dialog class="card dialog dialog-wide add-port" aria-labelledby="add-port-title">
+  <h2 id="add-port-title">Add a port to {{ sub.name }}</h2>
+  <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+  <form class="form" @submit.prevent="addPort">
+    <div class="form-grid">
+      <label>Service
+        <select class="field" name="preset" @change="choose($event.target.value)">
+          <option :each="p in PRESETS" :key="p.id" :value="p.id" :selected="p.id === preset">{{ p.label }}</option>
+        </select>
+      </label>
+      <label>Name
+        <input name="port-name" required maxlength="32" pattern="[A-Za-z0-9]([A-Za-z0-9\-]{0,30}[A-Za-z0-9])?" autocomplete="off" spellcheck="false"
+               placeholder="db" :value="name" @input="name = $event.target.value">
+      </label>
+      <label>Local port
+        <input name="local-port" type="number" required min="1" max="65535" placeholder="5432" :value="localPort" @input="localPort = $event.target.value">
+      </label>
+    </div>
+    <div :if="warning" class="flash flash-warn">{{ warning }}</div>
+    <div :if="udp" class="flash flash-info">UDP ports are forwarded with the gate2net client, not plain <code>ssh</code>: the page shows the command once the port exists.</div>
+    <fieldset>
+      <legend>Who can connect</legend>
+      <label class="radio tone-green">
+        <input type="radio" name="port-access" :checked="restricted" @change="restricted = true">
+        <span class="radio-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <span class="radio-text"><strong>Only these addresses</strong> <span class="muted">IP addresses or ranges like 203.0.113.0/24, one per line</span></span>
+        <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
+      </label>
+      <textarea :if="restricted" name="allow" rows="2" spellcheck="false" aria-label="Allowed addresses" :placeholder="sub.client_ip"
+                :value="allowText" @input="allowText = $event.target.value"></textarea>
+      <p :if="restricted" class="hint">Your address, as gate2net sees it, is <code>{{ sub.client_ip }}</code>.</p>
+      <label class="radio tone-orange">
+        <input type="radio" name="port-access" :checked="!restricted" @change="restricted = false">
+        <span class="radio-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg></span>
+        <span class="radio-text"><strong>Anyone</strong> <span class="muted">The whole internet, bots included: only for services with their own login</span></span>
+        <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
+      </label>
+    </fieldset>
+    <div class="dialog-actions">
+      <button type="button" class="button button-secondary" @click="addDialog().close()">Cancel</button>
+      <button type="submit" class="button" :disabled="busy">Add port</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="card dialog edit-port" aria-labelledby="edit-port-title">
+  <form class="form" @submit.prevent="saveEdit">
+    <h2 id="edit-port-title">Edit {{ editing ? editing.name : "" }}</h2>
+    <p :if="editing" class="muted">{{ editing.address }}. Connections already open keep going.</p>
+    <div :if="editError" class="flash flash-error" role="alert">{{ editError }}</div>
+    <div class="form-grid">
+      <label>Name
+        <input name="edit-name" required maxlength="32" autocomplete="off" spellcheck="false" :value="editName" @input="editName = $event.target.value">
+      </label>
+      <label>Local port
+        <input name="edit-local" type="number" required min="1" max="65535" :value="editLocal" @input="editLocal = $event.target.value">
+      </label>
+    </div>
+    <fieldset>
+      <legend>Who can connect</legend>
+      <label class="radio tone-green">
+        <input type="radio" name="edit-access" :checked="editRestricted" @change="editRestricted = true">
+        <span class="radio-text"><strong>Only these addresses</strong></span>
+        <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
+      </label>
+      <textarea :if="editRestricted" name="edit-allow" rows="3" spellcheck="false" aria-label="Allowed addresses"
+                :value="editAllow" @input="editAllow = $event.target.value"></textarea>
+      <label class="radio tone-orange">
+        <input type="radio" name="edit-access" :checked="!editRestricted" @change="editRestricted = false">
+        <span class="radio-text"><strong>Anyone</strong> <span class="muted">The whole internet</span></span>
+        <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
+      </label>
+    </fieldset>
+    <div class="dialog-actions">
+      <button type="button" class="button button-secondary" @click="document.querySelector('dialog.edit-port').close()">Cancel</button>
+      <button type="submit" class="button">Save</button>
+    </div>
+  </form>
+</dialog>

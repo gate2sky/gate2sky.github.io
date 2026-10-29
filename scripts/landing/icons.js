@@ -1,4 +1,6 @@
-// Renders pages/favicon.svg into the bitmaps for what does not take an SVG
+// Writes internal/web/ui/logo-mark.svg, the logo without its dark tile, for
+// the dashboard's header (as the landing's header inlines it), and renders
+// pages/favicon.svg into the bitmaps for what does not take an SVG
 // icon: favicon.ico (16 and 32 px; older Safari, and the /favicon.ico every
 // browser asks for) and apple-touch-icon.png (180 px, edge to edge on the
 // logo's own navy: iOS rounds the corners itself and fills transparency
@@ -11,6 +13,16 @@ const { chromium } = require("playwright")
 
 const pages = path.join(__dirname, "../../pages")
 const svg = "data:image/svg+xml;base64," + fs.readFileSync(path.join(pages, "favicon.svg")).toString("base64")
+
+// The desktop app's tray icon is the favicon too.
+process.on("exit", () => fs.copyFileSync(path.join(pages, "favicon.ico"), path.join(__dirname, "../../cmd/gate2net-gui/icon.ico")))
+
+// The same cut as hero.brand() in gen.py's hero.py: no comments, no tile.
+fs.writeFileSync(path.join(__dirname, "../../internal/web/ui/logo-mark.svg"), fs.readFileSync(path.join(pages, "favicon.svg"), "utf8")
+  .replace(/<!--[\s\S]*?-->\s*/g, "")
+  .replace(/<rect width="64" height="64"[^>]*\/>\s*/, ""))
+// The desktop app's window shows it too.
+fs.copyFileSync(path.join(__dirname, "../../internal/web/ui/logo-mark.svg"), path.join(__dirname, "../../internal/clientapp/ui/logo.svg"))
 
 async function render(browser, size, { background = "transparent", inset = 0 } = {}) {
   const page = await browser.newPage({ viewport: { width: size, height: size } })

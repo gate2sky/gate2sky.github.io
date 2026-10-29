@@ -1,0 +1,15 @@
+{{- if and .Values.certManager.enabled (not .Values.traefik.tls.secretName) }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "gate2net.fullname" . }}
+  labels:
+    {{- include "gate2net.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "gate2net.tlsSecret" . }}
+  dnsNames:
+    - {{ .Values.domain | quote }}
+    - {{ printf "*.%s" .Values.domain | quote }}
+  issuerRef:
+    {{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+{{- end }}
