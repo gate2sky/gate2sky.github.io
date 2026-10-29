@@ -12,9 +12,9 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2net/gate2net.github.io/internal/config"
-	"github.com/gate2net/gate2net.github.io/internal/store"
-	"github.com/gate2net/gate2net.github.io/internal/wizard"
+	"github.com/jgermade/intergate/internal/config"
+	"github.com/jgermade/intergate/internal/store"
+	"github.com/jgermade/intergate/internal/wizard"
 )
 
 // lineReader hands out one line per Read, like a person typing: the
@@ -54,7 +54,7 @@ func runWizard(t *testing.T, path string, answers ...string) string {
 }
 
 func TestWizardSetup(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "etc", "gate2net.yaml")
+	path := filepath.Join(t.TempDir(), "etc", "intergate.yaml")
 	out := runWizard(t, path,
 		// Domain and HTTPS.
 		"https://gate.example.org", "1",
@@ -92,7 +92,7 @@ func TestWizardSetup(t *testing.T) {
 		cfg.Auth.Email.SMTP.Host:           "smtp.example.org",
 		cfg.Auth.Email.SMTP.TLS:            "starttls",
 		cfg.Auth.Email.SMTP.Password:       "s3cret",
-		cfg.Auth.Email.From:                "gate2net <no-reply@gate.example.org>",
+		cfg.Auth.Email.From:                "intergate <no-reply@gate.example.org>",
 		cfg.Auth.Providers[0].ClientID:     "gh-id",
 		cfg.Auth.Providers[0].Type:         "github",
 		cfg.Auth.AllowedDomains[0]:         "example.org",
@@ -112,7 +112,7 @@ func TestWizardSetup(t *testing.T) {
 func TestWizardManagesRunningServer(t *testing.T) {
 	h := newHarness(t)
 	h.serveAdmin()
-	path := filepath.Join(t.TempDir(), "gate2net.yaml")
+	path := filepath.Join(t.TempDir(), "intergate.yaml")
 	os.WriteFile(path, h.yaml, 0o600)
 	key := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(newSigner(t).PublicKey()))) + " wizard-key"
 
@@ -153,7 +153,7 @@ func TestWizardManagesRunningServer(t *testing.T) {
 }
 
 func TestWizardKeepsCommentsAndSecrets(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "gate2net.yaml")
+	path := filepath.Join(t.TempDir(), "intergate.yaml")
 	original := `# Production gate. Ask ops before changing.
 public_url: http://localhost:8080
 data_dir: ./state
@@ -194,7 +194,7 @@ auth:
 }
 
 func TestWizardStopsWhenInputEnds(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "gate2net.yaml")
+	path := filepath.Join(t.TempDir(), "intergate.yaml")
 	var out bytes.Buffer
 	w := &wizard.Wizard{Path: path, Accessible: true, In: &lineReader{lines: []string{"http://localhost:8080"}}, Out: &out}
 	done := make(chan error, 1)

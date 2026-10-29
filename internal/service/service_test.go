@@ -5,20 +5,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/jgermade/intergate/internal/config"
 )
 
 func TestUnit(t *testing.T) {
-	opts := Options{ConfigPath: "/etc/gate2net/gate2net.yaml", Config: &config.Config{DataDir: "/var/lib/gate2net"}}
+	opts := Options{ConfigPath: "/etc/intergate/intergate.yaml", Config: &config.Config{DataDir: "/var/lib/intergate"}}
 	unit, err := Unit(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"ExecStart=/usr/local/bin/gate2net start --config /etc/gate2net/gate2net.yaml",
-		"User=gate2net",
-		"ReadWritePaths=/var/lib/gate2net",
-		"EnvironmentFile=-/etc/gate2net/gate2net.env",
+		"ExecStart=/usr/local/bin/intergate start --config /etc/intergate/intergate.yaml",
+		"User=intergate",
+		"ReadWritePaths=/var/lib/intergate",
+		"EnvironmentFile=-/etc/intergate/intergate.env",
 		"AmbientCapabilities=CAP_NET_BIND_SERVICE",
 		"ProtectSystem=strict",
 		"WantedBy=multi-user.target",
@@ -31,11 +31,11 @@ func TestUnit(t *testing.T) {
 
 func TestInstallDryRun(t *testing.T) {
 	var out bytes.Buffer
-	opts := Options{ConfigPath: "/etc/gate2net/gate2net.yaml", Config: &config.Config{DataDir: "/var/lib/gate2net"}, DryRun: true, Out: &out}
+	opts := Options{ConfigPath: "/etc/intergate/intergate.yaml", Config: &config.Config{DataDir: "/var/lib/intergate"}, DryRun: true, Out: &out}
 	if err := Install(opts); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"would: write /etc/systemd/system/gate2net.service", "would: enable and start gate2net", "[Service]"} {
+	for _, want := range []string{"would: write /etc/systemd/system/intergate.service", "would: enable and start intergate", "[Service]"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("dry run lacks %q:\n%s", want, out.String())
 		}

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gate2net — open a gate to the web</title>
-<meta name="description" content="gate2net exposes local services on your own domain through encrypted SSH tunnels: a subdomain per service, TCP and UDP ports with allow lists, SSH keys per subdomain, passkey sign-in and a live dashboard. One line to install.">
-<meta property="og:title" content="gate2net — open a gate to the web">
+<title>intergate — open a gate to the web</title>
+<meta name="description" content="intergate exposes local services on your own domain through encrypted SSH tunnels: a subdomain per service, TCP and UDP ports with allow lists, SSH keys per subdomain, passkey sign-in and a live dashboard. One line to install.">
+<meta property="og:title" content="intergate — open a gate to the web">
 <meta property="og:description" content="Encrypted SSH tunnels from your machine to your own domain, with a dashboard, passkeys and per-subdomain keys.">
-<meta property="og:url" content="https://gate2net.github.io/">
+<meta property="og:url" content="https://jgermade.github.io/intergate/">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#05070d">
 <meta name="color-scheme" content="dark light">
@@ -21,7 +21,7 @@
     const root = document.documentElement
     const system = matchMedia("(prefers-color-scheme: dark)")
     let pick = "auto"
-    try { pick = localStorage.getItem("gate2net.theme") || "auto" } catch {}
+    try { pick = localStorage.getItem("intergate.theme") || "auto" } catch {}
     if (!["auto", "light", "dark"].includes(pick)) pick = "auto"
     const apply = () => {
       const dark = root.dataset.pick === "auto" ? system.matches : root.dataset.pick === "dark"
@@ -31,9 +31,9 @@
     root.dataset.pick = pick
     apply()
     system.addEventListener?.("change", apply)
-    window.gate2netTheme = which => {
+    window.intergateTheme = which => {
       root.dataset.pick = which
-      try { localStorage.setItem("gate2net.theme", which) } catch {}
+      try { localStorage.setItem("intergate.theme", which) } catch {}
       apply()
     }
   })()
@@ -609,7 +609,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
 
 <header>
   <div class="wrap bar">
-    <a class="brand" href="#top" aria-label="gate2net home">
+    <a class="brand" href="#top" aria-label="intergate home">
       <svg aria-hidden="true" viewBox="0 0 64 64">
   <defs>
     <radialGradient id="logo-bg" cx=".6" cy=".3" r=".8"><stop offset="0" stop-color="#0a1a3d"/><stop offset="1" stop-color="#040815"/></radialGradient>
@@ -677,13 +677,13 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
     </g>
   </g>
 </svg>
-      gate2net
+      intergate
     </a>
     <nav aria-label="Sections">
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
       <a href="#install">Install</a>
-      <a class="gh" href="https://github.com/gate2net/gate2net.github.io" aria-label="gate2net on GitHub">
+      <a class="gh" href="https://github.com/jgermade/intergate" aria-label="intergate on GitHub">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         <span>GitHub</span>
       </a>
@@ -827,15 +827,15 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
       <h1>Open a <span class="glow">gate</span> to the web.</h1>
       <p class="lede">Expose any local service on your own domain through an encrypted SSH tunnel: websites on a subdomain each, databases and game servers on TCP and UDP ports. Keys per subdomain, passkeys to sign in.</p>
       <div class="install">
-        <code><span class="p">$ </span>curl -fsSL https://gate2net.github.io/setup.sh | sh</code>
-        <button class="copy" type="button" data-copy="curl -fsSL https://gate2net.github.io/setup.sh | sh" aria-label="Copy the install command">
+        <code><span class="p">$ </span>curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh</code>
+        <button class="copy" type="button" data-copy="curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh" aria-label="Copy the install command">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span>
         </button>
       </div>
       <div class="cta">
         <a href="#how">How it works ↓</a>
         <a href="./setup.sh">Read the script</a>
-        <a href="https://github.com/gate2net/gate2net.github.io">Source on GitHub ↗</a>
+        <a href="https://github.com/jgermade/intergate">Source on GitHub ↗</a>
       </div>
     </div>
   </div>
@@ -849,7 +849,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
       </div>
       <div class="flow">
         <!-- Wide drawing, from 760px. -->
-        <svg class="wide" viewBox="0 0 960 300" role="img" aria-label="Your machine connects to gate2net with ssh -R through an encrypted tunnel; visitors reach https://myapp.gate.example.com and their requests travel through the gate to localhost:3000.">
+        <svg class="wide" viewBox="0 0 960 300" role="img" aria-label="Your machine connects to intergate with ssh -R through an encrypted tunnel; visitors reach https://myapp.gate.example.com and their requests travel through the gate to localhost:3000.">
           <path id="route-w" d="M236 150 H724" fill="none"/>
           <!-- your machine -->
           <rect class="panel" x="40" y="66" width="196" height="132" rx="12"/>
@@ -900,7 +900,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
           <ellipse class="shimmer" rx="18" ry="54"/>
           <ellipse class="ring" rx="18" ry="54"/>
         </g>
-          <text class="cap" x="490" y="256" text-anchor="middle">gate2net</text>
+          <text class="cap" x="490" y="256" text-anchor="middle">intergate</text>
           <!-- the visitor's browser -->
           <rect class="panel" x="724" y="66" width="208" height="160" rx="12"/>
           <circle class="dot" cx="742" cy="84" r="4"/><circle class="dot" cx="756" cy="84" r="4"/><circle class="dot" cx="770" cy="84" r="4"/>
@@ -913,7 +913,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
         </svg>
 
         <!-- Tall drawing, for phones. -->
-        <svg class="tall" viewBox="0 0 320 660" role="img" aria-label="Your machine connects to gate2net with ssh -R through an encrypted tunnel; visitors reach https://myapp.gate.example.com and their requests travel through the gate to localhost:3000.">
+        <svg class="tall" viewBox="0 0 320 660" role="img" aria-label="Your machine connects to intergate with ssh -R through an encrypted tunnel; visitors reach https://myapp.gate.example.com and their requests travel through the gate to localhost:3000.">
           <path id="route-t" d="M160 156 V560" fill="none"/>
           <rect class="panel" x="62" y="14" width="196" height="122" rx="12"/>
           <rect class="screen" x="74" y="26" width="172" height="98" rx="6"/>
@@ -978,19 +978,19 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
         <div class="tbar"><i></i><i></i><i></i>
           <div class="win-tabs" role="tablist" aria-label="Which key ssh uses">
             <label for="k-default">Default<span class="wide">&nbsp;key</span></label>
-            <label for="k-file">-i ~/.ssh/gate2net</label>
+            <label for="k-file">-i ~/.ssh/intergate</label>
           </div>
           <button class="copy k-default" type="button" data-copy="ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com" aria-label="Copy the ssh command">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span>
           </button>
-          <button class="copy k-file" type="button" data-copy="ssh -i ~/.ssh/gate2net -p 2222 -R myapp:80:localhost:3000 gate.example.com" aria-label="Copy the ssh command">
+          <button class="copy k-file" type="button" data-copy="ssh -i ~/.ssh/intergate -p 2222 -R myapp:80:localhost:3000 gate.example.com" aria-label="Copy the ssh command">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span>
           </button>
         </div>
-<pre class="k-default" role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2net answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2net: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
-<pre class="k-file" role="img" aria-label="A terminal: ssh -i ~/.ssh/gate2net -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2net answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:74">ssh -i ~/.ssh/gate2net -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2net: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+<pre class="k-default" role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, intergate answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">intergate: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+<pre class="k-file" role="img" aria-label="A terminal: ssh -i ~/.ssh/intergate -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, intergate answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:74">ssh -i ~/.ssh/intergate -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">intergate: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
         <p class="tfoot k-default">ssh offers the keys in <code>~/.ssh</code> (<code>id_ed25519</code>, <code>id_ecdsa</code>, <code>id_rsa</code>…) and those in your agent: nothing to add when one of them is on the subdomain.</p>
-        <p class="tfoot k-file">For a key kept elsewhere, such as one made just for gate2net with <code>ssh-keygen -t ed25519 -f ~/.ssh/gate2net</code>. With many keys in your agent, add <code>-o IdentitiesOnly=yes</code>.</p>
+        <p class="tfoot k-file">For a key kept elsewhere, such as one made just for intergate with <code>ssh-keygen -t ed25519 -f ~/.ssh/intergate</code>. With many keys in your agent, add <code>-o IdentitiesOnly=yes</code>.</p>
       </div>
     </div>
   </section>
@@ -1044,7 +1044,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
             <rect class="menu-sel fillc" x="24" y="31" width="26" height="6" rx="2" opacity=".35"/>
             <path d="M26 34h20M26 43h16M26 52h0" stroke-width="2"/>
           </svg></span>
-          <div><h3>A wizard in the terminal</h3><p><code>gate2net config</code>: set up, add keys and users without the browser.</p></div>
+          <div><h3>A wizard in the terminal</h3><p><code>intergate config</code>: set up, add keys and users without the browser.</p></div>
         </div>
         <div class="card">
           <span class="tile t-orange"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true">
@@ -1058,7 +1058,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
             <rect x="8" y="18" width="14" height="28" rx="4"/><rect x="44" y="18" width="14" height="28" rx="4"/>
             <g class="dgram"><rect class="filla" x="22" y="24" width="8" height="5" rx="1.5"/><rect class="fillc" x="22" y="31" width="8" height="5" rx="1.5"/><rect class="filla" x="22" y="38" width="8" height="5" rx="1.5"/></g>
           </svg></span>
-          <div><h3>UDP too</h3><p>Minecraft Bedrock, WireGuard, DNS… through the gate2net client, run with one <code>curl</code> line.</p></div>
+          <div><h3>UDP too</h3><p>Minecraft Bedrock, WireGuard, DNS… through the intergate client, run with one <code>curl</code> line.</p></div>
         </div>
         <div class="card">
           <span class="tile t-cyan"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true">
@@ -1098,26 +1098,26 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
                   <label for="w-curl" class="v1 mono">curl</label>
                   <label for="w-wget" class="v2 mono">wget</label>
                 </div>
-                <button class="copy v1" type="button" data-copy="curl -fsSL https://gate2net.github.io/setup.sh | sh" aria-label="Copy the install command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
-                <button class="copy v2" type="button" data-copy="wget -qO- https://gate2net.github.io/setup.sh | sh" aria-label="Copy the install command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+                <button class="copy v1" type="button" data-copy="curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh" aria-label="Copy the install command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+                <button class="copy v2" type="button" data-copy="wget -qO- https://jgermade.github.io/intergate/setup.sh | sh" aria-label="Copy the install command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
               </div>
-<pre class="v1"><span class="p">$ </span>curl -fsSL https://gate2net.github.io/setup.sh | sh</pre>
-<pre class="v2"><span class="p">$ </span>wget -qO- https://gate2net.github.io/setup.sh | sh</pre>
-              <p class="tfoot v1">Linux and macOS. It installs the binary, opens the setup wizard and, with systemd, runs gate2net as a service. Run it again to update, reconfigure or uninstall.</p>
+<pre class="v1"><span class="p">$ </span>curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh</pre>
+<pre class="v2"><span class="p">$ </span>wget -qO- https://jgermade.github.io/intergate/setup.sh | sh</pre>
+              <p class="tfoot v1">Linux and macOS. It installs the binary, opens the setup wizard and, with systemd, runs intergate as a service. Run it again to update, reconfigure or uninstall.</p>
               <p class="tfoot v2">The same, for machines without curl, such as a minimal Debian: the installer then downloads with wget too.</p>
             </div>
           </div>
           <div class="pane p-docker">
             <div class="term win">
               <div class="tbar"><i></i><i></i><i></i>
-                <button class="copy" type="button" data-copy="docker volume create gate2net&#10;docker run -it --rm -v gate2net:/data ghcr.io/gate2net/gate2net config&#10;docker run -d --name gate2net --restart unless-stopped -v gate2net:/data -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2net/gate2net" aria-label="Copy the Docker commands"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+                <button class="copy" type="button" data-copy="docker volume create intergate&#10;docker run -it --rm -v intergate:/data ghcr.io/jgermade/intergate config&#10;docker run -d --name intergate --restart unless-stopped -v intergate:/data -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/jgermade/intergate" aria-label="Copy the Docker commands"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
               </div>
 <pre><span class="c"># configuration and state live in the volume</span>
-<span class="p">$ </span>docker volume create gate2net
-<span class="p">$ </span>docker run -it --rm -v gate2net:/data ghcr.io/gate2net/gate2net config
-<span class="p">$ </span>docker run -d --name gate2net --restart unless-stopped -v gate2net:/data \
-    -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2net/gate2net</pre>
-              <p class="tfoot">Choose Let's Encrypt in the wizard: gate2net gets a certificate for each subdomain on its own. Manage it later with <code>docker exec -it gate2net gate2net config</code>.</p>
+<span class="p">$ </span>docker volume create intergate
+<span class="p">$ </span>docker run -it --rm -v intergate:/data ghcr.io/jgermade/intergate config
+<span class="p">$ </span>docker run -d --name intergate --restart unless-stopped -v intergate:/data \
+    -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/jgermade/intergate</pre>
+              <p class="tfoot">Choose Let's Encrypt in the wizard: intergate gets a certificate for each subdomain on its own. Manage it later with <code>docker exec -it intergate intergate config</code>.</p>
             </div>
           </div>
           <div class="pane p-k8s">
@@ -1129,10 +1129,10 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
                   <label for="w-helm" class="v1"><span class="wide">Kubernetes + Traefik</span><span class="narrow">Kubernetes</span></label>
                   <label for="w-port" class="v2">Traefik port</label>
                 </div>
-                <button class="copy v1" type="button" data-copy="helm install gate2net oci://ghcr.io/gate2net/charts/gate2net --set domain=gate.example.com --set traefik.tls.certResolver=letsencrypt-dns" aria-label="Copy the helm command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+                <button class="copy v1" type="button" data-copy="helm install intergate oci://ghcr.io/jgermade/charts/intergate --set domain=gate.example.com --set traefik.tls.certResolver=letsencrypt-dns" aria-label="Copy the helm command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
                 <button class="copy v2" type="button" data-copy="ports:&#10;  ssh:&#10;    port: 2222&#10;    expose: {default: true}&#10;    exposedPort: 2222&#10;    protocol: TCP" aria-label="Copy the Traefik values"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
               </div>
-<pre class="v1"><span class="p">$ </span>helm install gate2net oci://ghcr.io/gate2net/charts/gate2net \
+<pre class="v1"><span class="p">$ </span>helm install intergate oci://ghcr.io/jgermade/charts/intergate \
     --set domain=gate.example.com \
     --set traefik.tls.certResolver=letsencrypt-dns</pre>
 <pre class="v2"><span class="c"># values.yaml of Traefik’s own chart</span>
@@ -1142,8 +1142,8 @@ ports:
     expose: {default: true}
     exposedPort: 2222
     protocol: TCP</pre>
-              <p class="tfoot v1">An IngressRoute for the dashboard and every subdomain, and SSH over a Traefik TCP entry point with the PROXY protocol. See the <a href="https://github.com/gate2net/gate2net.github.io/tree/main/deploy/helm/gate2net">chart</a>, also in a classic repository: <code>helm repo add gate2net https://gate2net.github.io/charts</code>.</p>
-              <p class="tfoot v2">Traefik opens the SSH port once its chart declares the entry point. Keep <code>exposedPort</code> and gate2net’s <code>ssh.publicPort</code> the same; port 22 only works on an address no other <code>sshd</code> uses.</p>
+              <p class="tfoot v1">An IngressRoute for the dashboard and every subdomain, and SSH over a Traefik TCP entry point with the PROXY protocol. See the <a href="https://github.com/jgermade/intergate/tree/main/deploy/helm/intergate">chart</a>, also in a classic repository: <code>helm repo add intergate https://jgermade.github.io/intergate/charts</code>.</p>
+              <p class="tfoot v2">Traefik opens the SSH port once its chart declares the entry point. Keep <code>exposedPort</code> and intergate’s <code>ssh.publicPort</code> the same; port 22 only works on an address no other <code>sshd</code> uses.</p>
             </div>
           </div>
         </div>
@@ -1155,7 +1155,7 @@ ports:
 <footer>
   <div class="wrap">
     <div class="name"><b>gate</b> to the <b>net</b>: one gate at your machine, another on your domain, an encrypted link between them.</div>
-    <div><a class="gh" href="https://github.com/gate2net/gate2net.github.io" aria-label="gate2net.github.io on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>gate2net.github.io</a> · <a href="./setup.sh">setup.sh</a> · <a href="https://github.com/gate2net/gate2net.github.io/releases/tag/v0.0.11">v0.0.11</a> · <a href="https://github.com/gate2net/gate2net.github.io/releases">releases</a></div>
+    <div><a class="gh" href="https://github.com/jgermade/intergate" aria-label="intergate on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>intergate.github.io</a> · <a href="./setup.sh">setup.sh</a> · <a href="https://github.com/jgermade/intergate/releases/tag/v0.0.11">v0.0.11</a> · <a href="https://github.com/jgermade/intergate/releases">releases</a></div>
   </div>
 </footer>
 
@@ -1185,7 +1185,7 @@ ports:
     const order = ["auto", "light", "dark"]
     document.querySelector(".theme")?.addEventListener("click", () => {
       const now = document.documentElement.dataset.pick
-      window.gate2netTheme(order[(order.indexOf(now) + 1) % order.length])
+      window.intergateTheme(order[(order.indexOf(now) + 1) % order.length])
     })
     // CSS animations stop through the media query; SMIL ones need telling.
     const still = matchMedia("(prefers-reduced-motion: reduce)")

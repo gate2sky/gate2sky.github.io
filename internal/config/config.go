@@ -1,4 +1,4 @@
-// Package config loads and validates the gate2net configuration file.
+// Package config loads and validates the intergate configuration file.
 package config
 
 import (
@@ -48,7 +48,7 @@ type HTTPConfig struct {
 	Listen string    `yaml:"listen"`
 	TLS    TLSConfig `yaml:"tls"`
 	// TrustProxyHeaders keeps incoming X-Forwarded-For headers. Enable it
-	// only when gate2net runs behind a reverse proxy you control.
+	// only when intergate runs behind a reverse proxy you control.
 	TrustProxyHeaders bool `yaml:"trust_proxy_headers"`
 }
 
@@ -61,7 +61,7 @@ type TLSConfig struct {
 	ACME     ACMEConfig `yaml:"acme"`
 }
 
-// Enabled reports whether gate2net terminates TLS itself.
+// Enabled reports whether intergate terminates TLS itself.
 func (t TLSConfig) Enabled() bool { return t.ACME.Enabled || t.CertFile != "" }
 
 type ACMEConfig struct {
@@ -138,7 +138,7 @@ func (t *TCPConfig) parse() error {
 }
 
 type AdminConfig struct {
-	// Socket is the Unix socket `gate2net config` and `gate2net status`
+	// Socket is the Unix socket `intergate config` and `intergate status`
 	// use to manage the running server. Defaults to <data_dir>/admin.sock.
 	Socket string `yaml:"socket"`
 }
@@ -161,7 +161,7 @@ type AuthConfig struct {
 }
 
 type EmailConfig struct {
-	// From is the sender, e.g. "gate2net <no-reply@gate.example.com>".
+	// From is the sender, e.g. "intergate <no-reply@gate.example.com>".
 	From    string        `yaml:"from"`
 	CodeTTL time.Duration `yaml:"code_ttl"`
 	SMTP    SMTPConfig    `yaml:"smtp"`
@@ -524,7 +524,7 @@ func (c *Config) IsAdmin(email string) bool {
 }
 
 // EmailAllowed reports whether a user with this (verified) email may sign
-// in and keep using gate2net.
+// in and keep using intergate.
 func (c *Config) EmailAllowed(email string) bool {
 	email = strings.ToLower(email)
 	if email == "" {
@@ -550,7 +550,7 @@ func (c *Config) UserRole(email, stored string) string {
 }
 
 // UserAllowed reports whether an account may sign in and keep using
-// gate2net: the configuration allows its email, or an administrator added
+// intergate: the configuration allows its email, or an administrator added
 // it or gave it a role.
 func (c *Config) UserAllowed(email string, added bool, stored string) bool {
 	return added || c.UserRole(email, stored) != "user" || c.EmailAllowed(email)

@@ -1,14 +1,14 @@
-# gate2net with Docker Compose, terminating TLS itself (Let's Encrypt).
+# intergate with Docker Compose, terminating TLS itself (Let's Encrypt).
 #
-#   docker compose run --rm gate2net config    # create /data/gate2net.yaml
+#   docker compose run --rm intergate config    # create /data/intergate.yaml
 #   docker compose up -d
-#   docker compose exec gate2net gate2net config   # manage subdomains, keys, users
+#   docker compose exec intergate intergate config   # manage subdomains, keys, users
 #
 # Point gate.example.com and *.gate.example.com to this host. In the setup,
 # choose Let's Encrypt and keep the default ports (80, 443 and 2222).
 services:
-  gate2net:
-    image: ghcr.io/gate2net/gate2net:latest
+  intergate:
+    image: ghcr.io/jgermade/intergate:latest
     build: ../..
     restart: unless-stopped
     ports:
@@ -20,15 +20,15 @@ services:
       # - "30000-30019:30000-30019"
       # - "30000-30019:30000-30019/udp"
     volumes:
-      - gate2net:/data
+      - intergate:/data
     # Secrets referenced as ${VAR} in the configuration:
     # environment:
     #   SMTP_PASSWORD: change-me
     healthcheck:
-      test: ["CMD", "gate2net", "status"]
+      test: ["CMD", "intergate", "status"]
       interval: 30s
       timeout: 5s
       retries: 3
 
 volumes:
-  gate2net:
+  intergate:

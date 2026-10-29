@@ -35,7 +35,7 @@ type idpCode struct {
 }
 
 const (
-	idpClientID     = "gate2net-test"
+	idpClientID     = "intergate-test"
 	idpClientSecret = "test-secret"
 )
 

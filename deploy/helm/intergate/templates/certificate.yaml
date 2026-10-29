@@ -2,11 +2,11 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "gate2net.fullname" . }}
+  name: {{ include "intergate.fullname" . }}
   labels:
-    {{- include "gate2net.labels" . | nindent 4 }}
+    {{- include "intergate.labels" . | nindent 4 }}
 spec:
-  secretName: {{ include "gate2net.tlsSecret" . }}
+  secretName: {{ include "intergate.tlsSecret" . }}
   dnsNames:
     - {{ .Values.domain | quote }}
     - {{ printf "*.%s" .Values.domain | quote }}

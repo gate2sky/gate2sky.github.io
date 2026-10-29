@@ -1,4 +1,4 @@
-// Package server wires gate2net together and runs its listeners.
+// Package server wires intergate together and runs its listeners.
 package server
 
 import (
@@ -25,16 +25,16 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2net/gate2net.github.io/internal/admin"
-	"github.com/gate2net/gate2net.github.io/internal/config"
-	"github.com/gate2net/gate2net.github.io/internal/mail"
-	"github.com/gate2net/gate2net.github.io/internal/manage"
-	"github.com/gate2net/gate2net.github.io/internal/names"
-	"github.com/gate2net/gate2net.github.io/internal/ports"
-	"github.com/gate2net/gate2net.github.io/internal/sshd"
-	"github.com/gate2net/gate2net.github.io/internal/store"
-	"github.com/gate2net/gate2net.github.io/internal/tunnel"
-	"github.com/gate2net/gate2net.github.io/internal/web"
+	"github.com/jgermade/intergate/internal/admin"
+	"github.com/jgermade/intergate/internal/config"
+	"github.com/jgermade/intergate/internal/mail"
+	"github.com/jgermade/intergate/internal/manage"
+	"github.com/jgermade/intergate/internal/names"
+	"github.com/jgermade/intergate/internal/ports"
+	"github.com/jgermade/intergate/internal/sshd"
+	"github.com/jgermade/intergate/internal/store"
+	"github.com/jgermade/intergate/internal/tunnel"
+	"github.com/jgermade/intergate/internal/web"
 )
 
 // Options customize a Server, mostly for tests.
@@ -46,7 +46,7 @@ type Options struct {
 	HTTPClient *http.Client
 }
 
-// Server is a configured gate2net instance.
+// Server is a configured intergate instance.
 type Server struct {
 	cfg      *config.Config
 	log      *slog.Logger
@@ -71,7 +71,7 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 	if err := adoptLegacyDatabase(cfg.DataDir); err != nil {
 		return nil, err
 	}
-	if s.store, err = store.Open(filepath.Join(cfg.DataDir, "gate2net.db")); err != nil {
+	if s.store, err = store.Open(filepath.Join(cfg.DataDir, "intergate.db")); err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 	secret, err := loadOrCreateSecret(filepath.Join(cfg.DataDir, "secret.key"))
@@ -237,7 +237,7 @@ func (s *Server) Run(ctx context.Context) error {
 	for _, p := range cfg.Auth.Providers {
 		methods = append(methods, p.ID)
 	}
-	log.Info("gate2net started",
+	log.Info("intergate started",
 		"version", s.version,
 		"dashboard", cfg.DashboardURL("/"),
 		"tunnels", cfg.TunnelURL("*"),
@@ -275,28 +275,32 @@ func (s *Server) Run(ctx context.Context) error {
 	return runErr
 }
 
-// adoptLegacyDatabase renames the database of gate2sky, gate2net's former
-// name, when the data directory has it and no gate2net.db yet.
+// adoptLegacyDatabase renames the database of gate2net or gate2sky,
+// intergate's former names (the newer first), when the data directory has
+// it and no intergate.db yet.
 func adoptLegacyDatabase(dir string) error {
-	db := filepath.Join(dir, "gate2net.db")
-	old := filepath.Join(dir, "gate2sky.db")
+	db := filepath.Join(dir, "intergate.db")
 	if _, err := os.Stat(db); err == nil {
 		return nil
 	}
-	if _, err := os.Stat(old); err != nil {
-		return nil
-	}
-	// SQLite's write-ahead log and index go with it.
-	for _, suffix := range []string{"-wal", "-shm", ""} {
-		if err := os.Rename(old+suffix, db+suffix); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("rename %s: %w", old+suffix, err)
+	for _, name := range []string{"gate2net", "gate2sky"} {
+		old := filepath.Join(dir, name+".db")
+		if _, err := os.Stat(old); err != nil {
+			continue
 		}
+		// SQLite's write-ahead log and index go with it.
+		for _, suffix := range []string{"-wal", "-shm", ""} {
+			if err := os.Rename(old+suffix, db+suffix); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("rename %s: %w", old+suffix, err)
+			}
+		}
+		return nil
 	}
 	return nil
 }
 
 // PIDFile is where a running server writes its process ID.
-func PIDFile(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "gate2net.pid") }
+func PIDFile(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "intergate.pid") }
 
 // RunningPID returns the PID of a server running on this data directory,
 // or 0.
@@ -313,10 +317,10 @@ func RunningPID(cfg *config.Config) int {
 }
 
 func writePIDFile(dataDir string) (string, error) {
-	path := filepath.Join(dataDir, "gate2net.pid")
+	path := filepath.Join(dataDir, "intergate.pid")
 	if b, err := os.ReadFile(path); err == nil {
 		if pid, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && pid != os.Getpid() && processAlive(pid) {
-			return "", fmt.Errorf("gate2net is already running with PID %d (%s)", pid, path)
+			return "", fmt.Errorf("intergate is already running with PID %d (%s)", pid, path)
 		}
 	}
 	return path, os.WriteFile(path, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o644)
@@ -341,7 +345,7 @@ func hostPolicy(cfg *config.Config, st *store.Store) autocert.HostPolicy {
 		}
 		name, ok := strings.CutSuffix(host, "."+cfg.Domain())
 		if !ok || strings.Contains(name, ".") {
-			return fmt.Errorf("acme: host %q is not served by gate2net", host)
+			return fmt.Errorf("acme: host %q is not served by intergate", host)
 		}
 		if _, err := st.SubdomainByName(ctx, name); err != nil {
 			return fmt.Errorf("acme: subdomain %q is not registered", name)
@@ -410,7 +414,7 @@ func loadOrCreateHostKey(path string) (ssh.Signer, error) {
 	if err != nil {
 		return nil, err
 	}
-	block, err := ssh.MarshalPrivateKey(priv, "gate2net host key")
+	block, err := ssh.MarshalPrivateKey(priv, "intergate host key")
 	if err != nil {
 		return nil, err
 	}

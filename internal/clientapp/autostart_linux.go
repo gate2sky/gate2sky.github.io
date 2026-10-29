@@ -14,7 +14,7 @@ func autostartFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "autostart", "gate2net.desktop"), nil
+	return filepath.Join(dir, "autostart", "intergate.desktop"), nil
 }
 
 // AutostartSupported reports whether SetAutostart can work here.
@@ -30,12 +30,14 @@ func AutostartEnabled() bool {
 	return err == nil
 }
 
-// SetAutostart makes this executable start with the system, or not.
+// SetAutostart makes this executable start with the system, or not. Either
+// way it removes the entry of gate2net, the app's former name.
 func SetAutostart(on bool) error {
 	f, err := autostartFile()
 	if err != nil {
 		return err
 	}
+	os.Remove(filepath.Join(filepath.Dir(f), "gate2net.desktop"))
 	if !on {
 		if err := os.Remove(f); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
@@ -49,6 +51,6 @@ func SetAutostart(on bool) error {
 	if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
 		return err
 	}
-	entry := fmt.Sprintf("[Desktop Entry]\nType=Application\nName=gate2net\nExec=%q --background\nX-GNOME-Autostart-enabled=true\n", exe)
+	entry := fmt.Sprintf("[Desktop Entry]\nType=Application\nName=intergate\nExec=%q --background\nX-GNOME-Autostart-enabled=true\n", exe)
 	return os.WriteFile(f, []byte(entry), 0o644)
 }

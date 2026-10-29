@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/gate2net/gate2net.github.io/internal/wizard"
+	"github.com/jgermade/intergate/internal/wizard"
 )
 
 func runWizard(path string, accessible bool) error {

@@ -23,9 +23,9 @@ import (
 	proxyproto "github.com/pires/go-proxyproto"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2net/gate2net.github.io/internal/admin"
-	"github.com/gate2net/gate2net.github.io/internal/config"
-	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/jgermade/intergate/internal/admin"
+	"github.com/jgermade/intergate/internal/config"
+	"github.com/jgermade/intergate/internal/store"
 )
 
 func freePort(t *testing.T) string {
@@ -141,7 +141,7 @@ auth:
 	if err := <-done; err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "gate2net.pid")); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, "intergate.pid")); err == nil {
 		t.Error("PID file left behind")
 	}
 	if _, err := os.Stat(cfg.Admin.Socket); err == nil {
@@ -232,16 +232,27 @@ func TestAdoptLegacyDatabase(t *testing.T) {
 	if err := adoptLegacyDatabase(dir); err != nil {
 		t.Fatal(err)
 	}
-	if b, _ := os.ReadFile(filepath.Join(dir, "gate2net.db")); string(b) != "old" {
-		t.Errorf("gate2net.db = %q", b)
+	if b, _ := os.ReadFile(filepath.Join(dir, "intergate.db")); string(b) != "old" {
+		t.Errorf("intergate.db = %q", b)
 	}
-	if b, _ := os.ReadFile(filepath.Join(dir, "gate2net.db-wal")); string(b) != "wal" {
-		t.Errorf("gate2net.db-wal = %q", b)
+	if b, _ := os.ReadFile(filepath.Join(dir, "intergate.db-wal")); string(b) != "wal" {
+		t.Errorf("intergate.db-wal = %q", b)
 	}
-	// An existing gate2net.db wins.
+	// An existing intergate.db wins.
 	os.WriteFile(filepath.Join(dir, "gate2sky.db"), []byte("older"), 0o600)
 	adoptLegacyDatabase(dir)
-	if b, _ := os.ReadFile(filepath.Join(dir, "gate2net.db")); string(b) != "old" {
+	if b, _ := os.ReadFile(filepath.Join(dir, "intergate.db")); string(b) != "old" {
 		t.Errorf("replaced an existing database: %q", b)
+	}
+
+	// gate2net's, the newer name, before gate2sky's.
+	dir = t.TempDir()
+	os.WriteFile(filepath.Join(dir, "gate2sky.db"), []byte("older"), 0o600)
+	os.WriteFile(filepath.Join(dir, "gate2net.db"), []byte("newer"), 0o600)
+	if err := adoptLegacyDatabase(dir); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "intergate.db")); string(b) != "newer" {
+		t.Errorf("intergate.db = %q, want gate2net's", b)
 	}
 }

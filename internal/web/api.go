@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gate2net/gate2net.github.io/internal/api"
-	"github.com/gate2net/gate2net.github.io/internal/manage"
-	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/jgermade/intergate/internal/api"
+	"github.com/jgermade/intergate/internal/manage"
+	"github.com/jgermade/intergate/internal/store"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

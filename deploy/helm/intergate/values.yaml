@@ -2,27 +2,32 @@
 # (https://myapp.<domain>), so point both <domain> and *.<domain> at Traefik.
 domain: gate.example.com
 
+# The name in the resources' names and labels, the chart's by default. A
+# release installed with the gate2net chart, intergate's former name, keeps
+# its resources and its volume with nameOverride: gate2net.
+nameOverride: ""
+
 image:
-  repository: ghcr.io/gate2net/gate2net
+  repository: ghcr.io/jgermade/intergate
   # Defaults to the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 
-# gate2net configuration, merged over the chart's defaults (public_url,
+# intergate configuration, merged over the chart's defaults (public_url,
 # ports, data_dir, trust_proxy_headers, ssh.public_*). Any option of
-# gate2net.example.yaml can go here. Reference secrets as ${VAR} and put
+# intergate.example.yaml can go here. Reference secrets as ${VAR} and put
 # them in secretEnv or existingSecret.
 config:
   auth:
     admins: [you@example.com]
     allowed_domains: []
     email:
-      from: "gate2net <no-reply@gate.example.com>"
+      from: "intergate <no-reply@gate.example.com>"
       smtp:
         host: smtp.example.com
         port: 587
-        username: gate2net
+        username: intergate
         password: ${SMTP_PASSWORD}
 
 # Environment variables stored in a Secret created by the chart.
@@ -55,7 +60,7 @@ traefik:
   ssh:
     enabled: true
     entryPoint: ssh
-    # Send the client address with the PROXY protocol, so gate2net logs
+    # Send the client address with the PROXY protocol, so intergate logs
     # and shows real client IPs. Leave sshService disabled when using it.
     proxyProtocol: true
 
@@ -76,7 +81,7 @@ tcp:
   first: 30000
   last: 30019
   maxPorts: 5
-  # Also expose the range over UDP, for UDP ports (the gate2net client).
+  # Also expose the range over UDP, for UDP ports (the intergate client).
   # Needs LoadBalancers that take both protocols (Kubernetes 1.26+).
   udp: true
   # Host in the ports' addresses; defaults to ssh.publicHost, then domain.

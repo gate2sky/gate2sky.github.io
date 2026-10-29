@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/gate2net/gate2net.github.io/internal/ports"
-	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/jgermade/intergate/internal/ports"
+	"github.com/jgermade/intergate/internal/store"
 )
 
 // A port's name is a DNS label: clients name it as <port>.<subdomain>.

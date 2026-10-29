@@ -14,11 +14,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/jgermade/intergate/internal/store"
 )
 
 // ErrNotRunning means nothing answers on the admin socket.
-var ErrNotRunning = errors.New("gate2net is not running")
+var ErrNotRunning = errors.New("intergate is not running")
 
 // Client talks to a running server over its admin socket.
 type Client struct {
@@ -48,7 +48,7 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		}
 		body = bytes.NewReader(b)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, "http://gate2net"+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, "http://intergate"+path, body)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 			return fmt.Errorf("%w (no server on %s)", ErrNotRunning, c.socket)
 		}
 		if errors.Is(err, os.ErrPermission) {
-			return fmt.Errorf("permission denied on %s: run as root or as the gate2net user", c.socket)
+			return fmt.Errorf("permission denied on %s: run as root or as the intergate user", c.socket)
 		}
 		return err
 	}

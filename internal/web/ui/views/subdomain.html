@@ -34,7 +34,7 @@
   }
   await load()
   $: name !== loaded && load()
-  $: document.title = `${name} · gate2net`
+  $: document.title = `${name} · intergate`
 
   $attached(() => {
     // Not while a key is being renamed or a dialog is open: a reload would

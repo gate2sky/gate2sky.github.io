@@ -1,5 +1,5 @@
 // Package admin exposes management operations on a local Unix socket, for
-// `gate2net config` and `gate2net status`. Access is controlled by the
+// `intergate config` and `intergate status`. Access is controlled by the
 // socket's file permissions: only the service user and root can connect.
 package admin
 
@@ -15,10 +15,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gate2net/gate2net.github.io/internal/api"
-	"github.com/gate2net/gate2net.github.io/internal/config"
-	"github.com/gate2net/gate2net.github.io/internal/manage"
-	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/jgermade/intergate/internal/api"
+	"github.com/jgermade/intergate/internal/config"
+	"github.com/jgermade/intergate/internal/manage"
+	"github.com/jgermade/intergate/internal/store"
 )
 
 // Status describes the running server.
@@ -100,7 +100,7 @@ func (h *Handler) Serve(ctx context.Context) error {
 	// another server is answering on it.
 	if c, err := net.DialTimeout("unix", path, time.Second); err == nil {
 		c.Close()
-		return fmt.Errorf("admin socket %s is in use: is gate2net already running?", path)
+		return fmt.Errorf("admin socket %s is in use: is intergate already running?", path)
 	}
 	os.Remove(path)
 	ln, err := net.Listen("unix", path)

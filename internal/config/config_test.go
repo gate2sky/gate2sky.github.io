@@ -92,7 +92,7 @@ func TestEmailAllowed(t *testing.T) {
 func TestParseErrors(t *testing.T) {
 	t.Setenv("TEST_SECRET", "x")
 	cases := map[string]string{
-		"missing env":     strings.Replace(base, "TEST_SECRET", "GATE2NET_UNSET_VAR", 1),
+		"missing env":     strings.Replace(base, "TEST_SECRET", "INTERGATE_UNSET_VAR", 1),
 		"unknown field":   base + "bogus: 1\n",
 		"ip public_url":   strings.Replace(base, "gate.example.com", "10.0.0.1", 1),
 		"path public_url": strings.Replace(base, "gate.example.com", "gate.example.com/x", 1),
@@ -144,7 +144,7 @@ func TestTCPPorts(t *testing.T) {
 
 func TestExampleConfig(t *testing.T) {
 	t.Setenv("SMTP_PASSWORD", "secret")
-	cfg, err := Load("../../gate2net.example.yaml")
+	cfg, err := Load("../../intergate.example.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestEnvValues(t *testing.T) {
 func TestLoadResolvesRelativePaths(t *testing.T) {
 	t.Setenv("TEST_SECRET", "x")
 	dir := t.TempDir()
-	path := filepath.Join(dir, "gate2net.yaml")
+	path := filepath.Join(dir, "intergate.yaml")
 	if err := os.WriteFile(path, []byte(base+"data_dir: state\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

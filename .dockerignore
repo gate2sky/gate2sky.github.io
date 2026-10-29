@@ -2,5 +2,5 @@
 data/
 deploy/
 *.db
-gate2net.yaml
-/gate2net
+intergate.yaml
+/intergate

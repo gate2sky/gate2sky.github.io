@@ -18,7 +18,7 @@ const svg = dataURL(source)
 const square = dataURL(source.replace(/(<rect width="64" height="64") rx="[^"]*"/, "$1"))
 
 // The desktop app's tray icon is the favicon too.
-process.on("exit", () => fs.copyFileSync(path.join(pages, "favicon.ico"), path.join(__dirname, "../../cmd/gate2net-gui/icon.ico")))
+process.on("exit", () => fs.copyFileSync(path.join(pages, "favicon.ico"), path.join(__dirname, "../../cmd/intergate-gui/icon.ico")))
 
 // The same cut as hero.brand() in gen.py's hero.py: no comments, no tile.
 fs.writeFileSync(path.join(__dirname, "../../internal/web/ui/logo-mark.svg"), source
