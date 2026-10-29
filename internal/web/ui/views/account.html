@@ -71,9 +71,30 @@
     }
     load()
   }
+
+  // Signing out asks first, in a dialog; Escape or Cancel closes it.
+  const askSignOut = () => document.querySelector("dialog.sign-out").showModal()
+  const signOut = async () => {
+    await api("POST", "/logout").catch(() => {})
+    location.assign("/login")
+  }
 </script>
 
-<div class="page-head"><h1>Account</h1></div>
+<div class="page-head">
+  <h1>Account</h1>
+  <button type="button" class="button button-secondary" @click="askSignOut">Sign out</button>
+</div>
+
+<dialog class="card dialog sign-out" aria-labelledby="sign-out-title">
+  <form method="dialog">
+    <h2 id="sign-out-title">Sign out?</h2>
+    <p class="muted">You will need an email code{{ app.passkeys ? " or a passkey" : "" }} to sign in again.</p>
+    <div class="dialog-actions">
+      <button value="cancel" class="button button-secondary" autofocus>Cancel</button>
+      <button type="button" class="button" @click="signOut">Sign out</button>
+    </div>
+  </form>
+</dialog>
 
 <section :if="welcome" class="card callout">
   <h2>Sign in faster next time</h2>
