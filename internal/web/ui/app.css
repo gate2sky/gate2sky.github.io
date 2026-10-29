@@ -361,14 +361,12 @@ select.role {
   font: inherit; font-size: 13px; font-weight: 500; color: var(--fg); cursor: pointer;
   padding: 4px 8px; border-radius: var(--radius-control); border: .5px solid var(--field-line); background: var(--field);
 }
-select.role:disabled { opacity: .6; cursor: default; }
 @supports (appearance: base-select) {
   select.role, select.role::picker(select) { appearance: base-select; }
   select.role { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 6px; }
   select.role > button { display: contents; }
   select.role selectedcontent { display: inline-flex; align-items: center; gap: 6px; }
   select.role::picker-icon { color: var(--muted); font-size: 10px; }
-  select.role:disabled::picker-icon { display: none; }
   select.role::picker(select) {
     margin-top: 4px; padding: 4px; border: .5px solid var(--line); border-radius: 10px;
     background: var(--material-hud); box-shadow: var(--shadow-pop);
@@ -379,6 +377,10 @@ select.role:disabled { opacity: .6; cursor: default; }
   select.role option:disabled { opacity: .4; }
   select.role option::checkmark { order: 1; margin-left: auto; padding-left: 10px; font-size: 12px; line-height: 1; color: var(--link); }
 }
+/* What a user can't change: the value itself, not a control. */
+.value { display: inline-flex; align-items: center; gap: 6px; padding: 0 7px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.state { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.state-off { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
 .role-icon { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .role-owner { color: #e08a00; }
 .role-admin { color: #8e4fd6; }
@@ -411,7 +413,6 @@ select.role:disabled { opacity: .6; cursor: default; }
 .icon-button:hover { background: var(--fill); }
 .icon-button.danger { color: var(--muted); }
 .icon-button.danger:hover { color: var(--err); }
-.icon-button:disabled { opacity: .3; cursor: default; background: none; color: var(--muted); }
 
 /* Dialogs: a card near the top of the page, which dims and blurs behind it. */
 

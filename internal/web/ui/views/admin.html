@@ -47,6 +47,8 @@
   const owner = app.user.role === "owner"
   const canManage = user =>
     user.id !== app.user.id && !user.config_owner && (owner || user.role !== "owner")
+  // Owners in auth.admins keep their role but can still be disabled.
+  const canToggle = user => user.id !== app.user.id && (owner || user.role !== "owner")
 
   const setRole = async (user, role) => {
     try {
@@ -116,25 +118,28 @@
             <div :if="!user.allowed" class="small danger">not allowed by the configuration: add them again to let them in</div>
           </td>
           <td class="keep">
-            <select class="role" aria-label="Role" :disabled="!canManage(user)" :title="user.config_owner ? 'An owner in auth.admins' : null"
-                    @change="setRole(user, $event.target.value)">
+            <select :if="canManage(user)" class="role" aria-label="Role" @change="setRole(user, $event.target.value)">
               <button type="button"><selectedcontent></selectedcontent></button>
                 <option value="owner" :selected="user.role === 'owner'" :disabled="!owner"><svg class="role-icon role-owner" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5Z"/></svg><span>Owner</span></option>
                 <option value="admin" :selected="user.role === 'admin'"><svg class="role-icon role-admin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6Z"/><path d="m9 12 2 2 4-4"/></svg><span>Admin</span></option>
                 <option value="user" :selected="user.role === 'user'"><svg class="role-icon role-user" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg><span>User</span></option>
             </select>
+            <span :elseif="user.role === 'owner'" class="value" :title="user.config_owner ? 'An owner in auth.admins' : null"><svg class="role-icon role-owner" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5Z"/></svg>Owner</span>
+            <span :elseif="user.role === 'admin'" class="value"><svg class="role-icon role-admin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6Z"/><path d="m9 12 2 2 4-4"/></svg>Admin</span>
+            <span :else class="value"><svg class="role-icon role-user" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg>User</span>
           </td>
           <td class="small hide-narrow">{{ signIn(user) }}</td>
           <td class="hide-narrow">{{ user.subdomains }}</td>
           <td class="hide-narrow">{{ ago(user.last_login_at) }}</td>
           <td class="center keep">
-            <label class="switch" :title="user.disabled ? 'Disabled' : 'Enabled'">
-              <input type="checkbox" role="switch" :checked="!user.disabled" :disabled="user.id === app.user.id || (!owner && user.role === 'owner')"
+            <label :if="canToggle(user)" class="switch" :title="user.disabled ? 'Disabled' : 'Enabled'">
+              <input type="checkbox" role="switch" :checked="!user.disabled"
                      :aria-label="(user.disabled ? 'Enable ' : 'Disable ') + user.email" @change="setDisabled(user, !$event.target.checked)">
             </label>
+            <span :else class="value"><span class="state" :class.state-off="user.disabled"></span>{{ user.disabled ? "Disabled" : "Enabled" }}</span>
           </td>
           <td class="right keep">
-            <button type="button" class="icon-button danger" :disabled="!canManage(user)" :aria-label="'Delete ' + user.email" title="Delete"
+            <button :if="canManage(user)" type="button" class="icon-button danger" :aria-label="'Delete ' + user.email" title="Delete"
                     @click="askDelete(user)">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
             </button>
