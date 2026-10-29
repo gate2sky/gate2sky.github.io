@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gate2sky — open a gate to the web</title>
-<meta name="description" content="gate2sky exposes local services on your own domain through encrypted SSH tunnels: a subdomain per service, SSH keys per subdomain, passkey sign-in and a live dashboard. One line to install.">
+<meta name="description" content="gate2sky exposes local services on your own domain through encrypted SSH tunnels: a subdomain per service, TCP and UDP ports with allow lists, SSH keys per subdomain, passkey sign-in and a live dashboard. One line to install.">
 <meta property="og:title" content="gate2sky — open a gate to the web">
 <meta property="og:description" content="Encrypted SSH tunnels from your machine to your own domain, with a dashboard, passkeys and per-subdomain keys.">
 <meta property="og:url" content="https://gate2sky.github.io/">
@@ -366,6 +366,7 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 .tile svg { width: 46px; height: 46px; overflow: visible; }
 .t-amber { --tone: #ff9f0a; } .t-purple { --tone: #a35ce6; } .t-blue { --tone: #0a84ff; }
 .t-teal { --tone: #20a8c4; } .t-green { --tone: #28b24b; } .t-indigo { --tone: #5e5ce6; }
+.t-orange { --tone: #ff6b2c; } .t-pink { --tone: #e5487f; } .t-cyan { --tone: #13b5d6; }
 .card h3 { margin: 0 0 2px; font-size: 17px; letter-spacing: -.01em; }
 .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
 .ic { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
@@ -391,6 +392,11 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 .access circle { transition: none; animation: access 4.5s infinite; }
 .access circle:nth-child(2) { animation-delay: 1.5s } .access circle:nth-child(3) { animation-delay: 3s }
 @keyframes access { 0%, 30% { fill: var(--hl); } 34%, 100% { fill: transparent; } }
+.dgram rect { animation: dgram 2.4s linear infinite; opacity: 0; }
+.dgram rect:nth-child(2) { animation-delay: -.8s } .dgram rect:nth-child(3) { animation-delay: -1.6s }
+@keyframes dgram { 0% { transform: translateX(0); opacity: 0 } 15%, 80% { opacity: 1 } 100% { transform: translateX(30px); opacity: 0 } }
+.allow-row { animation: allow 3.6s steps(1) infinite; }
+@keyframes allow { 0% { transform: translateY(0) } 33% { transform: translateY(10px) } 66% { transform: translateY(20px) } }
 
 /* Deploy */
 .tabs { max-width: 820px; margin: 0 auto; }
@@ -808,7 +814,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
     <div class="hero-text">
       <span class="eyebrow">two <b>gates</b> <span aria-hidden="true">·</span> one encrypted <b>link</b></span>
       <h1>Open a <span class="glow">gate</span> to the web.</h1>
-      <p class="lede">Expose any local service on your own domain through an encrypted SSH tunnel. A subdomain per service, keys per subdomain, passkeys to sign in.</p>
+      <p class="lede">Expose any local service on your own domain through an encrypted SSH tunnel: websites on a subdomain each, databases and game servers on TCP and UDP ports. Keys per subdomain, passkeys to sign in.</p>
       <div class="install">
         <code><span class="p">$ </span>curl -fsSL https://gate2sky.github.io/setup.sh | sh</code>
         <button class="copy" type="button" data-copy="curl -fsSL https://gate2sky.github.io/setup.sh | sh" aria-label="Copy the install command">
@@ -1028,6 +1034,28 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
             <path d="M26 34h20M26 43h16M26 52h0" stroke-width="2"/>
           </svg></span>
           <div><h3>A wizard in the terminal</h3><p><code>gate2sky config</code>: set up, add keys and users without the browser.</p></div>
+        </div>
+        <div class="card">
+          <span class="tile t-orange"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true">
+            <ellipse cx="28" cy="16" rx="14" ry="5.5"/><path d="M14 16v30c0 3 6.3 5.5 14 5.5s14-2.5 14-5.5V16M14 31c0 3 6.3 5.5 14 5.5s14-2.5 14-5.5"/>
+            <path class="w" d="M46 40h10M52 35l5 5-5 5"/><circle class="pulse filla" cx="28" cy="44" r="2.5"/>
+          </svg></span>
+          <div><h3>TCP ports</h3><p>Databases, SSH, game servers on a port of their own, <code>tcp://gate.example.com:30042</code>, with the same <code>ssh -R</code>.</p></div>
+        </div>
+        <div class="card">
+          <span class="tile t-pink"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="8" y="18" width="14" height="28" rx="4"/><rect x="44" y="18" width="14" height="28" rx="4"/>
+            <g class="dgram"><rect class="filla" x="22" y="24" width="8" height="5" rx="1.5"/><rect class="fillc" x="22" y="31" width="8" height="5" rx="1.5"/><rect class="filla" x="22" y="38" width="8" height="5" rx="1.5"/></g>
+          </svg></span>
+          <div><h3>UDP too</h3><p>Minecraft Bedrock, WireGuard, DNS… through the gate2sky client, run with one <code>curl</code> line.</p></div>
+        </div>
+        <div class="card">
+          <span class="tile t-cyan"><svg class="ic" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="10" y="12" width="44" height="40" rx="5"/>
+            <rect class="allow-row fillc" x="15" y="19" width="34" height="7" rx="2" opacity=".3"/>
+            <path d="M20 22.5h16M20 32.5h20M20 42.5h12"/><path class="w" d="m41 20 2.5 2.5L48 18"/>
+          </svg></span>
+          <div><h3>Allow lists</h3><p>Each port only lets in the addresses you choose: yours, by default.</p></div>
         </div>
       </div>
     </div>
