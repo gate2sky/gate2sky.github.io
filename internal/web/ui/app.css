@@ -179,7 +179,7 @@ h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: -.01em; font-weight: 600
 .topbar-inner > .nav { align-self: stretch; }
 .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 650; font-size: 15px; letter-spacing: -.01em; color: var(--fg); }
 .brand:hover { text-decoration: none; }
-.logo { width: 28px; height: 28px; border-radius: 7px; box-shadow: 0 1px 3px rgb(0 0 0 / .3); }
+.logo { width: 32px; height: 32px; margin: -2px; }
 .nav { display: flex; align-items: center; gap: 6px; }
 
 /* Tabs along the bottom edge of the toolbar. */

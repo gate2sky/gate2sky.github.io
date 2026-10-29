@@ -307,9 +307,10 @@ then run `python3 scripts/landing/gen.py scripts/landing/template.html
 pages/index.html`. Build checks that the two agree. The icon is
 [`pages/favicon.svg`](pages/favicon.svg), the same file as the dashboard's
 [`internal/web/ui/logo.svg`](internal/web/ui/logo.svg) (the landing's header
-inlines it); after changing it, copy it to both and run `node
-scripts/landing/icons.js`, which renders `favicon.ico` and
-`apple-touch-icon.png` from it.
+inlines it, without its dark tile); after changing it, copy it to both and
+run `node scripts/landing/icons.js`, which renders `favicon.ico` and
+`apple-touch-icon.png` from it and writes the dashboard header's
+[`logo-mark.svg`](internal/web/ui/logo-mark.svg), the logo without its tile.
 
 ## Roadmap
 
