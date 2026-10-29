@@ -59,7 +59,7 @@
     font-size: var(--ig-text-base);
     font-weight: var(--ig-weight-regular);
     cursor: pointer;
-    transition: box-shadow var(--ig-duration) ease, background-color var(--ig-duration) ease;
+    transition: box-shadow var(--ig-duration) ease, background-color var(--ig-duration) ease, transform var(--ig-duration-fast) ease;
   }
   .hue-blue { --hue: var(--ig-hue-blue); }
   .hue-purple { --hue: var(--ig-hue-purple); }
@@ -68,6 +68,7 @@
   .hue-teal { --hue: var(--ig-hue-teal); }
   .hue-pink { --hue: var(--ig-hue-pink); }
   .choice:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--hue) 50%, transparent), var(--ig-shadow-lift); }
+  .choice:active { box-shadow: 0 0 0 1px color-mix(in srgb, var(--hue) 50%, transparent); transform: scale(.985); }
   /* The radio stays in the card, unseen, for the keyboard. */
   input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
   .icon {
@@ -106,7 +107,7 @@
   .choice:has(input:checked) .check { background: var(--hue); box-shadow: none; }
   .choice:has(input:checked) .check > * { opacity: 1; transform: none; }
   .choice:has(input:focus-visible) { box-shadow: 0 0 0 1.5px var(--hue), var(--ig-ring); }
-  .choice:has(input:disabled) { opacity: .5; cursor: default; }
+  .choice:has(input:disabled) { opacity: .5; cursor: default; transform: none; }
 
   /* Side by side on a wide screen: the icon over the name, the check in the
      corner. */

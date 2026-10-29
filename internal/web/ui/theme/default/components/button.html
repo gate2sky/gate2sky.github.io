@@ -146,6 +146,9 @@
   .variant-plain:active,
   .variant-ghost:active,
   .variant-ghost-danger:active { transform: none; background: var(--ig-fill); }
+  /* A ghost's hover is already that fill: pressed, it gives a little. */
+  .variant-ghost:active,
+  .variant-ghost-danger:active { transform: scale(.92); }
 
   .size-sm {
     min-height: var(--ig-control-sm);

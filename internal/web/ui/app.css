@@ -118,6 +118,7 @@ h2 { font-size: var(--ig-text-lg); margin: 0 0 var(--ig-space-5); letter-spacing
   transition: color var(--ig-duration) ease, background-color var(--ig-duration) ease;
 }
 .tabs > a:hover { text-decoration: none; color: var(--ig-fg); background: var(--ig-fill-2); }
+.tabs > a:active { color: var(--ig-fg); background: var(--ig-fill); }
 .tabs > a.active { color: var(--ig-fg); font-weight: var(--ig-weight-semibold); }
 .tabs > a::after {
   content: ""; position: absolute; left: var(--ig-space-3); right: var(--ig-space-3); bottom: 0; height: 3px; border-radius: 3px 3px 0 0;
@@ -131,6 +132,7 @@ h2 { font-size: var(--ig-text-lg); margin: 0 0 var(--ig-space-5); letter-spacing
   color: var(--ig-fg); font-size: var(--ig-text-md); padding: 3px; border-radius: var(--ig-radius-full);
 }
 a.who:hover { text-decoration: none; background: var(--ig-fill-2); }
+a.who:active { background: var(--ig-fill); }
 a.who.active { background: var(--ig-fill); }
 .who span:last-child { display: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
 .brand-name { display: none; }
@@ -341,9 +343,10 @@ input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: no
 .copy {
   flex: none; font: inherit; font-size: var(--ig-text-md); font-weight: var(--ig-weight-semibold); padding: 7px 14px; border-radius: var(--ig-radius-sm); cursor: pointer;
   border: 0; background: var(--ig-code-button); color: var(--ig-code-fg); box-shadow: 0 0 0 var(--ig-hairline) var(--ig-code-line);
-  transition: background-color var(--ig-duration-fast);
+  transition: background-color var(--ig-duration-fast), transform var(--ig-duration-fast) ease;
 }
 .copy:hover { background: var(--ig-code-button-hover); }
+.copy:active { background: var(--ig-code-button-hover); transform: scale(.97); }
 
 .empty { text-align: center; padding: var(--ig-space-6) 0; }
 .empty p { margin: 0 auto; color: var(--ig-fg-muted); max-width: 440px; }

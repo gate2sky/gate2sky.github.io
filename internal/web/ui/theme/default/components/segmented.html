@@ -44,9 +44,11 @@
     font-size: var(--ig-text-sm);
     font-weight: var(--ig-weight-semibold);
     cursor: pointer;
-    transition: color var(--ig-duration) ease, background-color var(--ig-duration) ease;
+    transition: color var(--ig-duration) ease, background-color var(--ig-duration) ease, transform var(--ig-duration-fast) ease;
   }
   button:hover { color: var(--ig-fg); }
+  button:active { color: var(--ig-fg); background: var(--ig-fill); }
   button[aria-pressed="true"] { color: var(--ig-fg); background: var(--ig-field); box-shadow: var(--ig-shadow-sm); }
+  button[aria-pressed="true"]:active { transform: scale(.96); }
   button:focus-visible { outline: none; box-shadow: var(--ig-ring); }
 </style>

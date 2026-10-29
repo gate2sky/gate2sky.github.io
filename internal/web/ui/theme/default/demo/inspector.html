@@ -5,11 +5,16 @@
   // - **Source**: the component's own code, editable, beside a preview of
   //   that parent drawn with the code as edited — jq79 builds both from
   //   their text, and hands the parent the edited component in place of
-  //   the one it imports (`modules`). Nothing else on the page changes.
+  //   the one it imports (`modules`). Beside the code, `tokens.css`: the
+  //   tokens the component reads, or all of them, each editable — a colour
+  //   with the browser's picker — and declared over the theme's on the
+  //   preview alone (`tokens.js`). Nothing else on the page changes.
   //
   // A draft stays in this browser (`localStorage`) until it is reset, and
   // leaves it as the code itself or as a patch that `git apply` takes from
-  // the repository's root. The demo's, not the theme's.
+  // the repository's root; the tokens' edits are one draft for every
+  // component, and ride along in each one's patch. The demo's, not the
+  // theme's.
   //
   //   <Inspector :open="inspecting" :name="component" @close="inspecting = false" />
   // jq79 by the name the page's import map gives it: the same module that
@@ -19,14 +24,17 @@
   const Tabs = await import("@theme/components/tabs.html")
   const Button = await import("@theme/components/button.html")
   const Alert = await import("@theme/components/alert.html")
+  const Segmented = await import("@theme/components/segmented.html")
   const CodeEditor = await import("@theme/demo/code-editor.html")
   const { USAGE, TITLES } = await import("@theme/demo/usage.js")
   const { unifiedDiff } = await import("@theme/demo/diff.js")
   const { THEME } = await import("@theme/demo/paths.js")
+  const { parseTokens, writeTokens, declare, usable, pickable, repick } = await import("@theme/demo/tokens.js")
 
   // Where the theme is in the repository, for a patch.
   const REPO = "internal/web/ui/theme/default/"
   const KEY = "intergate.theme-draft."
+  const TOKENS = "tokens.css"
 
   const flag = v => v === "" || v === true || v === "true"
   $: isOpen = flag(open)
@@ -40,14 +48,33 @@
   let draft = ""
   let problems = []
   let copied = ""
+  // What the Source tab edits: the component's file, or the tokens.
+  let view = "file"
+
+  // tokens.css: as served, the text the edits started from, and the edits,
+  // by token (`dark:--ig-fg`): only those that differ from it. Which are
+  // listed: those the component reads, or all.
+  let tokensOriginal = ""
+  let tokensBase = ""
+  let tokenValues = {}
+  let listed = "read"
 
   $: usage = USAGE[name] || { file: "", lead: "", code: "" }
   $: file = name + ".html"
-  $: changed = draft !== base
+  $: fileChanged = draft !== base
   $: stale = !!original && base !== original
+  $: tokenList = parseTokens(tokensBase)
+  $: tokensDraft = writeTokens(tokensBase, tokenList, tokenValues)
+  $: tokensChanged = Object.keys(tokenValues).length > 0
+  $: tokensStale = !!tokensOriginal && tokensBase !== tokensOriginal
+  $: changed = fileChanged || tokensChanged
   $: tabs = [
     { value: "usage", label: "Usage" },
     { value: "source", label: "Source", extra: changed ? "edited" : "" },
+  ]
+  $: views = [
+    { value: "file", label: file + (fileChanged ? " · edited" : "") },
+    { value: "tokens", label: TOKENS + (tokensChanged ? " · edited" : "") },
   ]
 
   const saved = () => {
@@ -59,7 +86,7 @@
   }
   const keep = () => {
     try {
-      if (changed) localStorage.setItem(KEY + name, JSON.stringify({ base, draft }))
+      if (fileChanged) localStorage.setItem(KEY + name, JSON.stringify({ base, draft }))
       else localStorage.removeItem(KEY + name)
     } catch {}
   }
@@ -69,6 +96,7 @@
     tab = "usage"
     problems = []
     drop()
+    if (!tokensOriginal) loadTokens()
     const text = await (await fetch(THEME + "components/" + which + ".html")).text()
     if (which !== name) return
     const draftOf = saved()
@@ -82,6 +110,91 @@
     draft = original
     keep()
     build()
+  }
+
+  // ---- the tokens -------------------------------------------------------------
+
+  const keepTokens = () => {
+    try {
+      if (tokensChanged) localStorage.setItem(KEY + TOKENS, JSON.stringify({ base: tokensBase, values: tokenValues }))
+      else localStorage.removeItem(KEY + TOKENS)
+    } catch {}
+  }
+  const loadTokens = async () => {
+    const text = await (await fetch(THEME + TOKENS)).text()
+    let kept = null
+    try {
+      kept = JSON.parse(localStorage.getItem(KEY + TOKENS))
+    } catch {}
+    tokensOriginal = text
+    tokensBase = kept?.base ?? text
+    tokenValues = kept?.values ?? {}
+  }
+  const resetTokens = () => {
+    tokensBase = tokensOriginal
+    tokenValues = {}
+    keepTokens()
+  }
+
+  // A value that paints: a colour, or a gradient.
+  const paints = value => CSS.supports("color", value) || (/gradient\(/.test(value) && CSS.supports("background-image", value))
+
+  // The tokens listed, a row per name — its value in each tone, or the one
+  // for both — and colours first. A cell is a token with the value it has
+  // now, and the colour picker's for it, if it takes one.
+  const tokenGroups = (tokens, only, values) => {
+    const rows = new Map()
+    for (const token of tokens) {
+      if (only && !only.has(token.name)) continue
+      if (!rows.has(token.name)) rows.set(token.name, { name: token.name, cells: [], edited: false, colour: false })
+      const row = rows.get(token.name)
+      const current = values[token.key] ?? token.value
+      row.cells.push({ ...token, current, pick: pickable(current) })
+      row.edited ||= token.key in values
+      row.colour ||= paints(token.value)
+    }
+    const all = [...rows.values()]
+    return [["Colours", all.filter(row => row.colour)], ["Everything else", all.filter(row => !row.colour)]]
+      .filter(([, list]) => list.length)
+      .map(([title, list]) => ({ title, rows: list, toned: list.some(row => row.cells[0].scope !== "root") }))
+  }
+  $: reads = new Set([...draft.matchAll(/var\(\s*(--ig-[\w-]+)/g)].map(m => m[1]))
+  $: groups = tokenGroups(tokenList, listed === "read" ? reads : null, tokenValues)
+
+  const setToken = (cell, value) => {
+    const next = { ...tokenValues }
+    if (value === cell.value) delete next[cell.key]
+    else next[cell.key] = value
+    tokenValues = next
+    keepTokens()
+  }
+  // A value typed takes effect once entered; one that cannot be declared
+  // goes back to what it was.
+  const typed = (cell, event) => {
+    const value = event.target.value.trim()
+    if (usable(value)) setToken(cell, value)
+    else event.target.value = cell.current
+  }
+  const unset = row => {
+    const next = { ...tokenValues }
+    for (const cell of row.cells) delete next[cell.key]
+    tokenValues = next
+    keepTokens()
+  }
+
+  // The edits, declared over the theme's on the preview and on each island
+  // of a tone in it, and the swatches' paint: a stylesheet of the page's,
+  // as jq79 adopts its own, since the page's CSP allows no inline style.
+  const sheet = new CSSStyleSheet()
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]
+  const paintSheet = (groups, values) => {
+    let css = declare(".preview[data-token-preview]", values)
+    for (const group of groups) {
+      for (const row of group.rows) {
+        for (const cell of row.cells) if (row.colour && usable(cell.current)) css += `[data-swatch="${cell.key}"] { background: ${cell.current}; }\n`
+      }
+    }
+    sheet.replaceSync(css)
   }
 
   // ---- the preview ------------------------------------------------------------
@@ -163,15 +276,19 @@
   $: isOpen && name && name !== shown && load(name)
   $: (draft, isOpen && tab === "source" ? previewer.schedule() : drop())
   $: listen(isOpen)
+  $: paintSheet(groups, tokenValues)
   $destroyed(() => {
     previewer.stop()
     listen(false)
     drop()
+    document.adoptedStyleSheets = document.adoptedStyleSheets.filter(s => s !== sheet)
   })
 
   // ---- copying ----------------------------------------------------------------
 
-  const patch = () => unifiedDiff(base, draft, REPO + "components/" + file)
+  // Both files' changes, as one patch.
+  const patch = () => (fileChanged ? unifiedDiff(base, draft, REPO + "components/" + file) : "") +
+    (tokensChanged ? unifiedDiff(tokensBase, tokensDraft, REPO + TOKENS) : "")
   const copy = async (what, text) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -194,7 +311,7 @@
   <div class="inspect">
     <div class="top">
       <Tabs label="Inspect" :model="tab" :items="tabs" />
-      <code class="path">{{ REPO }}components/{{ file }}</code>
+      <code class="path">{{ REPO }}{{ tab === "source" && view === "tokens" ? TOKENS : "components/" + file }}</code>
     </div>
 
     <section :if="tab === 'usage'" role="tabpanel" aria-label="Usage">
@@ -209,20 +326,54 @@
     <section :else class="source" role="tabpanel" aria-label="Source">
       <div class="pane">
         <div class="bar">
-          <span><code>{{ file }}</code>{{ changed ? " · edited" : "" }}</span>
+          <Segmented label="File" :model="view" :items="views" />
           <span class="tools">
-            <Button variant="plain" size="sm" :disabled="!changed && !stale" @click="reset()">Reset</Button>
-            <Button variant="secondary" size="sm" :icon="copied === 'code' ? 'check' : 'copy'" @click="copy('code', draft)">{{ copied === "code" ? "Copied" : "Copy code" }}</Button>
+            <Button :if="view === 'file'" variant="plain" size="sm" :disabled="!fileChanged && !stale" @click="reset()">Reset</Button>
+            <Button :else variant="plain" size="sm" :disabled="!tokensChanged && !tokensStale" @click="resetTokens()">Reset</Button>
+            <Button variant="secondary" size="sm" :icon="copied === 'code' ? 'check' : 'copy'" @click="copy('code', view === 'file' ? draft : tokensDraft)">{{ copied === "code" ? "Copied" : "Copy code" }}</Button>
             <Button size="sm" :icon="copied === 'patch' ? 'check' : 'copy'" :disabled="!changed" @click="copy('patch', patch())">{{ copied === "patch" ? "Copied" : "Copy patch" }}</Button>
           </span>
         </div>
-        <Alert :if="stale" tone="warn">{{ file }} has changed since this draft started: its patch is against the older one. <strong>Reset</strong> starts again from the new one.</Alert>
-        <div class="editing"><CodeEditor :label="file" :model="draft" /></div>
-        <p class="hint">Tab indents. The draft stays in this browser until it is reset; <strong>Copy patch</strong> gives the change as a diff that <code>git apply</code> takes from the repository’s root.</p>
+        <div :if="view === 'file'" class="view">
+          <Alert :if="stale" tone="warn">{{ file }} has changed since this draft started: its patch is against the older one. <strong>Reset</strong> starts again from the new one.</Alert>
+          <div class="editing"><CodeEditor :label="file" :model="draft" /></div>
+          <p class="hint">Tab indents. The draft stays in this browser until it is reset; <strong>Copy patch</strong> gives the change as a diff that <code>git apply</code> takes from the repository’s root{{ tokensChanged ? ", with the tokens’ edits" : "" }}.</p>
+        </div>
+        <div :else class="view">
+          <Alert :if="tokensStale" tone="warn">{{ TOKENS }} has changed since these edits started: their patch is against the older one. <strong>Reset</strong> starts again from the new one.</Alert>
+          <div class="tokens">
+            <Segmented label="Tokens listed" :model="listed" :items="[{ value: 'read', label: 'Read by ' + file }, { value: 'all', label: 'All' }]" />
+            <p :if="!groups.length" class="none">{{ file }} reads no token of its own.</p>
+            <div :each="group in groups" :key="group.title" class="group">
+              <div class="token-row heading">
+                <span>{{ group.title }}</span>
+                <span :if="group.toned">dark · on the wallpaper</span>
+                <span :if="group.toned">light · on a card</span>
+              </div>
+              <div :each="row in group.rows" :key="row.name" class="token-row" :class.edited="row.edited">
+                <span class="name">
+                  <code>{{ row.name }}</code>
+                  <Button :if="row.edited" variant="ghost" size="sm" square icon="close" :title="'Back to ' + TOKENS + '’s'" @click="unset(row)" />
+                </span>
+                <span :each="cell in row.cells" :key="cell.key" class="cell" :data-scope="cell.scope">
+                  <small class="scope">{{ cell.scope === "root" ? "both tones" : cell.scope }}</small>
+                  <span :if="row.colour" class="swatch" :data-scope="cell.scope">
+                    <span class="paint" :data-swatch="cell.key"></span>
+                    <input :if="cell.pick" type="color" :value="cell.pick" :aria-label="row.name + ', ' + cell.scope + ': pick a colour'"
+                           @input="setToken(cell, repick(cell.current, $event.target.value))">
+                  </span>
+                  <input class="value" type="text" :value="cell.current" spellcheck="false" autocomplete="off" autocapitalize="off"
+                         :aria-label="row.name + ', ' + cell.scope" @change="typed(cell, $event)">
+                </span>
+              </div>
+            </div>
+          </div>
+          <p class="hint">A swatch opens the colour picker; a value typed takes effect once entered. They draw the preview alone, and stay in this browser for every component until reset; <strong>Copy patch</strong> carries them with <code>{{ file }}</code>’s changes.</p>
+        </div>
       </div>
       <div class="pane">
-        <div class="bar"><span>Preview: <code>{{ usage.file }}</code> with this <code>{{ file }}</code></span></div>
-        <div class="preview" data-tone="dark" @close="stop($event)" @closed="stop($event)"><div class="preview-host"></div></div>
+        <div class="bar"><span>Preview: <code>{{ usage.file }}</code> with this <code>{{ file }}</code>{{ tokensChanged ? " and these tokens" : "" }}</span></div>
+        <div class="preview" data-tone="dark" data-token-preview @close="stop($event)" @closed="stop($event)"><div class="preview-host"></div></div>
         <Alert :if="problems.length" tone="bad" flush>
           <p :each="problem in problems" :key="problem" class="problem">{{ problem }}</p>
         </Alert>
@@ -258,7 +409,8 @@
   .tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ig-space-3); }
   .source { display: grid; gap: var(--ig-space-8); }
   .pane { display: flex; flex-direction: column; min-width: 0; }
-  .editing, .preview { height: min(58vh, 560px); min-height: 280px; }
+  .view { display: flex; flex-direction: column; min-width: 0; }
+  .editing, .preview, .tokens { height: min(58vh, 560px); min-height: 280px; }
   .preview {
     margin-bottom: var(--ig-space-4);
     padding: var(--ig-space-8);
@@ -275,6 +427,76 @@
     line-height: var(--ig-leading);
   }
   .hint { margin: var(--ig-space-3) 0 0; color: var(--ig-fg-muted); font-size: var(--ig-text-sm); }
+
+  /* The tokens: a row per name, its value in each tone side by side, or
+     one across both. */
+  .tokens {
+    padding: var(--ig-space-5) var(--ig-space-6);
+    overflow: auto;
+    border-radius: var(--ig-radius-md);
+    background: var(--ig-field);
+    box-shadow: 0 0 0 var(--ig-hairline) var(--ig-field-line);
+  }
+  .none { margin: var(--ig-space-6) 0 0; color: var(--ig-fg-muted); font-size: var(--ig-text-md); }
+  .group { margin-top: var(--ig-space-6); }
+  .token-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1.25fr);
+    gap: var(--ig-space-3) var(--ig-space-5);
+    align-items: center;
+    padding: var(--ig-space-2) 0;
+    border-top: var(--ig-hairline) solid var(--ig-separator);
+  }
+  .token-row.heading {
+    padding-top: 0;
+    border-top: 0;
+    color: var(--ig-fg-muted);
+    font-size: var(--ig-text-xs);
+    font-weight: var(--ig-weight-semibold);
+  }
+  .token-row.heading span:first-child { color: var(--ig-fg); font-size: var(--ig-text-md); }
+  .name { display: flex; align-items: center; gap: var(--ig-space-1); min-width: 0; }
+  .name code { overflow: hidden; text-overflow: ellipsis; font-family: var(--ig-font-mono); font-size: var(--ig-text-sm); }
+  .edited .name code { color: var(--ig-link); font-weight: var(--ig-weight-semibold); }
+  .cell { display: flex; align-items: center; gap: var(--ig-space-3); min-width: 0; }
+  .cell[data-scope="root"] { grid-column: span 2; }
+  .scope { display: none; }
+  /* A swatch on the ground its tone draws on: the wallpaper, a card, or a
+     check for one that is the same on both. */
+  .swatch {
+    position: relative;
+    flex: none;
+    width: var(--ig-control-xs);
+    height: var(--ig-control-xs);
+    border-radius: var(--ig-radius-sm);
+    background: var(--ig-bg);
+    box-shadow: inset 0 0 0 var(--ig-hairline) var(--ig-field-line);
+  }
+  .swatch[data-scope="light"] { background: var(--ig-light); }
+  .swatch[data-scope="root"] { background: repeating-conic-gradient(var(--ig-separator) 0 25%, transparent 0 50%) 0 0 / 8px 8px, var(--ig-light); }
+  .swatch:focus-within { box-shadow: var(--ig-ring); }
+  .paint { position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 var(--ig-hairline) var(--ig-field-line); }
+  .swatch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
+  .value {
+    flex: 1;
+    min-width: 0;
+    height: var(--ig-control-xs);
+    padding: 0 var(--ig-space-3);
+    border: var(--ig-hairline) solid var(--ig-field-line);
+    border-radius: var(--ig-radius-sm);
+    background: var(--ig-field);
+    color: var(--ig-fg);
+    font-family: var(--ig-font-mono);
+    font-size: var(--ig-text-xs);
+  }
+  .value:focus-visible { outline: none; box-shadow: var(--ig-ring); }
+  /* A phone: each value under its name, saying which tone it is for. */
+  @media (max-width: 640px) {
+    .token-row { grid-template-columns: minmax(0, 1fr); }
+    .token-row.heading span + span { display: none; }
+    .cell[data-scope="root"] { grid-column: auto; }
+    .scope { display: block; flex: none; width: 4.5em; color: var(--ig-fg-muted); font-size: var(--ig-text-xs); }
+  }
   .problem { margin: 0; font-family: var(--ig-font-mono); font-size: var(--ig-text-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
   .problem + .problem { margin-top: var(--ig-space-3); }
   @media (min-width: 980px) {

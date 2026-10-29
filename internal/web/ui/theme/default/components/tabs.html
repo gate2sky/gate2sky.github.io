@@ -79,12 +79,13 @@
     font-weight: var(--ig-weight-semibold);
     white-space: nowrap;
     cursor: pointer;
-    transition: color var(--ig-duration) ease, background-color var(--ig-duration) ease;
+    transition: color var(--ig-duration) ease, background-color var(--ig-duration) ease, transform var(--ig-duration-fast) ease;
   }
   /* Without a count the pill is as wide on both sides. */
   button:not(:has(.count)) { padding-right: var(--ig-space-6); }
   button:hover { color: var(--ig-fg); background: var(--ig-fill-2); }
   button[aria-selected="true"] { color: var(--ig-fg); background: var(--ig-fill); }
+  button:active { color: var(--ig-fg); background: var(--ig-fill); transform: scale(.97); }
   button.bad[aria-selected="true"] { color: var(--ig-bad); }
   button:focus-visible { outline: none; box-shadow: var(--ig-ring); }
 

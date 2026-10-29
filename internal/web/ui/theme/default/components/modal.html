@@ -189,8 +189,10 @@
     background: none;
     color: var(--ig-fg-muted);
     cursor: pointer;
+    transition: background-color var(--ig-duration) ease, color var(--ig-duration) ease, transform var(--ig-duration-fast) ease;
   }
   .close:hover { background: var(--ig-fill); color: var(--ig-fg); }
+  .close:active { background: var(--ig-fill); color: var(--ig-fg); transform: scale(.9); }
   .close:focus-visible { outline: none; box-shadow: var(--ig-ring); }
   .body {
     min-height: 0;

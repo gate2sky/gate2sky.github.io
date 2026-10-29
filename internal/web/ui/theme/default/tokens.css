@@ -7,7 +7,7 @@
    Close to current macOS: a slowly drifting wallpaper behind translucent,
    blurred materials. **Two tones**, by what a thing sits on:
 
-   - `dark`, the default on `:root`: light text on the mid-gray wallpaper
+   - `dark`, the default on `:root`: light text on the dark wallpaper
      and on the toolbar's dark glass.
    - `light`: dark text on the light materials — a card, a dialog, the toast.
 
@@ -19,8 +19,8 @@
 :root {
   /* ---- the page ----------------------------------------------------------- */
 
-  /* The wallpaper: a mid gray, and four glows that drift over it. */
-  --ig-bg: #4b5060;
+  /* The wallpaper: near black, and four glows that drift over it. */
+  --ig-bg: #121212;
   --ig-wall-1: rgb(10 132 255 / .5);
   --ig-wall-2: rgb(191 90 242 / .42);
   --ig-wall-3: rgb(64 200 224 / .38);
@@ -28,11 +28,11 @@
 
   /* Materials: translucent fills that blur what is behind them. A card, the
      toolbar, and what floats over everything (a dialog, the toast, a
-     picker). */
-  --ig-material: rgb(246 247 250 / .84);
+     picker): white, a card letting the wallpaper's glows through. */
+  --ig-material: rgb(255 255 255 / .75);
   --ig-material-bar: rgb(40 43 53 / .62);
-  --ig-material-hud: rgb(250 250 252 / .9);
-  --ig-blur: blur(28px) saturate(170%);
+  --ig-material-hud: rgb(255 255 255 / .88);
+  --ig-blur: blur(12px);
   /* What a dialog lays over the page behind it. */
   --ig-overlay: rgb(10 14 30 / .35);
   --ig-overlay-blur: blur(3px);
@@ -223,15 +223,18 @@
 
 /* The light tone: on a card, a dialog, the toast. */
 [data-tone="light"] {
-  --ig-fg: #333a3e;
-  --ig-fg-muted: #5f676c;
-  --ig-link: #0a5fc2;
-  --ig-ok: #1d7a35;
-  --ig-bad: #c0271d;
-  --ig-warn: #8a5300;
+  --ig-fg: #1d2125;
+  --ig-fg-muted: #333a3e;
+  /* The tones as text, each at least 4.5:1 on a card over the wallpaper's
+     darkest. */
+  --ig-link: #074791;
+  --ig-ok: #145425;
+  --ig-bad: #8c1c15;
+  --ig-warn: #693f00;
 
+  /* On a card, hover lifts toward white; what is chosen sinks. */
   --ig-fill: rgb(0 0 0 / .06);
-  --ig-fill-2: rgb(0 0 0 / .035);
+  --ig-fill-2: rgb(255 255 255 / .35);
   --ig-field: rgb(255 255 255 / .92);
   --ig-field-line: rgb(0 0 0 / .16);
   --ig-line: rgb(0 0 0 / .1);
