@@ -12,7 +12,9 @@
   // the repository's root. The demo's, not the theme's.
   //
   //   <Inspector :open="inspecting" :name="component" @close="inspecting = false" />
-  const { C79 } = await import("/ui/vendor/jq79.js")
+  // jq79 by the name the page's import map gives it: the same module that
+  // drew the page, wherever the page is served.
+  const { C79 } = await import("jq79")
   const Modal = await import("@theme/components/modal.html")
   const Tabs = await import("@theme/components/tabs.html")
   const Button = await import("@theme/components/button.html")
@@ -20,9 +22,9 @@
   const CodeEditor = await import("@theme/demo/code-editor.html")
   const { USAGE, TITLES } = await import("@theme/demo/usage.js")
   const { unifiedDiff } = await import("@theme/demo/diff.js")
+  const { THEME } = await import("@theme/demo/paths.js")
 
-  // Where the theme is served, and where it is in the repository.
-  const SERVED = "/ui/theme/default/"
+  // Where the theme is in the repository, for a patch.
   const REPO = "internal/web/ui/theme/default/"
   const KEY = "intergate.theme-draft."
 
@@ -67,7 +69,7 @@
     tab = "usage"
     problems = []
     drop()
-    const text = await (await fetch(SERVED + "components/" + which + ".html")).text()
+    const text = await (await fetch(THEME + "components/" + which + ".html")).text()
     if (which !== name) return
     const draftOf = saved()
     original = text
@@ -108,9 +110,9 @@
       problems = []
       watchUntil = Date.now() + 1500
       try {
-        const component = new C79(draft, { filename: SERVED + "components/" + file + "#edited" })
+        const component = new C79(draft, { filename: THEME + "components/" + file + "#edited" })
         const parent = new C79(usage.code, {
-          filename: SERVED + "demo/usage/" + usage.file + "#preview",
+          filename: THEME + "demo/usage/" + usage.file + "#preview",
           modules: { ["@theme/components/" + file]: component },
         })
         const box = document.createElement("div")

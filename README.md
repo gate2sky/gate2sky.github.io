@@ -484,9 +484,13 @@ building blocks — `Button`, `Modal`, `Tabs`, `Card`, `Badge`, `Alert`,
 `Facts`, `Switch`, `Segmented`, `ChoiceCards`, `Icon` — which draw with those
 tokens alone. `app.css` declares no colour of its own. Every component, in
 both tones, is on one page at `/ui/theme/default/` of any running
-dashboard; **Inspect** beside each shows a parent component that uses it,
-and its own code, editable, with a live preview and a button that copies
-the change as a patch for `git apply`.
+dashboard, and at
+[jgermade.github.io/intergate/theme](https://jgermade.github.io/intergate/theme/)
+as of the latest release; **Inspect** beside each shows a parent component
+that uses it, and its own code, editable, with a live preview and a button
+that copies the change as a patch for `git apply`.
+[`scripts/theme-site.sh`](scripts/theme-site.sh) builds that static copy:
+`scripts/theme-site.sh /tmp/theme`, then serve the folder.
 
 `internal/e2e` runs the whole system: SSH clients opening tunnels, browsers
 signing in with email codes, a software WebAuthn authenticator and a fake
@@ -501,7 +505,7 @@ Two workflows:
   and verifies the dependencies, runs the tests, builds
   `intergate-<os>-<arch>.tar.gz` for Linux and macOS (amd64, arm64), walks
   the installer against this tree, builds the Docker image, renders the Helm
-  chart and checks the landing.
+  chart, checks the landing and assembles the design system's demo.
 - **Release** (`.github/workflows/release.yml`) is started by hand from the
   Actions tab on the default branch, choosing `patch`, `minor` or `major`. It
   raises [`VERSION`](VERSION) and the Helm chart's version, commits and tags
@@ -509,8 +513,9 @@ Two workflows:
   binaries, `SHA256SUMS` (what `setup.sh` installs) and the Helm chart, pushes
   the Docker image and the chart to GHCR, attests the provenance of all of
   them, and deploys [`pages/`](pages/) — the landing and `setup.sh` — to
-  GitHub Pages, with the Helm repository's `charts/index.yaml`, which adds
-  each release's chart to the one already served. `dry-run` builds everything
+  GitHub Pages, with the design system's demo under `theme/` and the Helm
+  repository's `charts/index.yaml`, which adds each release's chart to the
+  one already served. `dry-run` builds everything
   and publishes nothing.
 
 The landing is built from [`scripts/landing`](scripts/landing): edit
