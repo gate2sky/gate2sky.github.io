@@ -93,16 +93,17 @@
   }
 </script>
 
-<div class="page-head"><h1>Admin</h1></div>
-
-<div class="panel-tabs" role="tablist">
-  <button type="button" role="tab" :aria-selected="tab === 'users' ? 'true' : 'false'" @click="tab = 'users'">
-    Users <span class="count">{{ users.length }}</span>
-  </button>
-  <button type="button" role="tab" :aria-selected="tab === 'subdomains' ? 'true' : 'false'" @click="tab = 'subdomains'">
-    Subdomains <span class="count">{{ subdomains.length }}</span>
-    <span :if="online" class="count count-online" :title="online + ' online'">{{ online }} online</span>
-  </button>
+<div class="page-head">
+  <h1>Admin</h1>
+  <div class="panel-tabs" role="tablist">
+    <button type="button" role="tab" :aria-selected="tab === 'users' ? 'true' : 'false'" @click="tab = 'users'">
+      Users <span class="count">{{ users.length }}</span>
+    </button>
+    <button type="button" role="tab" :aria-selected="tab === 'subdomains' ? 'true' : 'false'" @click="tab = 'subdomains'">
+      Subdomains <span class="count">{{ subdomains.length }}</span>
+      <span :if="online" class="count count-online" :title="online + ' online'">{{ online }} online</span>
+    </button>
+  </div>
 </div>
 
 <section :if="tab === 'users'" class="card" role="tabpanel" aria-label="Users">

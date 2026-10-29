@@ -1,9 +1,9 @@
 <script :setup>
   // The signed-in user's subdomains, and the form that registers one.
-  const { app, go, toast } = await import("@ui/lib/store.js")
+  const { app } = await import("@ui/lib/store.js")
   const { api } = await import("@ui/lib/api.js")
   const { ago } = await import("@ui/lib/format.js")
-  const AccessOptions = await import("@ui/components/access-options.html")
+  const RegisterForm = await import("@ui/components/register-form.html")
   const StatusBadge = await import("@ui/components/status-badge.html")
 
   document.title = "Subdomains · gate2sky"
@@ -29,43 +29,21 @@
     })
   })
 
-  let name = ""
-  // The form's access choice is only saved by Register: until then it is
-  // kept in this browser, so a reload doesn't reset it.
-  const ACCESS_KEY = "gate2sky.new-subdomain-access"
-  let access = "public"
-  try {
-    const kept = localStorage.getItem(ACCESS_KEY)
-    if (["public", "users", "private"].includes(kept)) access = kept
-  } catch {}
-  const pickAccess = value => {
-    access = value
-    try { localStorage.setItem(ACCESS_KEY, value) } catch {}
+  // With subdomains listed, the register form opens in a dialog, new
+  // each time.
+  let registering = false
+  const openRegister = () => {
+    registering = true
+    setTimeout(() => document.querySelector("dialog.register").showModal())
   }
-  let keys = ""
-  let busy = false
-  let error = ""
-
-  const register = async () => {
-    busy = true
-    error = ""
-    try {
-      const result = await api("POST", "/subdomains", { name, access, keys })
-      const host = `${result.subdomain.name}.${app.domain}`
-      const problems = result.keys.problems || []
-      if (problems.length) toast(`${host} is registered, but some keys were not added: ${problems.join("; ")}.`, "error")
-      else toast(`${host} is registered with ${result.keys.added} SSH key(s).`)
-      go("/subdomains/" + encodeURIComponent(result.subdomain.name))
-    } catch (e) {
-      error = e.message
-    }
-    busy = false
-  }
+  const closeRegister = () => document.querySelector("dialog.register").close()
 </script>
 
 <div class="page-head">
-  <h1>Subdomains</h1>
-  <span class="count">{{ subdomains.length }} of {{ app.limits.subdomains }}</span>
+  <div class="page-title"><h1>Subdomains</h1><span class="count">{{ subdomains.length }} of {{ app.limits.subdomains }}</span></div>
+  <button :if="subdomains.length" type="button" class="button" @click="openRegister">
+    <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Register a subdomain
+  </button>
 </div>
 
 <div :if="loadError" class="flash flash-error" role="alert">{{ loadError }}</div>
@@ -73,7 +51,7 @@
 <section :if="subdomains.length" class="card">
   <div class="table-wrap">
     <table class="table">
-      <thead><tr><th>Subdomain</th><th>Status</th><th>Access</th><th class="hide-narrow">SSH keys</th><th class="hide-narrow"></th></tr></thead>
+      <thead><tr><th>Subdomain</th><th>Status</th><th>Access</th><th class="hide-narrow">SSH keys</th><th></th></tr></thead>
       <tbody>
         <tr :each="sub in subdomains" :key="sub.name">
           <td>
@@ -85,7 +63,14 @@
           <td><StatusBadge :tunnel="sub.tunnel" /><span :if="sub.tunnel" class="muted small hide-narrow">{{ ago(sub.tunnel.created_at) }}</span></td>
           <td><span class="badge" :class="'badge-' + sub.access">{{ sub.access }}</span></td>
           <td class="hide-narrow">{{ sub.keys }}</td>
-          <td class="right hide-narrow"><a :href="'/subdomains/' + encodeURIComponent(sub.name)">Manage</a></td>
+          <td class="right row-actions">
+            <a class="icon-button" :href="sub.url" target="_blank" rel="noopener noreferrer" :aria-label="'Open ' + sub.url" title="Open">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
+            </a>
+            <a class="icon-button" :href="'/subdomains/' + encodeURIComponent(sub.name)" :aria-label="'Manage ' + sub.name" title="Manage">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></svg>
+            </a>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -93,28 +78,15 @@
 </section>
 <div :elseif="!loadError" class="card empty">
   <svg class="empty-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-  <p>No subdomains yet. Register one below with your SSH public key, then connect with <code>ssh -R</code>.</p>
+  <p>No subdomains yet. Register one with your SSH public key, then connect with <code>ssh -R</code>.</p>
 </div>
 
-<section class="card">
+<section :if="!subdomains.length" class="card">
   <h2>Register a subdomain</h2>
-  <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
-  <form class="form" @submit.prevent="register">
-    <label>Name
-      <span class="input-suffix">
-        <input name="name" required maxlength="63" pattern="[A-Za-z0-9]([A-Za-z0-9\-]{0,61}[A-Za-z0-9])?" placeholder="myapp"
-               autocomplete="off" spellcheck="false" :value="name" @input="name = $event.target.value">
-        <span>.{{ app.domain }}</span>
-      </span>
-    </label>
-    <fieldset>
-      <legend>Who can open it <span class="hint">Applies when you register; change it later on the subdomain’s page.</span></legend>
-      <AccessOptions :model="access" @pick="pickAccess($event.detail)" />
-    </fieldset>
-    <label>SSH public keys <span class="hint">Optional, one per line. You can add more later.</span>
-      <textarea name="keys" rows="3" spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"
-                :value="keys" @input="keys = $event.target.value"></textarea>
-    </label>
-    <div><button type="submit" class="button" :disabled="busy">Register</button></div>
-  </form>
+  <RegisterForm />
 </section>
+
+<dialog class="card dialog dialog-wide register" aria-labelledby="register-title" @close="registering = false">
+  <h2 id="register-title">Register a subdomain</h2>
+  <RegisterForm :if="registering" :cancel="true" @cancel="closeRegister()" />
+</dialog>

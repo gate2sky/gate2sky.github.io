@@ -34,6 +34,8 @@
   --separator: rgb(255 255 255 / .15);
   --shadow: 0 1px 2px rgb(0 0 0 / .16), 0 14px 36px rgb(10 14 30 / .3);
   --button-2: rgb(255 255 255 / .14);
+  --button-2-hover: rgb(255 255 255 / .24);
+  --button-2-active: rgb(255 255 255 / .07);
   --button-2-shadow: 0 .5px 0 rgb(255 255 255 / .12) inset, 0 0 0 .5px rgb(0 0 0 / .18), 0 1px 2px rgb(0 0 0 / .18);
   --shadow-pop: 0 2px 6px rgb(0 0 0 / .2), 0 22px 56px rgb(10 14 30 / .45);
 
@@ -69,6 +71,8 @@
   --separator: rgb(0 0 0 / .09);
   --material-edge: rgb(255 255 255 / .8);
   --button-2: #fff;
+  --button-2-hover: #f2f3f6;
+  --button-2-active: #e3e5ea;
   --button-2-shadow: 0 0 0 .5px rgb(0 0 0 / .16), 0 1px 2px rgb(0 0 0 / .1);
   color: var(--fg);
 }
@@ -227,6 +231,8 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 .page-head > div { min-width: 0; }
 .page-head h1 { overflow-wrap: anywhere; }
 .page-head h1 a { color: inherit; }
+.page-title { display: flex; align-items: center; gap: 12px; }
+.page-head .panel-tabs { margin: 0; }
 .page-head h1 a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .count { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--fill); padding: 3px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
 
@@ -411,7 +417,7 @@ select.role {
   padding: 0; border: 0; border-radius: 7px; background: none; color: var(--muted); cursor: pointer;
 }
 .icon-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.icon-button:hover { background: var(--fill); }
+.icon-button:hover { background: var(--fill); text-decoration: none; }
 .icon-button.danger { color: var(--muted); }
 .icon-button.danger:hover { color: var(--err); }
 
@@ -426,6 +432,7 @@ select.role {
 .dialog h2 { font-size: 17px; margin-bottom: 6px; }
 .dialog p { margin: 0 0 18px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.dialog-wide { width: min(620px, calc(100vw - 32px)); margin-top: max(40px, 6vh); max-height: calc(100dvh - 80px); overflow: auto; }
 @keyframes dialog-in { from { opacity: 0; transform: translateY(-8px) scale(.97); } }
 @media (prefers-reduced-motion: reduce) { .dialog[open] { animation: none; } }
 
@@ -446,7 +453,12 @@ select.role {
 .button-secondary {
   color: var(--fg); background: var(--button-2);
   box-shadow: var(--button-2-shadow);
+  transition: background-color .12s, transform .06s;
 }
+/* Translucent on the wallpaper, where brightness hardly shows. */
+.button-secondary:hover { filter: none; background: var(--button-2-hover); }
+.button-secondary:active { filter: none; background: var(--button-2-active); transform: scale(.97); }
+.button-icon { width: 16px; height: 16px; margin-left: -3px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 .button-danger {
   --accent: #d92d23;
   color: #fff;
@@ -487,7 +499,7 @@ textarea { font-size: 14px; line-height: 1.55; resize: vertical; }
 input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
 
 .input-suffix { display: flex; align-items: stretch; max-width: 520px; border-radius: var(--radius-control); }
-.input-suffix input { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.input-suffix input:not([type=radio]):not([type=checkbox]) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .input-suffix span {
   display: flex; align-items: center; padding: 0 12px; font-weight: normal; white-space: nowrap; color: var(--muted);
   border: .5px solid var(--field-line); border-left: 0; border-radius: 0 var(--radius-control) var(--radius-control) 0; background: var(--fill-2);
