@@ -67,11 +67,11 @@ type SubdomainDetail struct {
 
 // User is an account.
 type User struct {
-	ID          int64     `json:"id"`
-	Email       string    `json:"email"`
-	Name        string    `json:"name"`
-	Disabled    bool      `json:"disabled"`
-	Admin       bool      `json:"admin"`
+	ID       int64  `json:"id"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Disabled bool   `json:"disabled"`
+	Admin    bool   `json:"admin"`
 	// ConfigAdmin is set when auth.admins makes the user an administrator,
 	// which the dashboard cannot take away.
 	ConfigAdmin bool      `json:"config_admin"`
