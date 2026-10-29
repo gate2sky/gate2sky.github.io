@@ -67,15 +67,18 @@ sshService:
   annotations: {}
   loadBalancerIP: ""
 
-# Raw TCP ports for subdomains (databases, SSH, games...), allocated from
-# first..last. Each port gets an entry in a Service of its own, by default
-# a LoadBalancer that keeps client addresses (externalTrafficPolicy: Local)
-# so allow lists work: keep the range small.
+# TCP and UDP ports for subdomains (databases, SSH, games...), allocated
+# from first..last. Each port gets an entry in a Service of its own, by
+# default a LoadBalancer that keeps client addresses (externalTrafficPolicy:
+# Local) so allow lists work: keep the range small.
 tcp:
   enabled: false
   first: 30000
   last: 30019
   maxPorts: 5
+  # Also expose the range over UDP, for UDP ports (the gate2sky client).
+  # Needs LoadBalancers that take both protocols (Kubernetes 1.26+).
+  udp: true
   # Host in the ports' addresses; defaults to ssh.publicHost, then domain.
   publicHost: ""
   service:

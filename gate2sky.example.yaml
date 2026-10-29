@@ -90,9 +90,10 @@ limits:
   keys_per_subdomain: 20
   tunnels_per_connection: 5
 
-# Raw TCP ports for subdomains (databases, SSH, games...), forwarded with
-# ssh -R <port>.<subdomain>:0:localhost:<local port>. Each port gets a public
-# number from this range for good; open the range in your firewall.
+# TCP and UDP ports for subdomains (databases, SSH, games...). TCP ports are
+# forwarded with ssh -R <port>.<subdomain>:0:localhost:<local port>, UDP ports
+# with the gate2sky client (<public_url>/tunnel.sh). Each port gets a public
+# number from this range for good; open it in your firewall, TCP and UDP.
 # tcp:
 #   ports: 30000-30019
 #   max_ports: 5                    # per subdomain

@@ -148,6 +148,7 @@ jobs:
           grep -q 'kind: Certificate' alt.yaml
           grep -q 'ports: 31000-31002' alt.yaml
           grep -q 'port: 31002' alt.yaml
+          grep -q 'name: udp-31002' alt.yaml
           ! grep -q 'g2s-gate2sky-tcp' default.yaml
           grep -q "image: \"ghcr.io/gate2sky/gate2sky:$(cat VERSION)\"" default.yaml
 

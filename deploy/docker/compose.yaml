@@ -15,8 +15,10 @@ services:
       - "80:80"
       - "443:443"
       - "2222:2222"
-      # With tcp.ports: 30000-30019 in the configuration, publish its range:
+      # With tcp.ports: 30000-30019 in the configuration, publish its range,
+      # over UDP too for UDP ports:
       # - "30000-30019:30000-30019"
+      # - "30000-30019:30000-30019/udp"
     volumes:
       - gate2sky:/data
     # Secrets referenced as ${VAR} in the configuration:

@@ -29,9 +29,10 @@ ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com
 - **Live view** of every tunnel: client address, key, requests and traffic,
   with a disconnect button. Removing a key or disabling a user closes their
   tunnels at once. The SSH session prints every request, like sish.
-- **TCP ports** for databases, SSH, game servers…: each subdomain can get
-  public ports of its own (`tcp://gate.example.com:30042`), open only to the
-  addresses you allow.
+- **TCP and UDP ports** for databases, SSH, game servers…: each subdomain
+  can get public ports of its own (`tcp://gate.example.com:30042`), open
+  only to the addresses you allow. UDP goes through the `gate2sky tunnel`
+  client, which runs without installing anything.
 - **Single static binary** with SQLite storage and automatic HTTPS (Let's
   Encrypt) — or Docker, or Kubernetes with Traefik.
 
@@ -83,7 +84,35 @@ The public port works too, with or without the subdomain
 (`-R myapp:30042:localhost:5432`, `-R 30042:localhost:5432`).
 `-R myapp:0:…` stays an HTTP tunnel. The subdomain's keys open all its
 ports, and removing a key, disabling its owner or deleting the port closes
-it at once. UDP needs more than `ssh -R` and is not available yet.
+it at once.
+
+### UDP ports and the gate2sky client
+
+SSH only carries TCP, so UDP ports (a Minecraft Bedrock or Valheim server,
+WireGuard, DNS…) go through the gate2sky client, the same binary as the
+server. The dashboard serves a script that downloads the client of its
+release, checks it against the release's `SHA256SUMS`, runs it and deletes
+it when it ends:
+
+```bash
+curl -fsSL https://gate.example.com/tunnel.sh | sh -s -- myapp --udp mc=19132
+curl -fsSL https://gate.example.com/tunnel.sh | sh -s -- --cache myapp \
+  --http 3000 --tcp db=5432 --udp mc=19132     # everything, client kept in ~/.cache
+gate2sky tunnel --server gate.example.com:2222 myapp --udp mc=19132   # installed
+```
+
+It signs in with ssh-agent or `~/.ssh` keys (`-i` for another), checks the
+server's host key (written into the script, or `--host-key`, or
+`~/.ssh/known_hosts`) and reconnects when the connection drops. It runs on
+Linux and macOS.
+
+Each remote address gets a stream of its own to your service, closed after
+two minutes of silence. UDP over a TCP connection suffers head-of-line
+blocking: fine for DNS, MQTT-SN or a quiet game server, jittery for
+fast-paced games or calls. Source addresses can be spoofed over UDP, so
+allow lists protect less than for TCP, and gate2sky caps what a port sends
+back to an address at ten times what it received (plus 64 KiB), so it
+can't be used to amplify attacks.
 
 ## Getting started
 
@@ -174,8 +203,8 @@ docker volume create gate2sky
 docker run -it --rm -v gate2sky:/data ghcr.io/gate2sky/gate2sky config
 docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data \
   -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2sky/gate2sky
-# with tcp.ports: 30000-30019, publish the range as well:
-#   -p 30000-30019:30000-30019
+# with tcp.ports: 30000-30019, publish the range as well, TCP and UDP:
+#   -p 30000-30019:30000-30019 -p 30000-30019:30000-30019/udp
 docker exec -it gate2sky gate2sky config     # manage subdomains, keys and users
 ```
 
@@ -200,10 +229,10 @@ without OCI support, such as helm-dashboard), so there is nothing to clone
 - an `IngressRouteTCP` on a dedicated Traefik entry point for SSH, with the
   PROXY protocol so gate2sky sees client addresses — or a `LoadBalancer`
   Service instead;
-- with `tcp.enabled`, a `LoadBalancer` Service for the TCP ports
-  (`tcp.first` to `tcp.last`), with `externalTrafficPolicy: Local` so allow
-  lists see client addresses. Keep the range small: it is one Service port
-  each.
+- with `tcp.enabled`, a `LoadBalancer` Service for the ports (`tcp.first`
+  to `tcp.last`, TCP and, with `tcp.udp`, UDP), with
+  `externalTrafficPolicy: Local` so allow lists see client addresses. Keep
+  the range small: it is one or two Service ports each.
 
 ```bash
 helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky \
@@ -256,7 +285,7 @@ Highlights:
   subdomain and account but owners', owners manage everything, and
   `auth.admins` are always owners.
 - `ssh.proxy_protocol`: expect a PROXY protocol header from a load balancer.
-- `tcp.ports`: the range TCP ports are allocated from (e.g. `30000-30019`);
+- `tcp.ports`: the range TCP and UDP ports are allocated from (e.g. `30000-30019`);
   `tcp.max_ports` per subdomain (5), `tcp.public_host` for their addresses
   (the SSH host by default) and `tcp.listen_host` to listen on one interface.
 
@@ -356,7 +385,7 @@ run `node scripts/landing/icons.js`, which renders `favicon.ico` and
 
 ## Roadmap
 
-- UDP ports, with a `gate2sky tunnel` client.
+- A Windows build of the client (`tunnel.ps1`).
 - Sharing private subdomains with specific users.
 - Custom domains (CNAME to a subdomain).
 - Request inspector in the dashboard.
