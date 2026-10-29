@@ -30,7 +30,18 @@
   })
 
   let name = ""
+  // The form's access choice is only saved by Register: until then it is
+  // kept in this browser, so a reload doesn't reset it.
+  const ACCESS_KEY = "gate2sky.new-subdomain-access"
   let access = "public"
+  try {
+    const kept = localStorage.getItem(ACCESS_KEY)
+    if (["public", "users", "private"].includes(kept)) access = kept
+  } catch {}
+  const pickAccess = value => {
+    access = value
+    try { localStorage.setItem(ACCESS_KEY, value) } catch {}
+  }
   let keys = ""
   let busy = false
   let error = ""
@@ -97,8 +108,8 @@
       </span>
     </label>
     <fieldset>
-      <legend>Who can open it</legend>
-      <AccessOptions :model="access" />
+      <legend>Who can open it <span class="hint">Applies when you register; change it later on the subdomain’s page.</span></legend>
+      <AccessOptions :model="access" @pick="pickAccess($event.detail)" />
     </fieldset>
     <label>SSH public keys <span class="hint">Optional, one per line. You can add more later.</span>
       <textarea name="keys" rows="3" spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"
