@@ -49,6 +49,7 @@
   --surface-2: #131b31;
   --border: #1c2640;
   --fg: #e8eefc;
+  --wordmark: #fff;
   --muted: #93a0bb;
   --dim: #5f6b85;
   --cyan: #5ad8ff;
@@ -83,6 +84,7 @@
   --surface-2: #f1f4fa;
   --border: #d7deea;
   --fg: #0e1526;
+  --wordmark: #333a3e;
   --muted: #4c5a75;
   --dim: #8090ab;
   --cyan: #0b9fd8;
@@ -171,6 +173,7 @@ header { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
 .bar { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 12px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
 .brand:hover { text-decoration: none; }
+.brand .word { color: var(--wordmark); }
 .brand svg { width: 40px; height: 40px; margin: -6px -2px -6px -4px; overflow: visible; }
 nav { display: flex; align-items: center; gap: 4px; }
 nav a { color: var(--muted); font-size: 14px; padding: 6px 10px; border-radius: 8px; display: none; }
@@ -245,7 +248,7 @@ svg.duo { width: 100%; height: auto; display: block; overflow: visible; }
   padding: 5px 12px; border-radius: 999px; }
 .eyebrow b { color: var(--amber); font-weight: 600; }
 h1 { font-size: clamp(36px, 9vw, 64px); line-height: 1.04; letter-spacing: -.035em; margin: 16px 0 12px; }
-h1 .glow { background: linear-gradient(90deg, var(--cyan), var(--blue) 60%, var(--cyan)); background-size: 200% 100%;
+h1 .glow, .brand .glow { background: linear-gradient(90deg, var(--cyan), var(--blue) 60%, var(--cyan)); background-size: 200% 100%;
   -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 6s linear infinite; }
 @keyframes shine { to { background-position: -200% 0 } }
 .lede { color: var(--muted); font-size: clamp(16px, 4.2vw, 19px); margin: 0 auto 22px; max-width: 34em; }
@@ -255,6 +258,9 @@ h1 .glow { background: linear-gradient(90deg, var(--cyan), var(--blue) 60%, var(
 .install code { flex: 1; min-width: 0; color: var(--code-fg); font-size: 13.5px; white-space: nowrap; overflow-x: auto; scrollbar-width: none; padding: 8px 0; }
 .install code::-webkit-scrollbar { display: none; }
 .install code .p { color: var(--cyan); user-select: none; }
+/* Just the icon here: the button's aria-label names it, and turning green says it copied. */
+.install .copy { padding: 9px; }
+.install .copy span { display: none; }
 .copy { flex: none; border: 1px solid var(--code-button-border); background: var(--code-button); color: var(--code-fg); border-radius: 10px;
   font: 600 13px system-ui, sans-serif; padding: 9px 12px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
 .copy:hover { border-color: var(--cyan); }
@@ -438,7 +444,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
   .flow .tall { display: none; }
 }
 @media (min-width: 960px) {
-  .hero { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); padding: 56px 0 64px; gap: 36px; }
+  .hero { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); padding: 56px 0 64px; gap: 36px; }
   .hero-text { text-align: left; order: -1; }
   .lede { margin-left: 0; }
   .install { margin: 0; }
@@ -677,7 +683,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
     </g>
   </g>
 </svg>
-      intergate
+      <span class="word">inter<span class="glow">gate</span></span>
     </a>
     <nav aria-label="Sections">
       <a href="#how">How it works</a>
