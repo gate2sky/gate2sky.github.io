@@ -1,0 +1,120 @@
+<script :setup="{ items = [], model = '', name = 'choice', disabled = false, layout = 'row' }">
+  // One of a few, each a card with an icon, a name, a line about it and a
+  // check: who can open a subdomain, who can connect to a port. Radios under
+  // the cards, so the arrows move between them as in any radio group.
+  //
+  // **Part of the default theme**: imports only the theme's `Icon`, and
+  // draws only with `tokens.css`. See
+  // `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <ChoiceCards name="access" :model="access" :items="[
+  //     { value: 'public', label: 'Public', hint: 'Anyone with the URL', hue: 'blue', icon: 'globe' },
+  //     { value: 'private', label: 'Private', hint: 'Only the owner', hue: 'pink', icon: 'lock' },
+  //   ]" />
+  //
+  // `hue` colours the card when chosen and its icon (`blue`, `purple`,
+  // `green`, `orange`, `teal`, `pink`); `icon` is optional. `layout` is
+  // `row` — side by side on a wide screen, as many columns as cards — or
+  // `stack`, one under another. The choice goes up through `:model` and as
+  // `change`.
+
+  const Icon = await import("@theme/components/icon.html")
+
+  const flag = v => v === "" || v === true || v === "true"
+  $: isDisabled = flag(disabled)
+  $: columns = Math.min(items.length, 4)
+
+  const pick = value => {
+    $updateModel(value)
+    $emit("change", value)
+  }
+</script>
+
+<div class="choices" :class="'layout-' + layout + ' columns-' + columns">
+  <label :each="item in items" :key="String(item.value)" class="choice" :class="'hue-' + (item.hue || 'blue')">
+    <input type="radio" :name="name" :value="item.value" :checked="model === item.value" :disabled="isDisabled"
+           @change="pick(item.value)">
+    <span :if="item.icon" class="icon"><Icon :name="item.icon" size="lg" weight="light" /></span>
+    <span class="text"><strong>{{ item.label }}</strong> <span :if="item.hint" class="hint">{{ item.hint }}</span></span>
+    <span class="check"><Icon name="check" size="sm" weight="bold" /></span>
+  </label>
+</div>
+
+<style scoped>
+  .choices {
+    display: grid;
+    gap: var(--ig-space-4);
+    font-family: var(--ig-font-sans);
+  }
+  .choice {
+    --hue: var(--ig-hue-blue);
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--ig-space-5);
+    padding: var(--ig-space-5) var(--ig-space-6);
+    border-radius: var(--ig-radius-lg);
+    background: var(--ig-field);
+    box-shadow: 0 0 0 var(--ig-hairline) var(--ig-field-line), var(--ig-shadow-xs);
+    font-size: var(--ig-text-base);
+    font-weight: var(--ig-weight-regular);
+    cursor: pointer;
+    transition: box-shadow var(--ig-duration) ease, background-color var(--ig-duration) ease;
+  }
+  .hue-blue { --hue: var(--ig-hue-blue); }
+  .hue-purple { --hue: var(--ig-hue-purple); }
+  .hue-green { --hue: var(--ig-hue-green); }
+  .hue-orange { --hue: var(--ig-hue-orange); }
+  .hue-teal { --hue: var(--ig-hue-teal); }
+  .hue-pink { --hue: var(--ig-hue-pink); }
+  .choice:hover { box-shadow: 0 0 0 1px color-mix(in srgb, var(--hue) 50%, transparent), var(--ig-shadow-lift); }
+  /* The radio stays in the card, unseen, for the keyboard. */
+  input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+  .icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: var(--ig-fill);
+    color: var(--ig-fg-muted);
+    transition: background var(--ig-duration) ease, color var(--ig-duration) ease;
+  }
+  .text { display: grid; gap: 1px; flex: 1; min-width: 0; }
+  .hint { color: var(--ig-fg-muted); font-size: var(--ig-text-sm); }
+  .check {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    color: var(--ig-on-accent);
+    box-shadow: inset 0 0 0 1.5px var(--ig-field-line);
+    transition: background-color var(--ig-duration) ease, box-shadow var(--ig-duration) ease;
+  }
+  .check > * { opacity: 0; transform: scale(.5); transition: opacity var(--ig-duration) ease, transform var(--ig-duration-slow) ease; }
+  .choice:has(input:checked) {
+    background: color-mix(in srgb, var(--hue) 8%, var(--ig-field));
+    box-shadow: 0 0 0 1.5px var(--hue), 0 4px 14px color-mix(in srgb, var(--hue) 22%, transparent);
+  }
+  .choice:has(input:checked) .icon {
+    color: var(--ig-on-accent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--hue) 65%, var(--ig-light)), var(--hue));
+  }
+  .choice:has(input:checked) .check { background: var(--hue); box-shadow: none; }
+  .choice:has(input:checked) .check > * { opacity: 1; transform: none; }
+  .choice:has(input:focus-visible) { box-shadow: 0 0 0 1.5px var(--hue), var(--ig-ring); }
+  .choice:has(input:disabled) { opacity: .5; cursor: default; }
+
+  /* Side by side on a wide screen: the icon over the name, the check in the
+     corner. */
+  @media (min-width: 640px) {
+    .layout-row.columns-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .layout-row.columns-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .layout-row.columns-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .layout-row .choice { flex-direction: column; align-items: flex-start; gap: var(--ig-space-4); padding: var(--ig-space-7); }
+    .layout-row .check { position: absolute; top: var(--ig-space-6); right: var(--ig-space-6); }
+  }
+</style>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>intergate — default theme</title>
+<!-- The theme's tokens and nothing of the app's: the components draw with
+     these alone, and this page is where that is seen to be true.
+     scripts/theme-site.sh makes these paths relative for GitHub Pages. -->
+<link rel="stylesheet" href="/ui/theme/default/tokens.css">
+<link rel="stylesheet" href="/ui/theme/default/demo.css">
+<link rel="icon" href="/ui/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<main id="demo"></main>
+<!-- `@theme/` is the theme's folder, as the app's own map says, and `jq79`
+     the module that draws the page, for the inspector's previews; before
+     the first module script, the only place a map is read. -->
+<script type="importmap" nonce="{{.Nonce}}">{ "imports": { "@theme/": "/ui/theme/default/", "jq79": "/ui/vendor/jq79.js" } }</script>
+<script type="module" nonce="{{.Nonce}}">
+  import { C79 } from "jq79"
+  await C79.safeEval({ nonce: true })
+  C79.fetch("/ui/theme/default/demo.html").mount("#demo")
+</script>
+</body>
+</html>

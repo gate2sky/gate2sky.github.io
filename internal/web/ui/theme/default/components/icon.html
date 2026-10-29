@@ -1,0 +1,48 @@
+<script :setup="{ name = '', size = 'md', weight = 'regular', label = '' }">
+  // A stroke icon from the theme's set (`icons.js`), drawn in the colour of
+  // the text around it. `size` is `xs` (12), `sm` (14), `md` (16), `lg` (20),
+  // `xl` (24) or `2xl` (40); `weight` is `thin`, `light`, `regular` or `bold`.
+  //
+  // **Part of the default theme**: imports only the theme's `icons.js`, and
+  // draws only with `tokens.css`. See
+  // `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Icon name="trash" />
+  //   <Icon name="globe" size="lg" label="Public" />
+  //
+  // Without a `label` it is decoration, hidden from screen readers: the text
+  // beside it, or the button around it, says what it is. With one it is an
+  // image of that name. A component can take an icon's name as a prop and
+  // draw it itself: a scoped style does not reach an `<svg>` that arrives
+  // through a slot, and this one styles its own.
+  const { ICONS } = await import("@theme/icons.js")
+</script>
+
+<svg class="icon"
+     :class="'size-' + size + ' weight-' + weight"
+     viewBox="0 0 24 24"
+     :role="label ? 'img' : null"
+     :aria-label="label || null"
+     :aria-hidden="label ? null : 'true'"><path :d="ICONS[name] || ''" /></svg>
+
+<style scoped>
+  .icon {
+    display: block;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .size-xs { width: 12px; height: 12px; }
+  .size-sm { width: 14px; height: 14px; }
+  .size-lg { width: 20px; height: 20px; }
+  .size-xl { width: 24px; height: 24px; }
+  .size-2xl { width: 40px; height: 40px; }
+  .weight-thin { stroke-width: 1.5; }
+  .weight-light { stroke-width: 1.8; }
+  .weight-bold { stroke-width: 2.2; }
+</style>

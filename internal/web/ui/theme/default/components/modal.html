@@ -1,0 +1,207 @@
+<script :setup="{ open = false, title = '', size = 'sm', dismissible = true }">
+  // A question or a form over the page, answered or left before the page is
+  // used again. The platform's `<dialog>`, opened with `showModal()`: the
+  // focus held inside, the page behind made inert, and a backdrop that dims
+  // and blurs it. A light material near the top of the window.
+  //
+  // **Part of the default theme**: imports only the theme's `Icon`, and
+  // draws only with `tokens.css`. See
+  // `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Modal :open="deleting" title="Delete this user?" @close="deleting = false">
+  //     <p>Their subdomains go with them.</p>
+  //     <template :slot.foot>
+  //       <Button variant="secondary" @click="deleting = false">Cancel</Button>
+  //       <Button variant="danger" @click="remove()">Delete</Button>
+  //     </template>
+  //   </Modal>
+  //
+  // **The owner decides whether it closes.** Escape, a click on the backdrop
+  // and the close button only emit `close`; it closes when `:open` goes
+  // false, and plays its way out first, then emits `closed`. `dismissible`
+  // false refuses all three and hides the close button — for a question with
+  // no way back. `size` is its width: `sm` (360px) for a question, `md`
+  // (480px), `lg` (620px) for a form, `xl` (1180px) for a workspace — the
+  // demo's inspector; never wider than the window, and its body scrolls
+  // when it is taller.
+  //
+  // A form in the body submits from a button in the foot with that button's
+  // `form` set to the form's id: the foot is outside the form.
+
+  const Icon = await import("@theme/components/icon.html")
+
+  // A bare attribute (`<X disabled>`) arrives as "", and means on.
+  const flag = v => v === "" || v === true || v === "true"
+  $: isOpen = flag(open)
+  $: isDismissible = flag(dismissible)
+
+  let leaving = false
+
+  // How long the way out is, from the token, so reduced motion is no wait.
+  const exit = () => {
+    const ms = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ig-duration-slow"))
+    return Number.isFinite(ms) ? ms : 0
+  }
+
+  const show = () => {
+    const dialog = $self("dialog")
+    if (!dialog || dialog.open) return
+    leaving = false
+    dialog.showModal()
+  }
+  const hide = () => {
+    const dialog = $self("dialog")
+    if (!dialog?.open || leaving) return
+    const done = () => {
+      dialog.close()
+      leaving = false
+      $emit("closed")
+    }
+    const ms = exit()
+    if (!ms) return done()
+    leaving = true
+    setTimeout(done, ms)
+  }
+
+  const ask = () => {
+    if (isDismissible) $emit("close")
+  }
+  // Escape is the platform's, and it would close the dialog behind the
+  // owner's back; it becomes a request like the others.
+  const cancel = event => {
+    event.preventDefault()
+    ask()
+  }
+  // A click whose target is the dialog itself landed on the backdrop: the
+  // box fills the dialog, so anything inside has a target of its own. Only
+  // when the press started there too, so a drag that selects text in a
+  // field and lets go outside it does not close the form.
+  let pressedOutside = false
+  const press = event => {
+    pressedOutside = event.target === event.currentTarget
+  }
+  const backdrop = event => {
+    if (pressedOutside && event.target === event.currentTarget) ask()
+    pressedOutside = false
+  }
+
+  await $mounted()
+  $: isOpen ? requestAnimationFrame(show) : hide()
+</script>
+
+<dialog class="modal"
+        data-tone="light"
+        :class="'size-' + size"
+        :class.leaving="leaving"
+        :aria-label="title || null"
+        @cancel="cancel($event)"
+        @pointerdown="press($event)"
+        @click="backdrop($event)">
+  <div class="box">
+    <header :if="title || isDismissible" class="head">
+      <h2 class="title">{{ title }}</h2>
+      <button :if="isDismissible" type="button" class="close" title="Close" aria-label="Close" @click="ask()">
+        <Icon name="close" />
+      </button>
+    </header>
+    <div class="body" data-flow><slot></slot></div>
+    <footer :if="$slots.foot" class="foot"><slot.foot /></footer>
+  </div>
+</dialog>
+
+<style scoped>
+  .modal {
+    position: fixed;
+    inset: 0 0 auto;
+    width: min(360px, calc(100vw - 32px));
+    max-height: calc(100dvh - max(72px, 12vh) - 32px);
+    min-height: 0;
+    margin: max(72px, 12vh) auto 0;
+    padding: 0;
+    border: var(--ig-hairline) solid var(--ig-line);
+    border-radius: var(--ig-radius-xl);
+    color: var(--ig-fg);
+    background: var(--ig-material-hud);
+    -webkit-backdrop-filter: var(--ig-blur);
+    backdrop-filter: var(--ig-blur);
+    box-shadow: 0 .5px 0 var(--ig-material-edge) inset, var(--ig-shadow-pop);
+    font-family: var(--ig-font-sans);
+    font-size: var(--ig-text-base);
+    line-height: var(--ig-leading);
+    overflow: hidden;
+  }
+  .size-md { width: min(480px, calc(100vw - 32px)); }
+  .size-lg {
+    width: min(620px, calc(100vw - 32px));
+    margin-top: max(40px, 6vh);
+    max-height: calc(100dvh - 80px);
+  }
+  .size-xl {
+    width: min(1180px, calc(100vw - 32px));
+    margin-top: max(24px, 4vh);
+    max-height: calc(100dvh - 48px);
+  }
+  .modal[open] { animation: arrive var(--ig-duration-slow) var(--ig-ease-spring); }
+  .modal.leaving { animation: leave var(--ig-duration-slow) var(--ig-ease-in) forwards; }
+  .modal::backdrop {
+    background: var(--ig-overlay);
+    -webkit-backdrop-filter: var(--ig-overlay-blur);
+    backdrop-filter: var(--ig-overlay-blur);
+  }
+  .modal[open]::backdrop { animation: fade var(--ig-duration-slow) ease; }
+  /* Keyframes of its own for the way out, not `fade` reversed: an animation
+     whose name stays the same is not started again. */
+  .modal.leaving::backdrop { animation: fade-out var(--ig-duration-slow) ease forwards; }
+  @keyframes arrive { from { opacity: 0; transform: translateY(-8px) scale(.97); } }
+  @keyframes leave { to { opacity: 0; transform: translateY(-6px) scale(.98); } }
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes fade-out { to { opacity: 0; } }
+
+  /* The box fills the dialog, so a click on the dialog itself is a click on
+     the backdrop; the body scrolls between the head and the foot. */
+  .box {
+    display: flex;
+    flex-direction: column;
+    max-height: inherit;
+  }
+  .head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--ig-space-5);
+    padding: var(--ig-space-8) var(--ig-space-8) 0;
+  }
+  .title {
+    margin: 0;
+    font-size: var(--ig-text-xl);
+    font-weight: var(--ig-weight-semibold);
+    line-height: var(--ig-leading-tight);
+    letter-spacing: -.01em;
+    overflow-wrap: anywhere;
+  }
+  .close {
+    display: inline-flex;
+    flex: none;
+    margin: calc(-1 * var(--ig-space-1)) calc(-1 * var(--ig-space-2)) 0 0;
+    padding: var(--ig-space-1);
+    border: 0;
+    border-radius: var(--ig-radius-sm);
+    background: none;
+    color: var(--ig-fg-muted);
+    cursor: pointer;
+  }
+  .close:hover { background: var(--ig-fill); color: var(--ig-fg); }
+  .close:focus-visible { outline: none; box-shadow: var(--ig-ring); }
+  .body {
+    min-height: 0;
+    overflow: auto;
+    padding: var(--ig-space-5) var(--ig-space-8) var(--ig-space-8);
+  }
+  .foot {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: var(--ig-space-4);
+    padding: 0 var(--ig-space-8) var(--ig-space-8);
+  }
+</style>

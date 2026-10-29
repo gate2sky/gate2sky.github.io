@@ -1,0 +1,43 @@
+<script :setup="{ tone = 'info', flush = false }">
+  // A message about the view around it: a notice, a caveat, a refusal.
+  // `tone` is how much it matters — `info` to say something, `ok` that
+  // something went well, `warn` that something might not, `bad` that
+  // something did not.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Alert :if="error" tone="bad">{{ error }}</Alert>
+  //   <Alert tone="warn">Redis accepts anyone without a password.</Alert>
+  //
+  // `bad` is announced as an alert, the rest as a status. It keeps a block's
+  // space below it, as a paragraph does; `flush` drops it, for an alert in a
+  // grid that spaces its rows itself.
+
+  const flag = v => v === "" || v === true || v === "true"
+  $: isFlush = flag(flush)
+</script>
+
+<div class="alert"
+     :class="'tone-' + tone"
+     :class.flush="isFlush"
+     :role="tone === 'bad' ? 'alert' : 'status'"><slot></slot></div>
+
+<style scoped>
+  .alert {
+    --hue: var(--ig-accent);
+    margin: 0 0 var(--ig-space-7);
+    padding: var(--ig-space-4) var(--ig-space-6);
+    border: var(--ig-hairline) solid color-mix(in srgb, var(--hue) 38%, transparent);
+    border-radius: var(--ig-radius-md);
+    background: color-mix(in srgb, var(--hue) 18%, transparent);
+    color: var(--ig-fg);
+    font-family: var(--ig-font-sans);
+    font-size: var(--ig-text-md);
+    line-height: var(--ig-leading);
+  }
+  .tone-ok { --hue: var(--ig-green); color: var(--ig-ok); }
+  .tone-warn { --hue: var(--ig-orange); color: var(--ig-warn); }
+  .tone-bad { --hue: var(--ig-red); color: var(--ig-bad); }
+  .flush { margin: 0; }
+</style>

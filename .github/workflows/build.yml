@@ -127,7 +127,7 @@ jobs:
           go-version-file: go.mod
       - name: shellcheck
         if: runner.os == 'Linux'
-        run: shellcheck -s sh pages/setup.sh && shellcheck scripts/setup-check.sh
+        run: shellcheck -s sh pages/setup.sh && shellcheck scripts/setup-check.sh scripts/theme-site.sh
       - run: scripts/setup-check.sh
 
   image:
@@ -176,8 +176,9 @@ jobs:
           grep -q 'claimName: gate2net$' legacy.yaml
           grep -q 'app.kubernetes.io/name: gate2net$' legacy.yaml
 
-  # What Pages serves: pages/ as it is, the landing and setup.sh. Every push
-  # checks it; only a release deploys it, with the Helm repository's index.
+  # What Pages serves: pages/ as it is, the landing and setup.sh, and the
+  # design system's demo under theme/. Every push checks it; only a release
+  # deploys it, with the Helm repository's index.
   pages:
     runs-on: ubuntu-latest
     steps:
@@ -198,3 +199,8 @@ jobs:
           }
           test -s pages/setup.sh
           for icon in favicon.svg favicon.ico apple-touch-icon.png og.png; do test -s "pages/$icon"; done
+      - name: The design system's demo assembles as a static site
+        run: |
+          set -euo pipefail
+          scripts/theme-site.sh "$RUNNER_TEMP/theme"
+          for f in index.html tokens.css demo.html demo/inspector.html components/button.html vendor/jq79.js; do test -s "$RUNNER_TEMP/theme/$f"; done

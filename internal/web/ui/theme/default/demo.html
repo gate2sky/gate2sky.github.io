@@ -1,0 +1,473 @@
+<script :setup>
+  // The default theme, on one page: its tokens, then every component in its
+  // variants, tones and states, on the wallpaper and on a card — the two
+  // tones the dashboard draws in — with how each one is used beside it. See
+  // `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  // The page imports the theme and nothing of the app's: no store, no
+  // `app.css`. What it shows is the theme alone.
+  const Icon = await import("@theme/components/icon.html")
+  const Button = await import("@theme/components/button.html")
+  const Badge = await import("@theme/components/badge.html")
+  const Alert = await import("@theme/components/alert.html")
+  const Card = await import("@theme/components/card.html")
+  const Facts = await import("@theme/components/facts.html")
+  const Switch = await import("@theme/components/switch.html")
+  const Segmented = await import("@theme/components/segmented.html")
+  const ChoiceCards = await import("@theme/components/choice-cards.html")
+  const Tabs = await import("@theme/components/tabs.html")
+  const Modal = await import("@theme/components/modal.html")
+  const { ICONS } = await import("@theme/icons.js")
+  const Inspector = await import("@theme/demo/inspector.html")
+
+  document.title = "Default theme · intergate"
+
+  const GROUPS = [
+    ["Foundations", [["colours", "Colours"], ["type", "Type"], ["shape", "Space · Shape · Motion"], ["icons", "Icons"]]],
+    ["Display", [["button", "Button"], ["badge", "Badge"], ["alert", "Alert"], ["card", "Card"], ["facts", "Facts"]]],
+    ["Forms", [["switch", "Switch"], ["segmented", "Segmented"], ["choice-cards", "ChoiceCards"]]],
+    ["Navigation · Overlays", [["tabs", "Tabs"], ["modal", "Modal"]]],
+  ]
+
+  // ---- tokens, read back from the computed style ----------------------------
+
+  // Per tone: what changes between the wallpaper and a card.
+  const TONED = ["fg", "fg-muted", "link", "ok", "warn", "bad", "fill", "fill-2", "field", "field-line", "line", "separator", "button-2"]
+  // The same in both.
+  const SHARED = [
+    ["Page", ["bg", "wall-1", "wall-2", "wall-3", "wall-4", "material", "material-bar", "material-hud", "overlay"]],
+    ["Accent and system", ["accent", "on-accent", "danger", "dark", "green", "red", "orange", "ok-solid", "tab-line"]],
+    ["Hues", ["hue-gray", "hue-blue", "hue-purple", "hue-green", "hue-orange", "hue-teal", "hue-pink", "role-owner", "role-admin"]],
+    ["Tiles and switches", ["tile-neutral", "tile-public", "tile-users", "tile-private", "avatar", "switch-on", "switch-off"]],
+    ["Code", ["code-bg", "code-surface", "code-fg", "code-comment", "code-pink", "code-green", "code-yellow", "code-purple", "code-button"]],
+  ]
+  const TEXT = ["2xs", "xs", "sm", "md", "base", "lg", "xl", "2xl", "3xl", "4xl"]
+  const WEIGHTS = ["regular", "medium", "semibold", "bold", "heavy"]
+  const SPACE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  const RADII = ["xs", "sm", "control", "md", "lg", "xl", "full"]
+  const SHADOWS = ["xs", "sm", "lift", "shadow", "pop"]
+  const CONTROLS = ["xs", "sm", "md"]
+  const MOTION = ["ease-spring", "ease-knob", "ease-in", "duration-fast", "duration", "duration-slow", "duration-arrive"]
+
+  let read = { dark: {}, light: {}, root: {} }
+  const readTokens = () => {
+    const value = (el, name) => getComputedStyle(el).getPropertyValue("--ig-" + name).trim()
+    const dark = $self(".tone-dark"), light = $self(".tone-light")
+    read = {
+      dark: Object.fromEntries(TONED.map(n => [n, value(dark, n)])),
+      light: Object.fromEntries(TONED.map(n => [n, value(light, n)])),
+      root: Object.fromEntries([
+        ...SHARED.flatMap(([, names]) => names), ...TEXT.map(t => "text-" + t), ...SPACE.map(s => "space-" + s),
+        ...RADII.map(r => "radius-" + r), ...CONTROLS.map(c => "control-" + c), ...MOTION,
+      ].map(n => [n, value(document.documentElement, n)])),
+    }
+  }
+  // A swatch, a sample or a bar is painted from its token by the style
+  // object, not a `style` attribute: the page's CSP allows no inline style.
+  const paint = () => {
+    for (const el of $self(".page").querySelectorAll("[data-paint]")) {
+      const [property, token] = el.dataset.paint.split(":")
+      el.style.setProperty(property, `var(--ig-${token})`)
+    }
+  }
+
+  // ---- the components' state -------------------------------------------------
+
+  let clicks = 0
+  let enabled = true
+  let os = "unix"
+  let access = "public"
+  let restricted = "only"
+  let tab = "users"
+  let modal = ""
+
+  // The component being inspected; kept while the inspector plays its way
+  // out.
+  let inspecting = false
+  let inspected = ""
+  const inspect = name => {
+    inspected = name
+    inspecting = true
+  }
+
+  const ACCESS = [
+    { value: "public", label: "Public", hint: "Anyone with the URL", hue: "blue", icon: "globe" },
+    { value: "users", label: "Signed-in users", hint: "Anyone who can sign in", hue: "orange", icon: "users" },
+    { value: "private", label: "Private", hint: "Only the owner, after signing in", hue: "pink", icon: "lock" },
+  ]
+  const WHO = [
+    { value: "only", label: "Only these addresses", hint: "IP addresses or ranges, one per line", hue: "green", icon: "shield" },
+    { value: "anyone", label: "Anyone", hint: "The whole internet, bots included", hue: "orange", icon: "globe" },
+  ]
+
+  // ---- how the theme is loaded, and recoloured ---------------------------------
+  //
+  // How each component is used is the inspector's (`demo/usage.js`).
+
+  const USAGE = {
+    load: `<link rel="stylesheet" href="/ui/theme/default/tokens.css">
+<link rel="stylesheet" href="/ui/app.css">
+<script type="importmap">{ "imports": { "@theme/": "/ui/theme/default/" } }<\/script>
+
+<!-- in a component's :setup -->
+const Button = await import("@theme/components/button.html")`,
+    colours: `/* After tokens.css: a brand of your own, in both tones. */
+:root { --ig-accent: #6d28d9; --ig-radius-control: 10px; }
+[data-tone="light"] { --ig-link: #5b21b6; }
+
+<!-- An island of the other tone. -->
+<div data-tone="light">…</div>`,
+  }
+
+  await $mounted()
+  readTokens()
+  paint()
+</script>
+
+<div class="page">
+  <header class="top">
+    <p class="kicker">intergate · design system</p>
+    <h1>Default theme</h1>
+    <p class="lead">Every value lives in <code>tokens.css</code>; every component in <code>components/</code> draws with those alone. Shown on the wallpaper and on a card: the two tones the dashboard draws in. <strong>Inspect</strong>, beside each component, shows a parent that uses it, and its code — editable, with a preview, and ready to copy as a patch.</p>
+    <pre class="usage">{{ USAGE.load }}</pre>
+  </header>
+
+  <nav class="index" aria-label="Sections">
+    <div :each="group in GROUPS" :key="group[0]">
+      <p class="group">{{ group[0] }}</p>
+      <a :each="s in group[1]" :key="s[0]" :href="'#' + s[0]">{{ s[1] }}</a>
+    </div>
+  </nav>
+
+  <main class="sections">
+    <p class="group">Foundations</p>
+
+    <section id="colours" class="section">
+      <h2>Colours</h2>
+      <p class="about">By role, not by hue. The dark tone is the default, on the wallpaper; a card, a dialog and the toast are islands of the light one (<code>data-tone="light"</code>).</p>
+      <div class="tones">
+        <div class="tone-panel tone-dark" data-tone="dark">
+          <p class="tone-name">dark · on the wallpaper</p>
+          <div class="swatches">
+            <div :each="n in TONED" :key="n" class="swatch"><span class="chip" :data-paint="'background:' + n"></span><code>{{ n }}</code><small>{{ read.dark[n] }}</small></div>
+          </div>
+        </div>
+        <div class="tone-panel tone-light" data-tone="light">
+          <p class="tone-name">light · on a card</p>
+          <div class="swatches">
+            <div :each="n in TONED" :key="n" class="swatch"><span class="chip" :data-paint="'background:' + n"></span><code>{{ n }}</code><small>{{ read.light[n] }}</small></div>
+          </div>
+        </div>
+      </div>
+      <div :each="group in SHARED" :key="group[0]">
+        <p class="sub">{{ group[0] }}</p>
+        <div class="swatches shared">
+          <div :each="n in group[1]" :key="n" class="swatch"><span class="chip" :data-paint="'background:' + n"></span><code>{{ n }}</code><small>{{ read.root[n] }}</small></div>
+        </div>
+      </div>
+      <pre class="usage">{{ USAGE.colours }}</pre>
+    </section>
+
+    <section id="type" class="section">
+      <h2>Type</h2>
+      <p class="about">The system's own face, and its monospace for code. Sizes from <code>--ig-text-2xs</code> to <code>--ig-text-4xl</code>.</p>
+      <div class="type-rows">
+        <div :each="t in TEXT" :key="t" class="type-row"><code>text-{{ t }}</code><small>{{ read.root['text-' + t] }}</small><span :data-paint="'font-size:text-' + t">myapp.gate.example.com</span></div>
+      </div>
+      <div class="type-rows">
+        <div :each="w in WEIGHTS" :key="w" class="type-row"><code>weight-{{ w }}</code><span :data-paint="'font-weight:weight-' + w">Register a subdomain</span></div>
+      </div>
+    </section>
+
+    <section id="shape" class="section">
+      <h2>Space · Shape · Motion</h2>
+      <p class="sub">Space</p>
+      <div class="bars">
+        <div :each="s in SPACE" :key="s" class="bar-row"><code>space-{{ s }}</code><span class="bar" :data-paint="'width:space-' + s"></span><small>{{ read.root['space-' + s] }}</small></div>
+      </div>
+      <p class="sub">Radii · shadows · control heights</p>
+      <div class="shapes" data-tone="light">
+        <div :each="r in RADII" :key="r" class="shape" :data-paint="'border-radius:radius-' + r"><code>radius-{{ r }}</code></div>
+      </div>
+      <div class="shapes" data-tone="light">
+        <div :each="s in SHADOWS" :key="s" class="shape" :data-paint="'box-shadow:' + (s === 'shadow' ? 'shadow' : 'shadow-' + s)"><code>{{ s === 'shadow' ? 'shadow' : 'shadow-' + s }}</code></div>
+      </div>
+      <div class="controls">
+        <div :each="c in CONTROLS" :key="c" class="control" :data-paint="'height:control-' + c"><code>control-{{ c }} · {{ read.root['control-' + c] }}</code></div>
+      </div>
+      <p class="sub">Motion</p>
+      <dl class="motion"><div :each="m in MOTION" :key="m"><dt><code>{{ m }}</code></dt><dd>{{ read.root[m] }}</dd></div></dl>
+      <p class="about">Under <code>prefers-reduced-motion</code>, every duration is <code>0ms</code>, once, in <code>tokens.css</code>.</p>
+    </section>
+
+    <section id="icons" class="section">
+      <div class="section-head">
+        <h2>Icons</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('icon')">Inspect</Button>
+      </div>
+      <p class="about">Strokes on a 24 × 24 grid, one path each (<code>icons.js</code>), drawn in the colour of the text. A component takes an icon by name.</p>
+      <div class="icons">
+        <div :each="name in Object.keys(ICONS)" :key="name" class="icon-cell"><Icon :name="name" size="xl" weight="light" /><code>{{ name }}</code></div>
+      </div>
+    </section>
+
+    <p class="group">Display</p>
+
+    <section id="button" class="section">
+      <div class="section-head">
+        <h2>Button</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('button')">Inspect</Button>
+      </div>
+      <p class="about">Tinted glass. <code>primary</code> is the one thing a view asks for; <code>secondary</code> the rest; <code>danger</code> loses something; <code>dark</code> is a quiet step; <code>plain</code> and <code>ghost</code> stay out of the way. Clicked {{ clicks }} times.</p>
+      <div class="both">
+        <div class="row"><Button @click="clicks++">Primary</Button><Button variant="secondary" @click="clicks++">Secondary</Button><Button variant="danger" @click="clicks++">Danger</Button><Button variant="dark" @click="clicks++">Dark</Button><Button variant="plain" @click="clicks++">Plain</Button></div>
+        <div class="row"><Button icon="plus" size="sm" variant="secondary">Add port</Button><Button disabled>Disabled</Button><Button variant="ghost" square icon="pencil" title="Rename" /><Button variant="ghost-danger" square icon="trash" title="Remove" /><Button href="#button" variant="secondary">A link</Button></div>
+      </div>
+      <Card>
+        <div class="row"><Button @click="clicks++">Primary</Button><Button variant="secondary" @click="clicks++">Secondary</Button><Button variant="danger" @click="clicks++">Danger</Button><Button variant="dark" @click="clicks++">Dark</Button><Button variant="plain" @click="clicks++">Plain</Button></div>
+        <div class="row"><Button icon="plus" size="sm" variant="secondary">Add port</Button><Button disabled>Disabled</Button><Button variant="ghost" square icon="pencil" title="Rename" /><Button variant="ghost-danger" square icon="trash" title="Remove" /><Button href="#button" variant="secondary">A link</Button></div>
+        <div class="row"><Button block icon="passkey">Sign in with a passkey</Button></div>
+      </Card>
+    </section>
+
+    <section id="badge" class="section">
+      <div class="section-head">
+        <h2>Badge</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('badge')">Inspect</Button>
+      </div>
+      <p class="about">A state, or how many: a tone's ink on a tint of its colour, a dot that can beat, a solid fill.</p>
+      <div class="both">
+        <div class="row"><Badge>neutral</Badge><Badge tone="accent">public</Badge><Badge tone="warn">users</Badge><Badge tone="bad">private</Badge><Badge tone="ok" dot pulse>online</Badge><Badge dot>offline</Badge><Badge tone="ok" solid>2 online</Badge><Badge size="lg">3 of 10</Badge></div>
+      </div>
+      <Card>
+        <div class="row"><Badge>neutral</Badge><Badge tone="accent">public</Badge><Badge tone="warn">users</Badge><Badge tone="bad">private</Badge><Badge tone="ok" dot pulse>online</Badge><Badge dot>offline</Badge><Badge tone="ok" solid>2 online</Badge><Badge size="lg">3 of 10</Badge></div>
+      </Card>
+    </section>
+
+    <section id="alert" class="section">
+      <div class="section-head">
+        <h2>Alert</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('alert')">Inspect</Button>
+      </div>
+      <p class="about">A message about the view around it. <code>bad</code> is announced as an alert.</p>
+      <div class="both">
+        <Alert>You are managing alice’s subdomain as an administrator.</Alert>
+        <Alert tone="ok">The new SMTP relay is saved.</Alert>
+        <Alert tone="warn">Redis accepts anyone without a password by default.</Alert>
+        <Alert tone="bad" flush>That name is taken.</Alert>
+      </div>
+      <Card>
+        <Alert>You are managing alice’s subdomain as an administrator.</Alert>
+        <Alert tone="ok">The new SMTP relay is saved.</Alert>
+        <Alert tone="warn">Redis accepts anyone without a password by default.</Alert>
+        <Alert tone="bad">That name is taken.</Alert>
+      </Card>
+    </section>
+
+    <section id="card" class="section">
+      <div class="section-head">
+        <h2>Card</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('card')">Inspect</Button>
+      </div>
+      <p class="about">A light material over the wallpaper, and a light island: what is in it draws dark. A head when it has a title or an aside.</p>
+      <Card title="SSH keys">
+        <template :slot.aside><Badge>1 of 20</Badge></template>
+        <p>Only these keys can open the tunnel for myapp.gate.example.com.</p>
+      </Card>
+      <Card tone="accent" title="Sign in faster next time"><p>Add a passkey and sign in with your fingerprint, face or device PIN.</p></Card>
+      <Card tone="bad" title="Delete subdomain"><p>Closes the tunnel and removes myapp.gate.example.com.</p></Card>
+      <Card width="sm" center><p><strong>width="sm"</strong>, centred: a card for one form alone.</p></Card>
+    </section>
+
+    <section id="facts" class="section">
+      <div class="section-head">
+        <h2>Facts</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('facts')">Inspect</Button>
+      </div>
+      <p class="about">Facts about one thing, each in a tile tinted by its icon’s hue.</p>
+      <Card>
+        <Facts columns="3" :items="[
+          { label: 'Client', value: '203.0.113.7', icon: 'monitor', hue: 'blue' },
+          { label: 'SSH key', value: 'laptop', icon: 'key', hue: 'purple' },
+          { label: 'Connected', value: '4 minutes ago', icon: 'clock', hue: 'green' },
+          { label: 'Requests', value: 128, icon: 'forward', hue: 'orange' },
+          { label: 'Traffic in / out', value: '1.2 MB / 8.4 MB', icon: 'traffic', hue: 'teal' },
+          { label: 'Open streams', value: 3, icon: 'layers', hue: 'pink' },
+        ]" />
+      </Card>
+    </section>
+
+    <p class="group">Forms</p>
+
+    <section id="switch" class="section">
+      <div class="section-head">
+        <h2>Switch</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('switch')">Inspect</Button>
+      </div>
+      <p class="about">On or off, in force as soon as it moves. It is {{ enabled ? "on" : "off" }}.</p>
+      <Card><div class="row"><Switch :model="enabled" label="Enabled" /><Switch model="false" label="Off" /><Switch model="true" disabled label="Fixed on" /></div></Card>
+    </section>
+
+    <section id="segmented" class="section">
+      <div class="section-head">
+        <h2>Segmented</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('segmented')">Inspect</Button>
+      </div>
+      <p class="about">One of a few, side by side. Chosen: <code>{{ os }}</code>.</p>
+      <div class="both"><Segmented label="Operating system" :model="os" :items="[{ value: 'unix', label: 'Linux / macOS' }, { value: 'windows', label: 'Windows' }]" /></div>
+      <Card><Segmented label="Operating system" :model="os" :items="[{ value: 'unix', label: 'Linux / macOS' }, { value: 'windows', label: 'Windows' }]" /></Card>
+    </section>
+
+    <section id="choice-cards" class="section">
+      <div class="section-head">
+        <h2>ChoiceCards</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('choice-cards')">Inspect</Button>
+      </div>
+      <p class="about">One of a few, each a card: radios underneath, so the arrows move between them. Chosen: <code>{{ access }}</code>, <code>{{ restricted }}</code>.</p>
+      <Card title="Access"><ChoiceCards name="demo-access" :model="access" :items="ACCESS" /></Card>
+      <Card title="Who can connect"><ChoiceCards name="demo-who" layout="stack" :model="restricted" :items="WHO" /></Card>
+    </section>
+
+    <p class="group">Navigation · Overlays</p>
+
+    <section id="tabs" class="section">
+      <div class="section-head">
+        <h2>Tabs</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('tabs')">Inspect</Button>
+      </div>
+      <p class="about">Views of one thing, one at a time: in a page's head, beside its title. Showing <code>{{ tab }}</code>.</p>
+      <div class="page-head-demo">
+        <h3>Admin</h3>
+        <Tabs label="Admin" :model="tab" :items="[
+          { value: 'users', label: 'Users', count: 2 },
+          { value: 'subdomains', label: 'Subdomains', count: 4, extra: '2 online' },
+          { value: 'relay', label: 'SMTP relay' },
+          { value: 'danger', label: 'Danger zone', tone: 'bad' },
+        ]" />
+      </div>
+    </section>
+
+    <section id="modal" class="section">
+      <div class="section-head">
+        <h2>Modal</h2>
+        <Button variant="secondary" size="sm" icon="code" @click="inspect('modal')">Inspect</Button>
+      </div>
+      <p class="about">A question or a form over the page. Escape, the close button and a click on the backdrop ask it to close; the owner closes it.</p>
+      <div class="both"><div class="row">
+        <Button variant="secondary" @click="modal = 'sm'">A question (sm)</Button>
+        <Button variant="secondary" @click="modal = 'lg'">A form (lg)</Button>
+        <Button variant="secondary" @click="modal = 'locked'">No way back</Button>
+      </div></div>
+    </section>
+  </main>
+</div>
+
+<Inspector :open="inspecting" :name="inspected" @close="inspecting = false" />
+
+<Modal :open="modal === 'sm'" title="Delete alice@example.com?" @close="modal = ''">
+  <p class="muted">This removes the account, its subdomains with their SSH keys and its passkeys, and closes any tunnel.</p>
+  <template :slot.foot>
+    <Button variant="secondary" @click="modal = ''">Cancel</Button>
+    <Button variant="danger" @click="modal = ''">Delete</Button>
+  </template>
+</Modal>
+
+<Modal :open="modal === 'lg'" size="lg" title="Add a port to myapp" @close="modal = ''">
+  <Alert tone="warn">Redis accepts anyone without a password by default: set one, and keep this port restricted.</Alert>
+  <ChoiceCards name="modal-who" layout="stack" :model="restricted" :items="WHO" />
+  <template :slot.foot>
+    <Button variant="secondary" @click="modal = ''">Cancel</Button>
+    <Button @click="modal = ''">Add port</Button>
+  </template>
+</Modal>
+
+<Modal :open="modal === 'locked'" title="Finish the setup" dismissible="false">
+  <p>Neither Escape nor the backdrop closes this one: only its button.</p>
+  <template :slot.foot><Button @click="modal = ''">Done</Button></template>
+</Modal>
+
+<style scoped>
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ig-space-9);
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--ig-space-10) var(--ig-space-7) 80px;
+  }
+  .top { max-width: 760px; }
+  .kicker { margin: 0; color: var(--ig-fg-muted); font-size: var(--ig-text-sm); font-weight: var(--ig-weight-semibold); text-transform: uppercase; letter-spacing: .06em; }
+  h1 { margin: var(--ig-space-2) 0 var(--ig-space-3); font-size: var(--ig-text-4xl); letter-spacing: -.022em; }
+  .lead { margin: 0 0 var(--ig-space-7); color: var(--ig-fg-muted); }
+  .index { display: none; }
+  .group { margin: var(--ig-space-3) 0 0; color: var(--ig-fg-muted); font-size: var(--ig-text-xs); font-weight: var(--ig-weight-heavy); text-transform: uppercase; letter-spacing: .08em; }
+  .sections { display: grid; gap: var(--ig-space-9); min-width: 0; }
+  .section { min-width: 0; scroll-margin-top: var(--ig-space-7); }
+  h2 { margin: 0 0 var(--ig-space-1); font-size: var(--ig-text-2xl); letter-spacing: -.015em; }
+  .section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ig-space-3) var(--ig-space-5); margin-bottom: var(--ig-space-1); }
+  .section-head h2 { margin: 0; }
+  .about { margin: 0 0 var(--ig-space-6); color: var(--ig-fg-muted); max-width: 720px; }
+  .sub { margin: var(--ig-space-7) 0 var(--ig-space-3); font-weight: var(--ig-weight-semibold); font-size: var(--ig-text-md); }
+  .usage {
+    margin: var(--ig-space-5) 0 0;
+    padding: var(--ig-space-5) var(--ig-space-6);
+    overflow-x: auto;
+    border-radius: var(--ig-radius-md);
+    background: var(--ig-code-bg);
+    color: var(--ig-code-fg);
+    box-shadow: 0 0 0 var(--ig-hairline) var(--ig-code-line);
+    font-size: var(--ig-text-sm);
+    line-height: 1.55;
+  }
+  code { font-family: var(--ig-font-mono); font-size: .92em; }
+
+  .tones { display: grid; gap: var(--ig-space-5); }
+  .tone-panel { padding: var(--ig-space-7); border-radius: var(--ig-radius-xl); color: var(--ig-fg); }
+  .tone-dark { background: var(--ig-material-bar); box-shadow: inset 0 0 0 var(--ig-hairline) var(--ig-line); }
+  .tone-light { background: var(--ig-material); box-shadow: var(--ig-shadow); }
+  .tone-name { margin: 0 0 var(--ig-space-5); font-weight: var(--ig-weight-semibold); }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--ig-space-4) var(--ig-space-5); }
+  .swatch { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--ig-space-4); align-items: center; }
+  .swatch .chip { grid-row: span 2; width: 36px; height: 36px; border-radius: var(--ig-radius-control); box-shadow: inset 0 0 0 var(--ig-hairline) var(--ig-line); }
+  .swatch code { font-size: var(--ig-text-sm); }
+  .swatch small { color: var(--ig-fg-muted); font-size: var(--ig-text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shared .chip { box-shadow: inset 0 0 0 1px var(--ig-line); }
+
+  .type-rows { display: grid; gap: var(--ig-space-2); margin-bottom: var(--ig-space-7); }
+  .type-row { display: grid; grid-template-columns: 140px 50px minmax(0, 1fr); gap: var(--ig-space-5); align-items: baseline; }
+  .type-row small { color: var(--ig-fg-muted); }
+  .type-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .bars { display: grid; gap: var(--ig-space-2); }
+  .bar-row { display: grid; grid-template-columns: 90px auto 1fr; gap: var(--ig-space-5); align-items: center; }
+  .bar { height: 12px; border-radius: 3px; background: var(--ig-accent); }
+  .bar-row small { color: var(--ig-fg-muted); }
+  .shapes { display: flex; flex-wrap: wrap; gap: var(--ig-space-7); margin-bottom: var(--ig-space-7); padding: var(--ig-space-7); border-radius: var(--ig-radius-xl); background: var(--ig-material); }
+  .shape { display: grid; place-items: center; width: 120px; height: 72px; border-radius: var(--ig-radius-md); background: var(--ig-field); box-shadow: 0 0 0 var(--ig-hairline) var(--ig-field-line); color: var(--ig-fg); font-size: var(--ig-text-xs); }
+  .controls { display: flex; flex-wrap: wrap; gap: var(--ig-space-5); align-items: flex-end; }
+  .control { display: grid; place-items: center; padding: 0 var(--ig-space-5); border-radius: var(--ig-radius-control); background: var(--ig-fill); box-shadow: inset 0 0 0 var(--ig-hairline) var(--ig-line); font-size: var(--ig-text-xs); }
+  .motion { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--ig-space-3); margin: 0 0 var(--ig-space-5); }
+  .motion div { padding: var(--ig-space-3) var(--ig-space-5); border-radius: var(--ig-radius-control); background: var(--ig-fill-2); }
+  .motion dd { margin: var(--ig-space-1) 0 0; color: var(--ig-fg-muted); font-size: var(--ig-text-sm); }
+
+  .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--ig-space-3); }
+  .icon-cell { display: grid; justify-items: center; gap: var(--ig-space-3); padding: var(--ig-space-6) var(--ig-space-2); border-radius: var(--ig-radius-md); background: var(--ig-fill-2); }
+  .icon-cell code { font-size: var(--ig-text-xs); color: var(--ig-fg-muted); }
+
+  .both { margin-bottom: var(--ig-space-7); }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ig-space-4); }
+  .row + .row { margin-top: var(--ig-space-5); }
+  .page-head-demo { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--ig-space-5) var(--ig-space-7); }
+  .page-head-demo h3 { margin: 0; font-size: var(--ig-text-4xl); letter-spacing: -.022em; }
+  .muted { color: var(--ig-fg-muted); }
+
+  @media (min-width: 900px) {
+    .page { grid-template-columns: 180px minmax(0, 1fr); }
+    .top { grid-column: 1 / -1; }
+    .index { display: block; position: sticky; top: var(--ig-space-7); align-self: start; }
+    .index a { display: block; padding: 3px 0; color: var(--ig-fg); font-size: var(--ig-text-md); text-decoration: none; }
+    .index a:hover { color: var(--ig-link); }
+    .index .group { margin-top: var(--ig-space-7); }
+    .tones { grid-template-columns: 1fr 1fr; }
+  }
+</style>

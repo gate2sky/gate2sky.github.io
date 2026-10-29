@@ -8,6 +8,13 @@
   const StatusBadge = await import("@ui/components/status-badge.html")
   const CopyText = await import("@ui/components/copy-text.html")
   const TcpPorts = await import("@ui/components/tcp-ports.html")
+  const Alert = await import("@theme/components/alert.html")
+  const Button = await import("@theme/components/button.html")
+  const Card = await import("@theme/components/card.html")
+  const Facts = await import("@theme/components/facts.html")
+  const Icon = await import("@theme/components/icon.html")
+  const Tabs = await import("@theme/components/tabs.html")
+  const Badge = await import("@theme/components/badge.html")
 
   let sub = null
   let missing = false
@@ -58,6 +65,19 @@
   await load()
   $: name !== loaded && load()
   $: document.title = `${name} · intergate`
+  $: tabs = sub ? [
+    { value: "connection", label: "Connection and access" },
+    { value: "keys", label: "SSH keys", count: sub.key_list.length },
+    { value: "danger", label: "Danger zone", tone: "bad" },
+  ] : []
+  $: facts = sub && sub.tunnel ? [
+    { label: "Client", value: sub.tunnel.client_addr, icon: "monitor", hue: "blue" },
+    { label: "SSH key", value: sub.tunnel.key_name, icon: "key", hue: "purple" },
+    { label: "Connected", value: ago(sub.tunnel.created_at), icon: "clock", hue: "green" },
+    { label: "Requests", value: sub.tunnel.requests, icon: "forward", hue: "orange" },
+    { label: "Traffic in / out", value: bytes(sub.tunnel.bytes_in) + " / " + bytes(sub.tunnel.bytes_out), icon: "traffic", hue: "teal" },
+    { label: "Open streams", value: sub.tunnel.active_conns, icon: "layers", hue: "pink" },
+  ] : []
   // The server's command forwards to localhost:3000.
   $: sshCommand = sub ? sub.ssh_command.replace(":80:localhost:3000 ", ":80:localhost:" + (validPort(localPort) ? localPort : "3000") + " ") : ""
 
@@ -174,47 +194,28 @@
   }
 </script>
 
-<p class="crumbs"><a class="icon-link" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Subdomains</a></p>
+<p class="crumbs"><a class="icon-link" href="/"><Icon name="arrow-left" size="sm" />Subdomains</a></p>
 
-<section :if="missing" class="card error-page">
-  <h1>Subdomain not found</h1>
+<Card :if="missing" width="lg" center>
+  <h1 class="error-title">Subdomain not found</h1>
   <p><strong>{{ name }}.{{ app.domain }}</strong> is not registered, or is not yours.</p>
-</section>
+</Card>
 
 <div :elseif="sub">
   <div class="page-head">
-    <div>
+    <div class="page-title">
       <h1><a :href="sub.url" target="_blank" rel="noopener noreferrer">{{ sub.name }}<span class="muted">.{{ app.domain }}</span></a></h1>
+      <StatusBadge :tunnel="sub.tunnel" />
     </div>
-    <StatusBadge :tunnel="sub.tunnel" />
+    <Tabs label="Subdomain" :model="tab" :items="tabs" />
   </div>
-  <div :if="!sub.mine" class="flash flash-info">You are managing {{ sub.owner }}’s subdomain as an administrator.</div>
-
-  <div class="panel-tabs" role="tablist" aria-label="Subdomain">
-    <button type="button" role="tab" :aria-selected="tab === 'connection' ? 'true' : 'false'" @click="tab = 'connection'">
-      Connection and access
-    </button>
-    <button type="button" role="tab" :aria-selected="tab === 'keys' ? 'true' : 'false'" @click="tab = 'keys'">
-      SSH keys <span class="count">{{ sub.key_list.length }}</span>
-    </button>
-    <button type="button" role="tab" class="tab-danger" :aria-selected="tab === 'danger' ? 'true' : 'false'" @click="tab = 'danger'">
-      Danger zone
-    </button>
-  </div>
+  <Alert :if="!sub.mine">You are managing {{ sub.owner }}’s subdomain as an administrator.</Alert>
 
   <div :if="tab === 'connection'" role="tabpanel" aria-label="Connection and access">
-    <section class="card">
-      <h2>Connection</h2>
+    <Card title="Connection">
       <div :if="sub.tunnel">
-        <dl class="stats stats-3">
-          <div class="tone-blue"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg>Client</dt><dd>{{ sub.tunnel.client_addr }}</dd></div>
-          <div class="tone-purple"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M21 12v2"/></svg>SSH key</dt><dd>{{ sub.tunnel.key_name }}</dd></div>
-          <div class="tone-green"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Connected</dt><dd>{{ ago(sub.tunnel.created_at) }}</dd></div>
-          <div class="tone-orange"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6"/></svg>Requests</dt><dd>{{ sub.tunnel.requests }}</dd></div>
-          <div class="tone-teal"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 20V4M4 8l4-4 4 4M16 4v16M12 16l4 4 4-4"/></svg>Traffic in / out</dt><dd>{{ bytes(sub.tunnel.bytes_in) }} / {{ bytes(sub.tunnel.bytes_out) }}</dd></div>
-          <div class="tone-pink"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg>Open streams</dt><dd>{{ sub.tunnel.active_conns }}</dd></div>
-        </dl>
-        <button type="button" class="button button-secondary" @click="disconnect">Disconnect</button>
+        <Facts columns="3" :items="facts" />
+        <Button variant="secondary" @click="disconnect">Disconnect</Button>
         <p class="muted">To connect again later, or from another machine with an authorized key:</p>
       </div>
       <p :else class="muted">No client is connected. Start your service locally, then run:</p>
@@ -224,71 +225,67 @@
           <input class="port-input" name="local-port" inputmode="numeric" maxlength="5" autocomplete="off" spellcheck="false"
                  :class.invalid="!validPort(localPort)" :value="localPort" @input="setLocalPort($event.target.value)"></label>.
         Add <code>-N</code> to run without a console; use <code>autossh -M 0</code> to reconnect automatically.</p>
-    </section>
+    </Card>
 
-    <section class="card">
-      <h2>Access</h2>
+    <Card title="Access">
       <fieldset>
         <legend class="sr-only">Who can open {{ sub.name }}.{{ app.domain }}</legend>
         <AccessOptions :model="sub.access" @pick="setAccess($event.detail)" />
       </fieldset>
-    </section>
+    </Card>
 
     <TcpPorts :if="app.tcp" :sub="sub" @changed="load()" />
   </div>
 
-  <section :elseif="tab === 'keys'" class="card" role="tabpanel" aria-label="SSH keys">
-    <div class="card-head"><h2>SSH keys</h2><span class="count">{{ sub.key_list.length }} of {{ app.limits.keys }}</span></div>
-    <p class="muted">Only these keys can open the tunnel for {{ sub.name }}.{{ app.domain }}.</p>
-    <div :if="sub.key_list.length" class="table-wrap">
-      <table class="table">
-        <thead><tr><th>Name</th><th>Fingerprint</th><th class="hide-narrow">Added</th><th class="hide-narrow">Last used</th><th></th></tr></thead>
-        <tbody>
-          <tr :each="key in sub.key_list" :key="key.id">
-            <td>
-              <form :if="renaming === key.id" class="form-row rename" @submit.prevent="renameKey(key)">
-                <input name="rename-key" maxlength="64" required autocomplete="off" aria-label="New name"
-                       :value="newName" @input="newName = $event.target.value" @keydown="$event.key === 'Escape' && (renaming = 0)">
-                <button type="submit" class="button">Save</button>
-                <button type="button" class="link" @click="renaming = 0">Cancel</button>
-              </form>
-              <span :else>{{ key.name }}</span>
-              <div class="muted small">{{ key.type }}</div>
-            </td>
-            <td><code class="small">{{ key.fingerprint }}</code></td>
-            <td class="hide-narrow">{{ ago(key.created_at) }}</td>
-            <td class="hide-narrow">{{ ago(key.last_used_at) }}</td>
-            <td class="right row-actions">
-              <button type="button" class="icon-button" :aria-label="'Rename ' + key.name" title="Rename" @click="startRename(key)">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg>
-              </button>
-              <button type="button" class="icon-button danger" :aria-label="'Remove ' + key.name" title="Remove" @click="removeKey(key)">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <p :else class="empty-inline">No keys yet — nobody can connect.</p>
+  <div :elseif="tab === 'keys'" role="tabpanel" aria-label="SSH keys">
+    <Card title="SSH keys">
+      <template :slot.aside><Badge>{{ sub.key_list.length }} of {{ app.limits.keys }}</Badge></template>
+      <p class="muted intro">Only these keys can open the tunnel for {{ sub.name }}.{{ app.domain }}.</p>
+      <div :if="sub.key_list.length" class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Name</th><th>Fingerprint</th><th class="hide-narrow">Added</th><th class="hide-narrow">Last used</th><th></th></tr></thead>
+          <tbody>
+            <tr :each="key in sub.key_list" :key="key.id">
+              <td>
+                <form :if="renaming === key.id" class="form-row rename" @submit.prevent="renameKey(key)">
+                  <input name="rename-key" maxlength="64" required autocomplete="off" aria-label="New name"
+                         :value="newName" @input="newName = $event.target.value" @keydown="$event.key === 'Escape' && (renaming = 0)">
+                  <Button type="submit" size="sm">Save</Button>
+                  <button type="button" class="link" @click="renaming = 0">Cancel</button>
+                </form>
+                <span :else>{{ key.name }}</span>
+                <div class="muted small">{{ key.type }}</div>
+              </td>
+              <td><code class="small">{{ key.fingerprint }}</code></td>
+              <td class="hide-narrow">{{ ago(key.created_at) }}</td>
+              <td class="hide-narrow">{{ ago(key.last_used_at) }}</td>
+              <td class="right row-actions">
+                <Button variant="ghost" square icon="pencil" title="Rename" :label="'Rename ' + key.name" @click="startRename(key)" />
+                <Button variant="ghost-danger" square icon="trash" title="Remove" :label="'Remove ' + key.name" @click="removeKey(key)" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p :else class="empty-inline">No keys yet — nobody can connect.</p>
 
-    <div :if="keyError" class="flash flash-error" role="alert">{{ keyError }}</div>
-    <form class="form" @submit.prevent="addKeys">
-      <label>Public keys
-        <span class="hint">One per line: the contents of <code>~/.ssh/id_ed25519.pub</code>, or of <code>https://github.com/&lt;user&gt;.keys</code>.</span>
-        <textarea name="keys" rows="3" required spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"
-                  :value="newKeys" @input="newKeys = $event.target.value"></textarea>
-      </label>
-      <label>Name <span class="hint">Optional. Defaults to the key comment.</span>
-        <input name="name" maxlength="64" autocomplete="off" :value="keyName" @input="keyName = $event.target.value">
-      </label>
-      <div><button type="submit" class="button" :disabled="busy">Add keys</button></div>
-    </form>
-  </section>
+      <form class="form" @submit.prevent="addKeys">
+        <Alert :if="keyError" tone="bad" flush>{{ keyError }}</Alert>
+        <label>Public keys
+          <span class="hint">One per line: the contents of <code>~/.ssh/id_ed25519.pub</code>, or of <code>https://github.com/&lt;user&gt;.keys</code>.</span>
+          <textarea name="keys" rows="3" required spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"
+                    :value="newKeys" @input="newKeys = $event.target.value"></textarea>
+        </label>
+        <label>Name <span class="hint">Optional. Defaults to the key comment.</span>
+          <input name="name" maxlength="64" autocomplete="off" :value="keyName" @input="keyName = $event.target.value">
+        </label>
+        <div><Button type="submit" :disabled="busy">Add keys</Button></div>
+      </form>
+    </Card>
+  </div>
 
   <div :else role="tabpanel" aria-label="Danger zone">
-    <section class="card danger-zone">
-      <h2>Rename subdomain</h2>
+    <Card tone="bad" title="Rename subdomain">
       <p>Gives {{ sub.name }}.{{ app.domain }} another name, with the same keys, ports and access. Its tunnel and ports disconnect until clients connect with the new name, and {{ sub.name }} becomes available to anyone.</p>
       <form class="form form-row" @submit.prevent="rename">
         <span class="input-suffix">
@@ -296,18 +293,17 @@
                  autocapitalize="off" placeholder="new-name" aria-label="New name" :value="newSubName" @input="newSubName = $event.target.value">
           <span>.{{ app.domain }}</span>
         </span>
-        <button type="submit" class="button button-danger" :disabled="!newSubName.trim() || newSubName.trim().toLowerCase() === sub.name">Rename</button>
+        <Button type="submit" variant="danger" :disabled="!newSubName.trim() || newSubName.trim().toLowerCase() === sub.name">Rename</Button>
       </form>
-    </section>
+    </Card>
 
-    <section class="card danger-zone">
-      <h2>Delete subdomain</h2>
+    <Card tone="bad" title="Delete subdomain">
       <p>Closes the tunnel and removes {{ sub.name }}.{{ app.domain }}, its keys and its ports. The name becomes available to anyone.</p>
       <form class="form form-row" @submit.prevent="remove">
         <input name="confirm" required autocomplete="off" spellcheck="false" :placeholder="'type ' + sub.name + ' to confirm'"
                :aria-label="'Type ' + sub.name + ' to confirm'" :value="confirmName" @input="confirmName = $event.target.value">
-        <button type="submit" class="button button-danger" :disabled="confirmName !== sub.name">Delete</button>
+        <Button type="submit" variant="danger" :disabled="confirmName !== sub.name">Delete</Button>
       </form>
-    </section>
+    </Card>
   </div>
 </div>

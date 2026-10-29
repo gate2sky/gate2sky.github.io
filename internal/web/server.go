@@ -79,6 +79,7 @@ type Server struct {
 	cookies   cookieNames
 	providers []provider
 	shell     *template.Template
+	theme     *template.Template
 	tunnelErr *template.Template
 	tunnelSh  *texttemplate.Template
 	tunnelPs  *texttemplate.Template
@@ -168,6 +169,9 @@ func New(o Options) (*Server, error) {
 	if s.shell, err = template.ParseFS(assets, "templates/app.html"); err != nil {
 		return nil, fmt.Errorf("web: %w", err)
 	}
+	if s.theme, err = template.ParseFS(assets, "templates/theme.html"); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
 	if s.tunnelErr, err = template.ParseFS(assets, "templates/tunnel_error.html"); err != nil {
 		return nil, fmt.Errorf("web: %w", err)
 	}
@@ -210,6 +214,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /ui/", s.serveUI)
+	// The design system: its tokens and components on one page.
+	mux.HandleFunc("GET /ui/theme/default/{$}", s.handleTheme)
+	mux.HandleFunc("GET /ui/theme/default", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/ui/theme/default/", http.StatusMovedPermanently)
+	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
 	mux.HandleFunc("GET /tunnel.sh", s.handleTunnelScript)
 	mux.HandleFunc("GET /tunnel.ps1", s.handleTunnelScript)

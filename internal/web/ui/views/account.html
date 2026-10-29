@@ -5,6 +5,13 @@
   const { api } = await import("@ui/lib/api.js")
   const { ago, date } = await import("@ui/lib/format.js")
   const { supported, register, problem } = await import("@ui/lib/passkeys.js")
+  const Alert = await import("@theme/components/alert.html")
+  const Badge = await import("@theme/components/badge.html")
+  const Button = await import("@theme/components/button.html")
+  const Card = await import("@theme/components/card.html")
+  const Facts = await import("@theme/components/facts.html")
+  const Icon = await import("@theme/components/icon.html")
+  const Modal = await import("@theme/components/modal.html")
 
   document.title = "Account · intergate"
 
@@ -72,8 +79,15 @@
     load()
   }
 
-  // Signing out asks first, in a dialog; Escape or Cancel closes it.
-  const askSignOut = () => document.querySelector("dialog.sign-out").showModal()
+  $: profile = [
+    { label: "Email", value: app.user.email, icon: "mail", hue: "blue" },
+    { label: "Name", value: app.user.name, icon: "user", hue: "purple" },
+    { label: "Member since", value: date(app.user.created_at), icon: "calendar", hue: "green" },
+  ]
+
+  // Signing out asks first, in a dialog; Escape, the backdrop or Cancel
+  // closes it.
+  let signingOut = false
   const signOut = async () => {
     await api("POST", "/logout").catch(() => {})
     location.assign("/login")
@@ -82,42 +96,33 @@
 
 <div class="page-head">
   <h1>Account</h1>
-  <button type="button" class="button button-secondary" @click="askSignOut">Sign out</button>
+  <Button variant="secondary" @click="signingOut = true">Sign out</Button>
 </div>
 
-<dialog class="card dialog sign-out" aria-labelledby="sign-out-title">
-  <form method="dialog">
-    <h2 id="sign-out-title">Sign out?</h2>
-    <p class="muted">You will need an email code{{ app.passkeys ? " or a passkey" : "" }} to sign in again.</p>
-    <div class="dialog-actions">
-      <button value="cancel" class="button button-secondary" autofocus>Cancel</button>
-      <button type="button" class="button button-dark" @click="signOut">Sign out</button>
-    </div>
-  </form>
-</dialog>
+<Modal :open="signingOut" title="Sign out?" @close="signingOut = false">
+  <p class="muted">You will need an email code{{ app.passkeys ? " or a passkey" : "" }} to sign in again.</p>
+  <template :slot.foot>
+    <Button variant="secondary" @click="signingOut = false">Cancel</Button>
+    <Button variant="dark" @click="signOut">Sign out</Button>
+  </template>
+</Modal>
 
-<section :if="welcome" class="card callout">
-  <h2>Sign in faster next time</h2>
+<Card :if="welcome" tone="accent" title="Sign in faster next time">
   <p>Add a passkey and sign in with your fingerprint, face or device PIN instead of waiting for an email. Passkeys can’t be phished.</p>
-  <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+  <Alert :if="error" tone="bad">{{ error }}</Alert>
   <div class="actions">
-    <button type="button" class="button" :disabled="busy || !supported" @click="addPasskey">Add a passkey</button>
-    <a class="icon-link" :href="next">Skip for now<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    <Button :disabled="busy || !supported" @click="addPasskey">Add a passkey</Button>
+    <a class="icon-link" :href="next">Skip for now<Icon name="arrow-right" size="sm" /></a>
   </div>
-</section>
+</Card>
 
-<section class="card">
-  <h2>Profile</h2>
-  <dl class="stats stats-3">
-    <div class="tone-blue"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Email</dt><dd>{{ app.user.email }}</dd></div>
-    <div :if="app.user.name" class="tone-purple"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg>Name</dt><dd>{{ app.user.name }}</dd></div>
-    <div class="tone-green"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Member since</dt><dd>{{ date(app.user.created_at) }}</dd></div>
-  </dl>
-</section>
+<Card title="Profile">
+  <Facts columns="3" :items="profile" />
+</Card>
 
-<section :if="app.passkeys" class="card">
-  <div class="card-head"><h2>Passkeys</h2><span class="count">{{ passkeys.length }}</span></div>
-  <p class="muted">Sign in without email codes. Each device or password manager has its own passkey.</p>
+<Card :if="app.passkeys" title="Passkeys">
+  <template :slot.aside><Badge>{{ passkeys.length }}</Badge></template>
+  <p class="muted intro">Sign in without email codes. Each device or password manager has its own passkey.</p>
   <div :if="passkeys.length" class="table-wrap">
     <table class="table">
       <thead><tr><th>Name</th><th class="hide-narrow">Added</th><th>Last used</th><th></th></tr></thead>
@@ -127,7 +132,7 @@
             <form :if="renaming === passkey.id" class="form-row rename" @submit.prevent="renamePasskey(passkey)">
               <input name="rename-passkey" maxlength="64" required autocomplete="off" aria-label="New name"
                      :value="newName" @input="newName = $event.target.value" @keydown="$event.key === 'Escape' && (renaming = 0)">
-              <button type="submit" class="button">Save</button>
+              <Button type="submit" size="sm">Save</Button>
               <button type="button" class="link" @click="renaming = 0">Cancel</button>
             </form>
             <span :else>{{ passkey.name }}</span>
@@ -135,23 +140,19 @@
           <td class="hide-narrow">{{ ago(passkey.created_at) }}</td>
           <td>{{ ago(passkey.last_used_at) }}</td>
           <td class="right row-actions">
-            <button type="button" class="icon-button" :aria-label="'Rename ' + passkey.name" title="Rename" @click="startRename(passkey)">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg>
-            </button>
-            <button type="button" class="icon-button danger" :aria-label="'Remove ' + passkey.name" title="Remove" @click="removePasskey(passkey)">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
-            </button>
+            <Button variant="ghost" square icon="pencil" title="Rename" :label="'Rename ' + passkey.name" @click="startRename(passkey)" />
+            <Button variant="ghost-danger" square icon="trash" title="Remove" :label="'Remove ' + passkey.name" @click="removePasskey(passkey)" />
           </td>
         </tr>
       </tbody>
     </table>
   </div>
   <p :else class="empty-inline">No passkeys yet.</p>
-  <div :if="error && !welcome" class="flash flash-error" role="alert">{{ error }}</div>
+  <Alert :if="error && !welcome" tone="bad">{{ error }}</Alert>
   <p :if="!supported" class="muted small">This browser does not support passkeys.</p>
   <form class="form form-row" @submit.prevent="addPasskey">
     <input name="passkey-name" maxlength="64" placeholder="Name, e.g. MacBook or 1Password" aria-label="Passkey name"
            autocomplete="off" :value="passkeyName" @input="passkeyName = $event.target.value">
-    <button type="submit" class="button" :disabled="busy || !supported">Add a passkey</button>
+    <Button type="submit" :disabled="busy || !supported">Add a passkey</Button>
   </form>
-</section>
+</Card>

@@ -1,0 +1,52 @@
+<script :setup="{ items = [], model = '', label = '' }">
+  // One of a few, side by side, the chosen one raised: which system a
+  // command is for, where a server runs.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Segmented label="Operating system" :model="os"
+  //              :items="[{ value: 'unix', label: 'Linux / macOS' }, { value: 'windows', label: 'Windows' }]" />
+  //
+  // An item is a string or `{ value, label }`. The choice goes up through
+  // `:model` and as `change`.
+
+  $: options = items.map(o => typeof o === "string" ? { value: o, label: o } : o)
+
+  const choose = option => {
+    if (option.value === model) return
+    $updateModel(option.value)
+    $emit("change", option.value)
+  }
+</script>
+
+<div class="segmented" role="group" :aria-label="label || null">
+  <button :each="option in options" :key="String(option.value)" type="button"
+          :aria-pressed="option.value === model ? 'true' : 'false'"
+          @click="choose(option)">{{ option.label }}</button>
+</div>
+
+<style scoped>
+  .segmented {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: var(--ig-radius-control);
+    background: var(--ig-fill);
+    font-family: var(--ig-font-sans);
+  }
+  button {
+    padding: var(--ig-space-1) var(--ig-space-4);
+    border: 0;
+    border-radius: var(--ig-radius-sm);
+    background: none;
+    color: var(--ig-fg-muted);
+    font: inherit;
+    font-size: var(--ig-text-sm);
+    font-weight: var(--ig-weight-semibold);
+    cursor: pointer;
+    transition: color var(--ig-duration) ease, background-color var(--ig-duration) ease;
+  }
+  button:hover { color: var(--ig-fg); }
+  button[aria-pressed="true"] { color: var(--ig-fg); background: var(--ig-field); box-shadow: var(--ig-shadow-sm); }
+  button:focus-visible { outline: none; box-shadow: var(--ig-ring); }
+</style>

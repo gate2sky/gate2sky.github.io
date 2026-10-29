@@ -586,6 +586,25 @@ func TestPageSecurity(t *testing.T) {
 	if resp, _ := get(t, b, "http://"+domain+"/ui/nope.js"); resp.StatusCode != http.StatusNotFound {
 		t.Errorf("missing file: %d", resp.StatusCode)
 	}
+
+	// The design system's demo is a page of its own, signed in or not, under
+	// the same CSP; without its slash it redirects, so its links resolve.
+	resp, body := get(t, h.browser(false), "http://"+domain+"/ui/theme/default/")
+	m := regexp.MustCompile(`script-src 'self' 'nonce-([A-Za-z0-9_-]{24})';`).FindStringSubmatch(resp.Header.Get("Content-Security-Policy"))
+	if resp.StatusCode != http.StatusOK || m == nil || !strings.Contains(body, `<script type="module" nonce="`+m[1]+`">`) ||
+		!strings.Contains(body, "/ui/theme/default/demo.html") {
+		t.Errorf("theme demo: %d %q\n%s", resp.StatusCode, resp.Header.Get("Content-Security-Policy"), body)
+	}
+	if resp, _ := get(t, h.browser(false), "http://"+domain+"/ui/theme/default"); resp.StatusCode != http.StatusMovedPermanently ||
+		resp.Header.Get("Location") != "/ui/theme/default/" {
+		t.Errorf("theme demo without its slash: %d %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+	for _, f := range []string{"/ui/theme/default/tokens.css", "/ui/theme/default/icons.js", "/ui/theme/default/components/modal.html",
+		"/ui/theme/default/demo/inspector.html", "/ui/theme/default/demo/usage.js"} {
+		if resp, _ := get(t, b, "http://"+domain+f); resp.StatusCode != http.StatusOK {
+			t.Errorf("%s: %d", f, resp.StatusCode)
+		}
+	}
 }
 
 func TestDashboardManagesSubdomains(t *testing.T) {

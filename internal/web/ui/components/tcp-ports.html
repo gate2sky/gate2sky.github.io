@@ -9,6 +9,20 @@
   const { api } = await import("@ui/lib/api.js")
   const { ago, bytes, plural } = await import("@ui/lib/format.js")
   const CopyText = await import("@ui/components/copy-text.html")
+  const Alert = await import("@theme/components/alert.html")
+  const Badge = await import("@theme/components/badge.html")
+  const Button = await import("@theme/components/button.html")
+  const Card = await import("@theme/components/card.html")
+  const ChoiceCards = await import("@theme/components/choice-cards.html")
+  const Modal = await import("@theme/components/modal.html")
+  const Segmented = await import("@theme/components/segmented.html")
+
+  // Who can connect to a port: the addresses in its allow list, or anyone.
+  const WHO = [
+    { value: "only", label: "Only these addresses", hint: "IP addresses or ranges like 203.0.113.0/24, one per line", hue: "green", icon: "shield" },
+    { value: "anyone", label: "Anyone", hint: "The whole internet, bots included: only for services with their own login", hue: "orange", icon: "globe" },
+  ]
+  const OS = [{ value: "unix", label: "Linux / macOS" }, { value: "windows", label: "Windows" }]
 
   // The local port only builds the command; restricted ports start with
   // the visitor's own address in their allow list.
@@ -36,11 +50,12 @@
   const path = () => "/subdomains/" + encodeURIComponent(sub.name)
   const lines = text => text.split(/[\s,]+/).filter(Boolean)
 
-  // The add form.
+  // The add form, in a dialog.
+  let adding = false
   let preset = "postgresql"
   let name = "postgres"
   let localPort = 5432
-  let restricted = true
+  let who = "only"
   let allowText = sub.client_ip
   let error = ""
   let busy = false
@@ -50,8 +65,8 @@
     preset = p.id
     name = p.name
     localPort = p.port
-    restricted = p.restricted
-    if (restricted && !allowText) allowText = sub.client_ip
+    who = p.restricted ? "only" : "anyone"
+    if (p.restricted && !allowText) allowText = sub.client_ip
   }
 
   const body = (portName, local, isRestricted, text) => {
@@ -60,12 +75,11 @@
     return { name: portName, local_port: Number(local), allow }
   }
 
-  const addDialog = () => document.querySelector("dialog.add-port")
   const startAdd = () => {
     choose("postgresql")
     allowText = sub.client_ip
     error = ""
-    addDialog().showModal()
+    adding = true
   }
 
   const addPort = async () => {
@@ -73,8 +87,8 @@
     busy = true
     try {
       const protocol = presetOf(preset).udp ? "udp" : "tcp"
-      const port = await api("POST", path() + "/ports", { ...body(name, localPort, restricted, allowText), preset, protocol })
-      addDialog().close()
+      const port = await api("POST", path() + "/ports", { ...body(name, localPort, who === "only", allowText), preset, protocol })
+      adding = false
       toast(`Added ${port.name}: ${port.address}.`)
       $emit("changed")
     } catch (e) {
@@ -83,11 +97,13 @@
     busy = false
   }
 
-  // The port being edited, and its new settings.
+  // The port being edited, and its new settings, in a dialog. `editing`
+  // stays while the dialog plays its way out.
+  let editOpen = false
   let editing = null
   let editName = ""
   let editLocal = ""
-  let editRestricted = true
+  let editWho = "only"
   let editAllow = ""
   let editError = ""
 
@@ -95,17 +111,17 @@
     editing = port
     editName = port.name
     editLocal = port.local_port
-    editRestricted = port.allow.length > 0
+    editWho = port.allow.length ? "only" : "anyone"
     editAllow = port.allow.length ? port.allow.join("\n") : sub.client_ip
     editError = ""
-    document.querySelector("dialog.edit-port").showModal()
+    editOpen = true
   }
 
   const saveEdit = async () => {
     editError = ""
     try {
-      const port = await api("PATCH", `${path()}/ports/${editing.id}`, body(editName, editLocal, editRestricted, editAllow))
-      document.querySelector("dialog.edit-port").close()
+      const port = await api("PATCH", `${path()}/ports/${editing.id}`, body(editName, editLocal, editWho === "only", editAllow))
+      editOpen = false
       toast(`Saved ${port.name}.`)
       $emit("changed")
     } catch (e) {
@@ -145,17 +161,12 @@
   $: hasUDP = sub.port_list.some(port => port.protocol === "udp")
 </script>
 
-<section class="card tcp-ports">
-  <div class="card-head">
-    <h2>Ports</h2>
-    <div class="card-head-actions">
-      <span class="count">{{ sub.port_list.length }} of {{ app.tcp.max_ports }}</span>
-      <button :if="!full" type="button" class="button button-secondary button-small" @click="startAdd">
-        <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add port
-      </button>
-    </div>
-  </div>
-  <p class="muted">Raw TCP and UDP on <strong>{{ app.tcp.host }}</strong> for databases, SSH, games… Each port has a public number of its own, and only the addresses you allow can connect.</p>
+<Card title="Ports">
+  <template :slot.aside>
+    <Badge>{{ sub.port_list.length }} of {{ app.tcp.max_ports }}</Badge>
+    <Button :if="!full" variant="secondary" size="sm" icon="plus" @click="startAdd">Add port</Button>
+  </template>
+  <p class="muted intro">Raw TCP and UDP on <strong>{{ app.tcp.host }}</strong> for databases, SSH, games… Each port has a public number of its own, and only the addresses you allow can connect.</p>
 
   <div :if="sub.port_list.length" class="table-wrap">
     <table class="table">
@@ -169,10 +180,8 @@
           <td class="keep">
             <span class="address">
               <code>{{ port.address }}</code>
-              <button type="button" class="icon-button" :aria-label="'Copy ' + port.address" :title="copied === port.id ? 'Copied' : 'Copy'" @click="copyAddress(port)">
-                <svg :if="copied === port.id" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
-                <svg :else viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
-              </button>
+              <Button variant="ghost" square :icon="copied === port.id ? 'check' : 'copy'" :title="copied === port.id ? 'Copied' : 'Copy'"
+                      :label="'Copy ' + port.address" @click="copyAddress(port)" />
             </span>
           </td>
           <td class="hide-narrow small">
@@ -180,17 +189,13 @@
             <span :else class="warn">Anyone</span>
           </td>
           <td>
-            <span :if="port.forward" class="badge badge-online"><i class="dot"></i>online</span>
-            <span :else class="badge"><i class="dot"></i>idle</span>
+            <Badge :if="port.forward" tone="ok" dot pulse>online</Badge>
+            <Badge :else dot>idle</Badge>
             <div :if="port.forward" class="muted small hide-narrow">{{ plural(port.forward.connections, "connection") }} · {{ bytes(port.forward.bytes_in + port.forward.bytes_out) }}<span :if="port.forward.refused"> · {{ port.forward.refused }} refused</span></div>
           </td>
           <td class="right row-actions">
-            <button type="button" class="icon-button" :aria-label="'Edit ' + port.name" title="Edit" @click="startEdit(port)">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/></svg>
-            </button>
-            <button type="button" class="icon-button danger" :aria-label="'Delete ' + port.name" title="Delete" @click="removePort(port)">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
-            </button>
+            <Button variant="ghost" square icon="pencil" title="Edit" :label="'Edit ' + port.name" @click="startEdit(port)" />
+            <Button variant="ghost-danger" square icon="trash" title="Delete" :label="'Delete ' + port.name" @click="removePort(port)" />
           </td>
         </tr>
       </tbody>
@@ -201,10 +206,7 @@
   <div :if="hasUDP && sub.tunnel_command">
     <div class="command-head">
       <p class="muted">To forward them, UDP included, with the intergate client and an authorized key (ssh-agent or <code>-i</code>):</p>
-      <div class="segmented" role="group" aria-label="Operating system">
-        <button type="button" :aria-pressed="os === 'unix' ? 'true' : 'false'" @click="os = 'unix'">Linux / macOS</button>
-        <button type="button" :aria-pressed="os === 'windows' ? 'true' : 'false'" @click="os = 'windows'">Windows</button>
-      </div>
+      <Segmented label="Operating system" :model="os" :items="OS" />
     </div>
     <CopyText :if="os === 'unix'" :command="sub.tunnel_command" />
     <CopyText :else :command="sub.tunnel_command_windows" />
@@ -217,12 +219,11 @@
   </div>
 
   <p :if="full" class="hint">A subdomain can have at most {{ app.tcp.max_ports }} ports: delete one to add another.</p>
-</section>
+</Card>
 
-<dialog class="card dialog dialog-wide add-port" aria-labelledby="add-port-title">
-  <h2 id="add-port-title">Add a port to {{ sub.name }}</h2>
-  <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
-  <form class="form" @submit.prevent="addPort">
+<Modal :open="adding" size="lg" :title="'Add a port to ' + sub.name" @close="adding = false">
+  <form id="add-port" class="form" @submit.prevent="addPort">
+    <Alert :if="error" tone="bad" flush>{{ error }}</Alert>
     <div class="form-grid">
       <label>Service
         <select class="field" name="preset" @change="choose($event.target.value)">
@@ -237,39 +238,29 @@
         <input name="local-port" type="number" required min="1" max="65535" placeholder="5432" :value="localPort" @input="localPort = $event.target.value">
       </label>
     </div>
-    <div :if="warning" class="flash flash-warn">{{ warning }}</div>
-    <div :if="udp" class="flash flash-info">UDP ports are forwarded with the intergate client, not plain <code>ssh</code>: the page shows the command once the port exists.</div>
+    <Alert :if="warning" tone="warn" flush>{{ warning }}</Alert>
+    <Alert :if="udp" flush>UDP ports are forwarded with the intergate client, not plain <code>ssh</code>: the page shows the command once the port exists.</Alert>
     <fieldset>
       <legend>Who can connect</legend>
-      <label class="radio tone-green">
-        <input type="radio" name="port-access" :checked="restricted" @change="restricted = true">
-        <span class="radio-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6Z"/><path d="m9 12 2 2 4-4"/></svg></span>
-        <span class="radio-text"><strong>Only these addresses</strong> <span class="muted">IP addresses or ranges like 203.0.113.0/24, one per line</span></span>
-        <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
-      </label>
-      <textarea :if="restricted" name="allow" rows="2" spellcheck="false" aria-label="Allowed addresses" :placeholder="sub.client_ip"
-                :value="allowText" @input="allowText = $event.target.value"></textarea>
-      <p :if="restricted" class="hint">Your address, as intergate sees it, is <code>{{ sub.client_ip }}</code>.</p>
-      <label class="radio tone-orange">
-        <input type="radio" name="port-access" :checked="!restricted" @change="restricted = false">
-        <span class="radio-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg></span>
-        <span class="radio-text"><strong>Anyone</strong> <span class="muted">The whole internet, bots included: only for services with their own login</span></span>
-        <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
-      </label>
+      <ChoiceCards name="port-access" layout="stack" :model="who" :items="WHO" />
+      <div :if="who === 'only'" class="allow">
+        <textarea name="allow" rows="2" spellcheck="false" aria-label="Allowed addresses" :placeholder="sub.client_ip"
+                  :value="allowText" @input="allowText = $event.target.value"></textarea>
+        <p class="hint">Your address, as intergate sees it, is <code>{{ sub.client_ip }}</code>.</p>
+      </div>
     </fieldset>
-    <div class="dialog-actions">
-      <button type="button" class="button button-secondary" @click="addDialog().close()">Cancel</button>
-      <button type="submit" class="button" :disabled="busy">Add port</button>
-    </div>
   </form>
-</dialog>
+  <template :slot.foot>
+    <Button variant="secondary" @click="adding = false">Cancel</Button>
+    <Button type="submit" form="add-port" :disabled="busy">Add port</Button>
+  </template>
+</Modal>
 
-<dialog class="card dialog edit-port" aria-labelledby="edit-port-title">
-  <form class="form" @submit.prevent="saveEdit">
-    <h2 id="edit-port-title">Edit {{ editing ? editing.name : "" }}</h2>
-    <p :if="editing" class="muted">{{ editing.address }}. Connections already open keep going.</p>
-    <div :if="editError" class="flash flash-error" role="alert">{{ editError }}</div>
-    <div class="form-grid">
+<Modal :open="editOpen" size="md" :title="'Edit ' + (editing ? editing.name : '')" @close="editOpen = false">
+  <p :if="editing" class="muted">{{ editing.address }}. Connections already open keep going.</p>
+  <form id="edit-port" class="form" @submit.prevent="saveEdit">
+    <Alert :if="editError" tone="bad" flush>{{ editError }}</Alert>
+    <div class="form-grid pair">
       <label>Name
         <input name="edit-name" required maxlength="32" autocomplete="off" spellcheck="false" :value="editName" @input="editName = $event.target.value">
       </label>
@@ -279,22 +270,13 @@
     </div>
     <fieldset>
       <legend>Who can connect</legend>
-      <label class="radio tone-green">
-        <input type="radio" name="edit-access" :checked="editRestricted" @change="editRestricted = true">
-        <span class="radio-text"><strong>Only these addresses</strong></span>
-        <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
-      </label>
-      <textarea :if="editRestricted" name="edit-allow" rows="3" spellcheck="false" aria-label="Allowed addresses"
+      <ChoiceCards name="edit-access" layout="stack" :model="editWho" :items="WHO" />
+      <textarea :if="editWho === 'only'" class="allow" name="edit-allow" rows="3" spellcheck="false" aria-label="Allowed addresses"
                 :value="editAllow" @input="editAllow = $event.target.value"></textarea>
-      <label class="radio tone-orange">
-        <input type="radio" name="edit-access" :checked="!editRestricted" @change="editRestricted = false">
-        <span class="radio-text"><strong>Anyone</strong> <span class="muted">The whole internet</span></span>
-        <span class="radio-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9"/></svg></span>
-      </label>
     </fieldset>
-    <div class="dialog-actions">
-      <button type="button" class="button button-secondary" @click="document.querySelector('dialog.edit-port').close()">Cancel</button>
-      <button type="submit" class="button">Save</button>
-    </div>
   </form>
-</dialog>
+  <template :slot.foot>
+    <Button variant="secondary" @click="editOpen = false">Cancel</Button>
+    <Button type="submit" form="edit-port">Save</Button>
+  </template>
+</Modal>

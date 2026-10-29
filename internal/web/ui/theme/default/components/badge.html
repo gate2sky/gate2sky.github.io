@@ -1,0 +1,73 @@
+<script :setup="{ tone = 'neutral', dot = false, pulse = false, solid = false, size = 'md', title = '' }">
+  // A short label that says what state something is in, or how many there
+  // are: `online`, `public`, `3 of 10`. `tone` is the state — `neutral`,
+  // `accent`, `ok`, `warn`, `bad` — as the tone's ink on a tint of its
+  // colour; `solid` fills it instead (what is online, in a count). `dot` puts
+  // a dot before the text, and `pulse` makes it beat, for something live.
+  // `size="lg"` is the count beside a page's title.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Badge tone="ok" dot pulse>online</Badge>
+  //   <Badge>{{ keys.length }} of 20</Badge>
+
+  // A bare attribute (`<X disabled>`) arrives as "", and means on.
+  const flag = v => v === "" || v === true || v === "true"
+  $: hasDot = flag(dot)
+  $: beats = flag(pulse)
+  $: isSolid = flag(solid)
+</script>
+
+<span class="badge"
+      :class="'tone-' + tone"
+      :class.solid="isSolid"
+      :class.lg="size === 'lg'"
+      :title="title || null">
+  <i :if="hasDot" class="dot" :class.pulse="beats" aria-hidden="true"></i>
+  <slot></slot>
+</span>
+
+<style scoped>
+  .badge {
+    --hue: var(--ig-fg-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ig-space-2);
+    padding: 1px 9px;
+    border-radius: var(--ig-radius-full);
+    background: var(--ig-fill);
+    color: var(--ig-fg-muted);
+    font-family: var(--ig-font-sans);
+    font-size: var(--ig-text-sm);
+    font-weight: var(--ig-weight-semibold);
+    line-height: var(--ig-leading);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    vertical-align: middle;
+  }
+  .lg { padding: 3px var(--ig-space-4); }
+  .tone-accent { --hue: var(--ig-accent); color: var(--ig-link); }
+  .tone-ok { --hue: var(--ig-green); color: var(--ig-ok); }
+  .tone-warn { --hue: var(--ig-orange); color: var(--ig-warn); }
+  .tone-bad { --hue: var(--ig-red); color: var(--ig-bad); }
+  .tone-accent, .tone-ok, .tone-warn, .tone-bad {
+    background: color-mix(in srgb, var(--hue) 22%, transparent);
+  }
+  .solid.tone-ok { color: var(--ig-on-ok-solid); background: var(--ig-ok-solid); }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .55;
+  }
+  .tone-ok .dot { background: var(--ig-green); opacity: 1; }
+  .pulse { animation: pulse 2.4s ease-out infinite; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--hue) 55%, transparent); }
+    70%, 100% { box-shadow: 0 0 0 6px transparent; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+</style>

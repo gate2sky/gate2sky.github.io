@@ -5,6 +5,13 @@
   const { ago } = await import("@ui/lib/format.js")
   const RegisterForm = await import("@ui/components/register-form.html")
   const StatusBadge = await import("@ui/components/status-badge.html")
+  const AccessBadge = await import("@ui/components/access-badge.html")
+  const Alert = await import("@theme/components/alert.html")
+  const Badge = await import("@theme/components/badge.html")
+  const Button = await import("@theme/components/button.html")
+  const Card = await import("@theme/components/card.html")
+  const Icon = await import("@theme/components/icon.html")
+  const Modal = await import("@theme/components/modal.html")
 
   document.title = "Subdomains · intergate"
 
@@ -29,26 +36,25 @@
     })
   })
 
-  // With subdomains listed, the register form opens in a dialog, new
-  // each time.
+  // With subdomains listed, the register form opens in a dialog, new each
+  // time: it stays while the dialog plays its way out, and goes once it
+  // has.
   let registering = false
+  let registerForm = false
   const openRegister = () => {
+    registerForm = true
     registering = true
-    setTimeout(() => document.querySelector("dialog.register").showModal())
   }
-  const closeRegister = () => document.querySelector("dialog.register").close()
 </script>
 
 <div class="page-head">
-  <div class="page-title"><h1>Subdomains</h1><span class="count">{{ subdomains.length }} of {{ app.limits.subdomains }}</span></div>
-  <button :if="subdomains.length" type="button" class="button" @click="openRegister">
-    <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Register a subdomain
-  </button>
+  <div class="page-title"><h1>Subdomains</h1><Badge size="lg">{{ subdomains.length }} of {{ app.limits.subdomains }}</Badge></div>
+  <Button :if="subdomains.length" icon="plus" @click="openRegister">Register a subdomain</Button>
 </div>
 
-<div :if="loadError" class="flash flash-error" role="alert">{{ loadError }}</div>
+<Alert :if="loadError" tone="bad">{{ loadError }}</Alert>
 
-<section :if="subdomains.length" class="card">
+<Card :if="subdomains.length">
   <div class="table-wrap">
     <table class="table">
       <thead><tr><th>Subdomain</th><th>Status</th><th>Access</th><th class="hide-narrow">SSH keys</th><th></th></tr></thead>
@@ -61,32 +67,28 @@
             </a>
           </td>
           <td><StatusBadge :tunnel="sub.tunnel" /><span :if="sub.tunnel" class="muted small hide-narrow">{{ ago(sub.tunnel.created_at) }}</span></td>
-          <td><span class="badge" :class="'badge-' + sub.access">{{ sub.access }}</span></td>
+          <td><AccessBadge :access="sub.access" /></td>
           <td class="hide-narrow">{{ sub.keys }}</td>
           <td class="right row-actions">
-            <a class="icon-button" :href="sub.url" target="_blank" rel="noopener noreferrer" :aria-label="'Open ' + sub.url" title="Open">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
-            </a>
-            <a class="icon-button" :href="'/subdomains/' + encodeURIComponent(sub.name)" :aria-label="'Manage ' + sub.name" title="Manage">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></svg>
-            </a>
+            <Button variant="ghost" square icon="external" title="Open" :label="'Open ' + sub.url" :href="sub.url" target="_blank" />
+            <Button variant="ghost" square icon="sliders" title="Manage" :label="'Manage ' + sub.name" :href="'/subdomains/' + encodeURIComponent(sub.name)" />
           </td>
         </tr>
       </tbody>
     </table>
   </div>
-</section>
-<div :elseif="!loadError" class="card empty">
-  <svg class="empty-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-  <p>No subdomains yet. Register one with your SSH public key, then connect with <code>ssh -R</code>.</p>
-</div>
+</Card>
+<Card :elseif="!loadError">
+  <div class="empty">
+    <span class="empty-icon"><Icon name="globe" size="2xl" weight="thin" /></span>
+    <p>No subdomains yet. Register one with your SSH public key, then connect with <code>ssh -R</code>.</p>
+  </div>
+</Card>
 
-<section :if="!subdomains.length" class="card">
-  <h2>Register a subdomain</h2>
+<Card :if="!subdomains.length" title="Register a subdomain">
   <RegisterForm />
-</section>
+</Card>
 
-<dialog class="card dialog dialog-wide register" aria-labelledby="register-title" @close="registering = false">
-  <h2 id="register-title">Register a subdomain</h2>
-  <RegisterForm :if="registering" :cancel="true" @cancel="closeRegister()" />
-</dialog>
+<Modal :open="registering" size="lg" title="Register a subdomain" @close="registering = false" @closed="registerForm = false">
+  <RegisterForm :if="registerForm" :cancel="true" @cancel="registering = false" />
+</Modal>

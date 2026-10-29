@@ -3,7 +3,8 @@ name: Release
 # Started by hand from the Actions tab, on the default branch: raises the
 # version, builds that commit with build.yml, publishes the GitHub release
 # with the binaries pages/setup.sh installs, the Docker image and the Helm
-# chart, and deploys the landing and the Helm repository to GitHub Pages.
+# chart, and deploys the landing, the design system's demo and the Helm
+# repository to GitHub Pages.
 # Every binary, the image and the chart carry a build provenance attestation:
 # `gh attestation verify <file> --repo jgermade/intergate`.
 on:
@@ -211,7 +212,8 @@ jobs:
   # The landing tells people to install the chart, so it waits for it. Pages
   # replaces the whole site on each deploy, so the Helm repository's index
   # starts from the one being served: every release adds its chart, which
-  # stays a download of its own release.
+  # stays a download of its own release. The design system's demo is the
+  # release's own, at theme/.
   pages:
     needs: [version, build, chart]
     runs-on: ubuntu-latest
@@ -227,10 +229,11 @@ jobs:
           name: chart
           path: chart
       - uses: azure/setup-helm@v4
-      - name: The site, with the Helm repository
+      - name: The site, with the design system and the Helm repository
         run: |
           set -euo pipefail
           cp -r pages site
+          scripts/theme-site.sh site/theme
           mkdir -p site/charts
           # Only a site with no repository yet may start a new index: any
           # other failure would drop the earlier releases from it.

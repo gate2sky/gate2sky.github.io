@@ -6,6 +6,12 @@
   const { app, query } = await import("@ui/lib/store.js")
   const { api } = await import("@ui/lib/api.js")
   const CopyText = await import("@ui/components/copy-text.html")
+  const Alert = await import("@theme/components/alert.html")
+  const Button = await import("@theme/components/button.html")
+  const Card = await import("@theme/components/card.html")
+  const Icon = await import("@theme/components/icon.html")
+  const Segmented = await import("@theme/components/segmented.html")
+  const WHERE = [{ value: "server", label: "Server" }, { value: "docker", label: "Docker" }, { value: "kubernetes", label: "Kubernetes" }]
 
   document.title = "Set up · intergate"
 
@@ -121,28 +127,24 @@
   }
 </script>
 
-<section class="card login setup">
+<Card width="md" center>
   <img class="app-icon" src="/ui/logo-mark.svg" alt="">
 
   <div :if="!setup.session && token">
-    <h1>Set up intergate</h1>
+    <h1 class="login-title">Set up intergate</h1>
     <p class="muted">This link opens the setup of intergate at <strong>{{ app.domain }}</strong>: how it sends email, and who owns it. It works once.</p>
-    <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+    <div :if="error" class="login-alert"><Alert tone="bad" flush>{{ error }}</Alert></div>
     <div class="providers">
-      <button type="button" class="button button-block" :disabled="busy" @click="start">Start the setup</button>
+      <Button block :disabled="busy" @click="start">Start the setup</Button>
     </div>
   </div>
 
   <div :elseif="!setup.session">
-    <h1>intergate is not set up yet</h1>
+    <h1 class="login-title">intergate is not set up yet</h1>
     <p class="muted">Its owner sets it up with a one-time link. To get one, run this where intergate runs:</p>
-    <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+    <div :if="error" class="login-alert"><Alert tone="bad" flush>{{ error }}</Alert></div>
     <div class="setup-command">
-      <div class="segmented" role="group" aria-label="Where intergate runs">
-        <button type="button" :aria-pressed="runsOn === 'server' ? 'true' : 'false'" @click="runsOn = 'server'">Server</button>
-        <button type="button" :aria-pressed="runsOn === 'docker' ? 'true' : 'false'" @click="runsOn = 'docker'">Docker</button>
-        <button type="button" :aria-pressed="runsOn === 'kubernetes' ? 'true' : 'false'" @click="runsOn = 'kubernetes'">Kubernetes</button>
-      </div>
+      <Segmented label="Where intergate runs" :model="runsOn" :items="WHERE" />
       <CopyText :command="COMMANDS[runsOn]" />
     </div>
   </div>
@@ -151,7 +153,7 @@
     <ol :if="steps" class="setup-steps">
       <li :class.current="step === 'email'" :class.done="step !== 'email'">
         <span class="step-mark" aria-hidden="true">
-          <svg :if="step !== 'email'" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+          <Icon :if="step !== 'email'" name="check" size="xs" weight="bold" />
           <span :else>1</span>
         </span>
         Email delivery
@@ -163,15 +165,15 @@
     </ol>
 
     <div :if="step === 'email'">
-      <h1>Email delivery</h1>
+      <h1 class="login-title">Email delivery</h1>
       <p class="muted">intergate signs people in with codes sent by email. Which SMTP server sends them?</p>
-      <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+      <div :if="error" class="login-alert"><Alert tone="bad" flush>{{ error }}</Alert></div>
       <form class="form form-login" @submit.prevent="saveEmail">
         <label>SMTP server
           <input name="host" required autocapitalize="off" spellcheck="false" placeholder="smtp.example.com"
                  :value="host" @input="host = $event.target.value">
         </label>
-        <div class="form-pair">
+        <div class="form-grid pair">
           <label>Encryption
             <select class="field" name="tls" @change="setTLS($event.target.value)">
               <option value="starttls" :selected="tls === 'starttls'">STARTTLS</option>
@@ -197,40 +199,40 @@
           <input name="from" required spellcheck="false" :value="from" @input="from = $event.target.value">
           <span class="hint">Who the emails come from: an address the SMTP server may send as.</span>
         </label>
-        <button type="submit" class="button button-block" :disabled="busy">{{ busy ? "Checking the SMTP server…" : "Check and save" }}</button>
+        <Button type="submit" block :disabled="busy">{{ busy ? "Checking the SMTP server…" : "Check and save" }}</Button>
         <p class="hint setup-note">intergate signs in to the SMTP server before saving. The password is stored encrypted in its data directory; to read it from an environment variable or a file instead, use <code>intergate config</code> on the server.</p>
       </form>
     </div>
 
     <div :elseif="!sentTo">
-      <h1>The owner</h1>
+      <h1 class="login-title">The owner</h1>
       <p class="muted">The owner manages everything here: subdomains, users and who may sign in. A code sent to their email confirms the address, and that emails arrive.</p>
-      <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+      <div :if="error" class="login-alert"><Alert tone="bad" flush>{{ error }}</Alert></div>
       <form class="form form-login" @submit.prevent="sendCode">
         <label>Owner’s email
           <input type="email" name="email" required autocomplete="email" autocapitalize="off" spellcheck="false"
                  placeholder="you@example.com" :value="ownerEmail" @input="ownerEmail = $event.target.value">
         </label>
-        <button type="submit" class="button button-block" :disabled="busy">{{ busy ? "Sending…" : "Email me a code" }}</button>
+        <Button type="submit" block :disabled="busy">{{ busy ? "Sending…" : "Email me a code" }}</Button>
       </form>
       <p :if="setup.smtp" class="small muted"><button type="button" class="link" @click="editEmail = true">Change the email settings</button></p>
     </div>
 
     <div :else>
-      <h1>Check your email</h1>
+      <h1 class="login-title">Check your email</h1>
       <p class="muted">We sent a 6-digit code to <strong>{{ sentTo }}</strong>. With it, the setup is done and you are signed in as the owner.</p>
-      <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+      <div :if="error" class="login-alert"><Alert tone="bad" flush>{{ error }}</Alert></div>
       <form class="form form-login" @submit.prevent="verify">
         <label>Code
           <input class="code-input" name="code" required inputmode="numeric" autocomplete="one-time-code"
                  pattern="[0-9 ]{6,7}" maxlength="7" placeholder="123456" autofocus
                  :value="code" @input="code = $event.target.value">
         </label>
-        <button type="submit" class="button button-block" :disabled="busy">Finish the setup</button>
+        <Button type="submit" block :disabled="busy">Finish the setup</Button>
       </form>
       <p class="small muted">Didn’t get it? Check your spam folder,
         <button type="button" class="link" @click="otherAddress">use another address</button><span :if="setup.smtp"> or
         <button type="button" class="link" @click="changeEmail">change the email settings</button></span>.</p>
     </div>
   </div>
-</section>
+</Card>

@@ -1,4 +1,7 @@
-<script :setup="{ tunnel = null }"></script>
+<script :setup="{ tunnel = null }">
+  // Whether a subdomain's tunnel is up: online, beating, or offline.
+  const Badge = await import("@theme/components/badge.html")
+</script>
 
-<span :if="tunnel" class="badge badge-online"><i class="dot"></i>online</span>
-<span :else class="badge"><i class="dot"></i>offline</span>
+<Badge :if="tunnel" tone="ok" dot pulse>online</Badge>
+<Badge :else dot>offline</Badge>

@@ -1,0 +1,91 @@
+<script :setup="{ title = '', tone = 'neutral', width = '', center = false }">
+  // A light material over the wallpaper that groups one thing: a list, a
+  // form, a subdomain's connection. A head when there is a `title` or
+  // something in the `aside` slot (a count, a button), and the content.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Card title="SSH keys">
+  //     <template :slot.aside><Badge>{{ keys.length }} of 20</Badge></template>
+  //     …
+  //   </Card>
+  //
+  // `tone` is `neutral`, `accent` (a callout: a step to take) or `bad` (a
+  // danger zone). `width` makes it a card for one thing alone, centred on
+  // the page — `sm` (400px) to sign in, `md` (440px) for the setup, `lg`
+  // (560px) for an error — and
+  // `center` centres its text. A card is a `light` island: what is in it
+  // draws dark on the material, whatever it sits on.
+
+  const flag = v => v === "" || v === true || v === "true"
+  $: isCenter = flag(center)
+</script>
+
+<section class="card"
+         data-tone="light"
+         :class="'tone-' + tone"
+         :class.narrow="!!width"
+         :class.width-md="width === 'md'"
+         :class.width-lg="width === 'lg'"
+         :class.center="isCenter">
+  <header :if="title || $slots.aside" class="head">
+    <h2 :if="title" class="title">{{ title }}</h2>
+    <div :if="$slots.aside" class="aside"><slot.aside /></div>
+  </header>
+  <div class="body" data-flow><slot></slot></div>
+</section>
+
+<style scoped>
+  .card {
+    position: relative;
+    margin: 0 0 var(--ig-block-gap);
+    padding: var(--ig-space-7);
+    border: var(--ig-hairline) solid var(--ig-line);
+    border-radius: var(--ig-radius-lg);
+    color: var(--ig-fg);
+    background: var(--ig-material);
+    -webkit-backdrop-filter: var(--ig-blur);
+    backdrop-filter: var(--ig-blur);
+    box-shadow: 0 .5px 0 var(--ig-material-edge) inset, var(--ig-shadow);
+    font-family: var(--ig-font-sans);
+  }
+  .tone-accent {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ig-accent) 14%, var(--ig-material)), var(--ig-material));
+    border-color: color-mix(in srgb, var(--ig-accent) 35%, var(--ig-line));
+  }
+  .tone-bad { border-color: color-mix(in srgb, var(--ig-red) 35%, var(--ig-line)); }
+  .tone-bad .title { color: var(--ig-bad); }
+  .narrow {
+    max-width: 400px;
+    margin: var(--ig-space-7) auto;
+    padding: var(--ig-space-9) var(--ig-space-8) var(--ig-space-8);
+  }
+  .width-md { max-width: 440px; }
+  .width-lg { max-width: 560px; margin-top: var(--ig-space-10); }
+  .center { text-align: center; }
+
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ig-space-5);
+    margin-bottom: var(--ig-space-5);
+  }
+  .title {
+    margin: 0;
+    font-size: var(--ig-text-lg);
+    font-weight: var(--ig-weight-semibold);
+    letter-spacing: -.01em;
+  }
+  .aside {
+    display: flex;
+    align-items: center;
+    gap: var(--ig-space-4);
+  }
+
+  @media (min-width: 640px) {
+    .card { padding: var(--ig-space-8); border-radius: var(--ig-radius-xl); }
+    .narrow { margin-top: 40px; padding: var(--ig-space-10); }
+  }
+</style>
