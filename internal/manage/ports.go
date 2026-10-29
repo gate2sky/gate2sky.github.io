@@ -81,7 +81,6 @@ func (s *Service) CreatePort(ctx context.Context, d *store.Subdomain, in PortInp
 	switch in.Protocol {
 	case store.ProtocolTCP:
 	case store.ProtocolUDP:
-		return nil, Errorf("UDP ports are not available yet")
 	default:
 		return nil, Errorf("unknown protocol %q", in.Protocol)
 	}
@@ -93,7 +92,7 @@ func (s *Service) CreatePort(ctx context.Context, d *store.Subdomain, in PortInp
 		return nil, err
 	}
 	if len(existing) >= s.cfg.TCP.MaxPorts {
-		return nil, Errorf("a subdomain can have at most %d TCP ports", s.cfg.TCP.MaxPorts)
+		return nil, Errorf("a subdomain can have at most %d ports", s.cfg.TCP.MaxPorts)
 	}
 	p := &store.Port{
 		SubdomainID: d.ID, Subdomain: d.Name, OwnerID: d.UserID,

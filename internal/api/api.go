@@ -62,7 +62,7 @@ func NewPort(cfg *config.Config, p *store.Port, f *ports.Stats) Port {
 		allow = []string{}
 	}
 	return Port{
-		ID: p.ID, Name: p.Name, Protocol: p.Protocol, Port: p.Port, Address: cfg.TCPAddress(p.Port),
+		ID: p.ID, Name: p.Name, Protocol: p.Protocol, Port: p.Port, Address: cfg.PortAddress(string(p.Protocol), p.Port),
 		Allow: allow, Preset: p.Preset, LocalPort: p.LocalPort, CreatedAt: p.CreatedAt, Forward: f,
 	}
 }

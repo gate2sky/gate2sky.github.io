@@ -1,6 +1,7 @@
-// Package ports serves the TCP ports of subdomains: while an SSH client
-// forwards one, it listens on its public number and hands every
-// connection its allow list lets in to that client.
+// Package ports serves the TCP and UDP ports of subdomains: while an SSH
+// client forwards one, it listens on its public number and hands every
+// connection (or, for UDP, every remote address) its allow list lets in
+// to that client.
 package ports
 
 import (
@@ -48,14 +49,16 @@ type Forward struct {
 
 	name     atomic.Value // string
 	allow    atomic.Pointer[[]netip.Prefix]
-	keyName  atomic.Value // string
-	ln       net.Listener
+	keyName  atomic.Value   // string
+	ln       net.Listener   // TCP
+	pc       net.PacketConn // UDP
 	registry *Registry
 	done     chan struct{}
 
 	closeOnce sync.Once
 	mu        sync.Mutex
 	conns     map[net.Conn]struct{}
+	sessions  map[netip.AddrPort]*udpSession
 
 	total    atomic.Int64
 	active   atomic.Int64
@@ -147,10 +150,18 @@ func (f *Forward) Done() <-chan struct{} { return f.done }
 func (f *Forward) Close(reason string) {
 	f.closeOnce.Do(func() {
 		close(f.done)
-		f.ln.Close()
+		if f.ln != nil {
+			f.ln.Close()
+		}
+		if f.pc != nil {
+			f.pc.Close()
+		}
 		f.mu.Lock()
 		for c := range f.conns {
 			c.Close()
+		}
+		for _, s := range f.sessions {
+			s.close()
 		}
 		f.mu.Unlock()
 		f.registry.remove(f)
@@ -311,17 +322,23 @@ func (r *Registry) Open(opts Options) (*Forward, error) {
 	if old := r.Get(port); old != nil {
 		old.Close("replaced by a newer connection from " + opts.ClientAddr)
 	}
-	ln, err := net.Listen("tcp", net.JoinHostPort(r.listenHost, strconv.Itoa(port)))
-	if err != nil {
-		return nil, fmt.Errorf("port %d can't be opened on the server right now", port)
-	}
 	f := &Forward{
 		Options:   opts,
 		CreatedAt: time.Now(),
-		ln:        ln,
 		registry:  r,
 		done:      make(chan struct{}),
 		conns:     map[net.Conn]struct{}{},
+		sessions:  map[netip.AddrPort]*udpSession{},
+	}
+	addr := net.JoinHostPort(r.listenHost, strconv.Itoa(port))
+	var err error
+	if opts.Port.Protocol == store.ProtocolUDP {
+		f.pc, err = net.ListenPacket("udp", addr)
+	} else {
+		f.ln, err = net.Listen("tcp", addr)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("port %d can't be opened on the server right now", port)
 	}
 	f.name.Store(opts.Port.Name)
 	f.keyName.Store(opts.KeyName)
@@ -335,7 +352,12 @@ func (r *Registry) Open(opts Options) (*Forward, error) {
 	if old != nil {
 		old.Close("replaced by a newer connection from " + opts.ClientAddr)
 	}
-	go f.serve()
+	if f.pc != nil {
+		go f.serveUDP()
+		go f.expireSessions()
+	} else {
+		go f.serve()
+	}
 	return f, nil
 }
 

@@ -135,7 +135,7 @@ func TestTCPPorts(t *testing.T) {
 	_, other := add(bob, "other", map[string]any{"name": "db", "local_port": 5432})
 	for _, bad := range []map[string]any{
 		{"name": "db", "local_port": 1},                         // limit of 2 per subdomain
-		{"name": "x", "local_port": 1, "protocol": "udp"},       // not yet
+		{"name": "x", "local_port": 1, "protocol": "sctp"},      // unknown protocol
 		{"name": "bad name", "local_port": 1},                   // not a label
 		{"name": "x", "local_port": 0},                          // no local port
 		{"name": "x", "local_port": 1, "allow": []string{"me"}}, // not an address

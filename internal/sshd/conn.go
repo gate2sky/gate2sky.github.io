@@ -16,6 +16,7 @@ import (
 	"github.com/gate2sky/gate2sky.github.io/internal/ports"
 	"github.com/gate2sky/gate2sky.github.io/internal/store"
 	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
+	"github.com/gate2sky/gate2sky.github.io/internal/udpframe"
 )
 
 // clientConn is one authenticated SSH connection.
@@ -53,8 +54,10 @@ func (c *clientConn) handleGlobalRequests(reqs <-chan *ssh.Request) {
 		switch req.Type {
 		case "tcpip-forward":
 			c.handleForward(req)
-		case "cancel-tcpip-forward":
+		case "cancel-tcpip-forward", udpframe.CancelRequest:
 			c.handleCancel(req)
+		case udpframe.ForwardRequest:
+			c.handleUDPForward(req)
 		default:
 			req.Reply(false, nil)
 		}
@@ -91,21 +94,7 @@ func (c *clientConn) handleForward(req *ssh.Request) {
 		return
 	}
 	if portName != "" || !isHTTPPort(fr.BindPort) {
-		f, err := c.openPort(fr, portName, requested)
-		if err != nil {
-			reject(err)
-			return
-		}
-		var reply []byte
-		if fr.BindPort == 0 {
-			// OpenSSH prints "Allocated port N for remote forward".
-			reply = ssh.Marshal(struct{ Port uint32 }{uint32(f.Port.Port)})
-		}
-		req.Reply(true, reply)
-		cfg := c.srv.cfg
-		c.log.Info("port opened", "subdomain", f.Port.Subdomain, "port", f.Port.Port, "name", f.Port.Name, "key", f.KeyName)
-		c.console.Printf("✔ %s (%s.%s) is now forwarding to this connection", f.Address, f.Port.Name, f.Port.Subdomain)
-		c.console.Printf("  access: %s — manage it at %s", describeAllow(f.Port.Allow), cfg.DashboardURL("/subdomains/"+f.Port.Subdomain))
+		c.forwardPort(req, fr, portName, requested, store.ProtocolTCP)
 		return
 	}
 	t, err := c.openTunnel(fr, requested)
@@ -123,6 +112,43 @@ func (c *clientConn) handleForward(req *ssh.Request) {
 	c.log.Info("tunnel opened", "subdomain", t.Subdomain, "key", t.KeyName)
 	c.console.Printf("✔ %s is now forwarding to this connection", cfg.TunnelURL(t.Subdomain))
 	c.console.Printf("  access: %s — manage it at %s", t.Access(), cfg.DashboardURL("/subdomains/"+t.Subdomain))
+}
+
+// handleUDPForward forwards a UDP port, for the gate2sky client.
+func (c *clientConn) handleUDPForward(req *ssh.Request) {
+	var fr forwardRequest
+	if err := ssh.Unmarshal(req.Payload, &fr); err != nil {
+		req.Reply(false, nil)
+		return
+	}
+	portName, requested, err := c.srv.parseBind(fr.BindAddr)
+	if err != nil {
+		c.console.Printf("✖ cannot forward UDP %s: %v", forwardKey(fr.BindAddr, fr.BindPort), err)
+		req.Reply(false, nil)
+		return
+	}
+	c.forwardPort(req, fr, portName, requested, store.ProtocolUDP)
+}
+
+// forwardPort answers a request to forward one of a subdomain's ports.
+func (c *clientConn) forwardPort(req *ssh.Request, fr forwardRequest, portName, requested string, proto store.Protocol) {
+	f, err := c.openPort(fr, portName, requested, proto)
+	if err != nil {
+		c.log.Info("forward rejected", "bind", forwardKey(fr.BindAddr, fr.BindPort), "protocol", proto, "err", err)
+		c.console.Printf("✖ cannot forward %s: %v", forwardKey(fr.BindAddr, fr.BindPort), err)
+		req.Reply(false, nil)
+		return
+	}
+	var reply []byte
+	if fr.BindPort == 0 {
+		// OpenSSH prints "Allocated port N for remote forward".
+		reply = ssh.Marshal(struct{ Port uint32 }{uint32(f.Port.Port)})
+	}
+	req.Reply(true, reply)
+	cfg := c.srv.cfg
+	c.log.Info("port opened", "subdomain", f.Port.Subdomain, "port", f.Port.Port, "protocol", proto, "name", f.Port.Name, "key", f.KeyName)
+	c.console.Printf("✔ %s (%s.%s) is now forwarding to this connection", f.Address, f.Port.Name, f.Port.Subdomain)
+	c.console.Printf("  access: %s — manage it at %s", describeAllow(f.Port.Allow), cfg.DashboardURL("/subdomains/"+f.Port.Subdomain))
 }
 
 // isHTTPPort reports whether a forward to port is an HTTP tunnel, unless
@@ -188,7 +214,7 @@ func (c *clientConn) openTunnel(fr forwardRequest, requested string) (*tunnel.Tu
 		KeyName:       g.KeyName,
 		ClientAddr:    c.conn.RemoteAddr().String(),
 		ClientVersion: string(c.conn.ClientVersion()),
-		Dial:          c.dialer(fr.BindAddr, port),
+		Dial:          c.dialer("forwarded-tcpip", fr.BindAddr, port),
 		Logf:          c.console.Printf,
 		OnClose:       func(reason string) { c.tunnelClosed(key, t, reason) },
 	})
@@ -206,10 +232,13 @@ func (c *clientConn) openTunnel(fr forwardRequest, requested string) (*tunnel.Tu
 // openPort starts forwarding one of a subdomain's TCP ports, named in the
 // bind address (db.myapp, port 0 or its public number) or given by its
 // public number (myapp:30042, or without the subdomain).
-func (c *clientConn) openPort(fr forwardRequest, name, requested string) (*ports.Forward, error) {
+func (c *clientConn) openPort(fr forwardRequest, name, requested string, proto store.Protocol) (*ports.Forward, error) {
 	cfg := c.srv.cfg
 	if !cfg.TCP.Enabled() {
 		return nil, fmt.Errorf("this server only has HTTP tunnels; use port 80, e.g. -R %s:80:localhost:3000", orName(requested, "myapp"))
+	}
+	if proto == store.ProtocolUDP && name == "" && requested != "" && fr.BindPort == 0 {
+		return nil, errors.New("name the UDP port, as <port>.<subdomain>")
 	}
 	if name != "" && (fr.BindPort == 80 || fr.BindPort == 443) {
 		return nil, fmt.Errorf("%s names a TCP port; use port 0, e.g. -R %s:0:localhost:<port>", fr.BindAddr, fr.BindAddr)
@@ -227,7 +256,7 @@ func (c *clientConn) openPort(fr forwardRequest, name, requested string) (*ports
 		// -R 30042:localhost:5432: the port says which subdomain.
 		p, err = c.srv.store.PortByNumber(ctx, int(fr.BindPort))
 		if errors.Is(err, store.ErrNotFound) {
-			return nil, fmt.Errorf("port %d is not a TCP port of your subdomains", fr.BindPort)
+			return nil, fmt.Errorf("port %d is not a port of your subdomains", fr.BindPort)
 		}
 		if err != nil {
 			c.log.Error("load port", "err", err)
@@ -240,7 +269,7 @@ func (c *clientConn) openPort(fr forwardRequest, name, requested string) (*ports
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("port %d is not a TCP port of your subdomains", fr.BindPort)
+			return nil, fmt.Errorf("port %d is not a port of your subdomains", fr.BindPort)
 		}
 	} else {
 		if g, err = pickGrant(grants, requested, c.conn.User()); err != nil {
@@ -258,16 +287,18 @@ func (c *clientConn) openPort(fr forwardRequest, name, requested string) (*ports
 		}
 		switch {
 		case p == nil && name != "":
-			return nil, fmt.Errorf("%s has no TCP port named %q; add it at %s", g.Subdomain, name, cfg.DashboardURL("/subdomains/"+g.Subdomain))
+			return nil, fmt.Errorf("%s has no port named %q; add it at %s", g.Subdomain, name, cfg.DashboardURL("/subdomains/"+g.Subdomain))
 		case p == nil:
-			return nil, fmt.Errorf("port %d is not a TCP port of %s; add one at %s", fr.BindPort, g.Subdomain, cfg.DashboardURL("/subdomains/"+g.Subdomain))
+			return nil, fmt.Errorf("port %d is not a port of %s; add one at %s", fr.BindPort, g.Subdomain, cfg.DashboardURL("/subdomains/"+g.Subdomain))
 		case fr.BindPort != 0 && p.Port != int(fr.BindPort):
 			return nil, fmt.Errorf("%s.%s is port %d, not %d; use -R %s.%s:0:localhost:<port>", p.Name, g.Subdomain, p.Port, fr.BindPort, p.Name, g.Subdomain)
 		}
 	}
 	switch {
-	case p.Protocol != store.ProtocolTCP:
-		return nil, fmt.Errorf("%s.%s is a %s port, which plain ssh can't forward", p.Name, p.Subdomain, strings.ToUpper(string(p.Protocol)))
+	case p.Protocol == store.ProtocolUDP && proto != store.ProtocolUDP:
+		return nil, fmt.Errorf("%s.%s is a UDP port, which plain ssh can't forward: use the gate2sky client (%s)", p.Name, p.Subdomain, cfg.DashboardURL("/tunnel.sh"))
+	case p.Protocol != proto:
+		return nil, fmt.Errorf("%s.%s is a %s port", p.Name, p.Subdomain, strings.ToUpper(string(p.Protocol)))
 	case !cfg.TCP.InRange(p.Port):
 		return nil, fmt.Errorf("port %d is outside the server's TCP range (%s)", p.Port, cfg.TCP.Ports)
 	}
@@ -275,18 +306,21 @@ func (c *clientConn) openPort(fr forwardRequest, name, requested string) (*ports
 	// The client matches incoming streams by what it asked for, so they
 	// echo its bind address and the port it was told.
 	key := forwardKey(fr.BindAddr, uint32(p.Port))
+	if proto == store.ProtocolUDP {
+		key = "udp:" + key
+	}
 	if err := c.reserve(key); err != nil {
 		return nil, err
 	}
 	var f *ports.Forward
 	f, err = c.srv.ports.Open(ports.Options{
 		Port:          *p,
-		Address:       cfg.TCPAddress(p.Port),
+		Address:       cfg.PortAddress(string(p.Protocol), p.Port),
 		KeyID:         g.KeyID,
 		KeyName:       g.KeyName,
 		ClientAddr:    c.conn.RemoteAddr().String(),
 		ClientVersion: string(c.conn.ClientVersion()),
-		Dial:          c.dialer(fr.BindAddr, uint32(p.Port)),
+		Dial:          c.dialer(channelType(proto), fr.BindAddr, uint32(p.Port)),
 		Logf:          c.console.Printf,
 		OnClose:       func(reason string) { c.portClosed(key, f, reason) },
 	})
@@ -365,13 +399,17 @@ func (c *clientConn) handleCancel(req *ssh.Request) {
 		req.Reply(false, nil)
 		return
 	}
+	prefix := ""
+	if req.Type == udpframe.CancelRequest {
+		prefix = "udp:"
+	}
 	c.mu.Lock()
-	key := forwardKey(fr.BindAddr, fr.BindPort)
+	key := prefix + forwardKey(fr.BindAddr, fr.BindPort)
 	f := c.ports[key]
 	if f == nil && fr.BindPort == 0 {
 		// A port asked for with port 0, cancelled the same way.
 		for k, pf := range c.ports {
-			if h, _, _ := net.SplitHostPort(k); h == fr.BindAddr {
+			if h, _, _ := net.SplitHostPort(strings.TrimPrefix(k, "udp:")); h == fr.BindAddr && strings.HasPrefix(k, prefix) && (prefix != "" || !strings.HasPrefix(k, "udp:")) {
 				key, f = k, pf
 			}
 		}
@@ -379,7 +417,7 @@ func (c *clientConn) handleCancel(req *ssh.Request) {
 	var t *tunnel.Tunnel
 	if f != nil {
 		delete(c.ports, key)
-	} else {
+	} else if prefix == "" {
 		key = forwardKey(fr.BindAddr, effectivePort(fr.BindPort))
 		t = c.forwards[key]
 		delete(c.forwards, key)
@@ -425,9 +463,16 @@ func (c *clientConn) closeAll() {
 	}
 }
 
-// dialer opens forwarded-tcpip channels back to the client. bindAddr and
-// port must echo the forward request so the client can match it.
-func (c *clientConn) dialer(bindAddr string, port uint32) tunnel.DialFunc {
+func channelType(proto store.Protocol) string {
+	if proto == store.ProtocolUDP {
+		return udpframe.ChannelType
+	}
+	return "forwarded-tcpip"
+}
+
+// dialer opens channels of chanType back to the client. bindAddr and port
+// must echo the forward request so the client can match it.
+func (c *clientConn) dialer(chanType, bindAddr string, port uint32) tunnel.DialFunc {
 	return func(ctx context.Context, origin string) (net.Conn, error) {
 		p := forwardedTCPPayload{Addr: bindAddr, Port: port, OriginAddr: "0.0.0.0"}
 		if host, sport, err := net.SplitHostPort(origin); err == nil {
@@ -441,7 +486,7 @@ func (c *clientConn) dialer(bindAddr string, port uint32) tunnel.DialFunc {
 		}
 		res := make(chan result, 1)
 		go func() {
-			ch, reqs, err := c.conn.OpenChannel("forwarded-tcpip", ssh.Marshal(p))
+			ch, reqs, err := c.conn.OpenChannel(chanType, ssh.Marshal(p))
 			res <- result{ch, reqs, err}
 		}()
 		select {

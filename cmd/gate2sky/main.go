@@ -26,9 +26,11 @@ Usage:
   gate2sky service --install      install and start gate2sky as a systemd service
   gate2sky service --uninstall    stop and remove the systemd service
   gate2sky service --status       show the systemd service status
+  gate2sky tunnel SUBDOMAIN ...    forward a subdomain's HTTP tunnel and TCP or
+                                    UDP ports from this machine (see --help)
   gate2sky version                print the version
 
-Every command accepts --config FILE. Without it, gate2sky uses
+Every server command accepts --config FILE. Without it, gate2sky uses
 $GATE2SKY_CONFIG, ./gate2sky.yaml or /etc/gate2sky/gate2sky.yaml,
 whichever exists first.
 `
@@ -62,6 +64,8 @@ func run(args []string, out io.Writer) error {
 		return cmdConfig(args)
 	case "service":
 		return cmdService(args, out)
+	case "tunnel":
+		return cmdTunnel(args)
 	case "version", "--version", "-version":
 		fmt.Fprintln(out, "gate2sky", version)
 		return nil

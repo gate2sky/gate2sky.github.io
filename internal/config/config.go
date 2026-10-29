@@ -510,8 +510,12 @@ func (c *Config) TCPHost() string {
 
 // TCPAddress is the public address of a TCP port, e.g.
 // tcp://gate.example.com:30042.
-func (c *Config) TCPAddress(port int) string {
-	return "tcp://" + net.JoinHostPort(c.TCPHost(), strconv.Itoa(port))
+func (c *Config) TCPAddress(port int) string { return c.PortAddress("tcp", port) }
+
+// PortAddress is the public address of a port of a protocol, "tcp" or
+// "udp": udp://gate.example.com:30043.
+func (c *Config) PortAddress(protocol string, port int) string {
+	return protocol + "://" + net.JoinHostPort(c.TCPHost(), strconv.Itoa(port))
 }
 
 // IsAdmin reports whether email belongs to an administrator.
