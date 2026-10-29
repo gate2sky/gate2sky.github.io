@@ -320,7 +320,10 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 #k-default:checked ~ .tbar [for="k-default"], #k-file:checked ~ .tbar [for="k-file"] {
   color: var(--code-fg); border-bottom-color: var(--cyan); }
 #k-default:focus-visible ~ .tbar [for="k-default"], #k-file:focus-visible ~ .tbar [for="k-file"] { outline: 2px solid var(--cyan); outline-offset: -2px; }
-.term .copy.k-file, .term pre.k-file, #k-file:checked ~ .tbar .copy.k-default, #k-file:checked ~ pre.k-default { display: none; }
+.term .tfoot { margin: 0; padding: 10px 18px; background: var(--code-bar); border-top: 1px solid var(--code-border); color: var(--code-dim); font-size: 13px; line-height: 1.5; }
+.term .tfoot code { color: var(--code-fg); font-size: 12px; }
+.term .copy.k-file, .term pre.k-file, .term .tfoot.k-file, #k-file:checked ~ .tbar .copy.k-default, #k-file:checked ~ .k-default { display: none; }
+#k-file:checked ~ .tfoot.k-file { display: block; }
 #k-file:checked ~ .tbar .copy.k-file { display: inline-flex; }
 #k-file:checked ~ pre.k-file { display: block; }
 @media (max-width: 479px) {
@@ -632,6 +635,8 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
         </div>
 <pre class="k-default" role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2sky answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2sky: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
 <pre class="k-file" role="img" aria-label="A terminal: ssh -i ~/.ssh/gate2sky -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, gate2sky answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:74">ssh -i ~/.ssh/gate2sky -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">gate2sky: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+        <p class="tfoot k-default">ssh offers the keys in <code>~/.ssh</code> (<code>id_ed25519</code>, <code>id_ecdsa</code>, <code>id_rsa</code>…) and those in your agent: nothing to add when one of them is on the subdomain.</p>
+        <p class="tfoot k-file">For a key kept elsewhere, such as one made just for gate2sky with <code>ssh-keygen -t ed25519 -f ~/.ssh/gate2sky</code>. With many keys in your agent, add <code>-o IdentitiesOnly=yes</code>.</p>
       </div>
     </div>
   </section>
