@@ -326,27 +326,27 @@ input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: no
   border: var(--ig-hairline) solid var(--ig-field-line); border-left: 0; border-radius: 0 var(--ig-radius-control) var(--ig-radius-control) 0; background: var(--ig-fill-2);
 }
 
-/* A command to copy, as a terminal line in light Monokai. */
+/* A command to copy, as a terminal line in Monokai on its dark ground. */
 
 .command {
   display: flex; align-items: center; gap: var(--ig-space-5); margin: var(--ig-space-5) 0;
   padding: 7px 7px 7px 14px; font-size: var(--ig-text-md); border-radius: var(--ig-radius-md);
-  background: var(--ig-code-surface); color: var(--ig-code-fg); border: var(--ig-hairline) solid var(--ig-code-line);
+  background: var(--ig-term-bg); color: var(--ig-term-fg); border: var(--ig-hairline) solid var(--ig-term-line);
   box-shadow: var(--ig-shadow-xs);
 }
 .command code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 4px 0; scrollbar-width: none; }
-.command code::before { content: "$ "; color: var(--ig-code-comment); user-select: none; }
-.tok-cmd { color: var(--ig-code-green); }
-.tok-flag { color: var(--ig-code-pink); }
-.tok-num { color: var(--ig-code-purple); }
-.tok-arg { color: var(--ig-code-yellow); }
+.command code::before { content: "$ "; color: var(--ig-term-comment); user-select: none; }
+.tok-cmd { color: var(--ig-term-green); }
+.tok-flag { color: var(--ig-term-pink); }
+.tok-num { color: var(--ig-term-purple); }
+.tok-arg { color: var(--ig-term-yellow); }
 .copy {
   flex: none; font: inherit; font-size: var(--ig-text-md); font-weight: var(--ig-weight-semibold); padding: 7px 14px; border-radius: var(--ig-radius-sm); cursor: pointer;
-  border: 0; background: var(--ig-code-button); color: var(--ig-code-fg); box-shadow: 0 0 0 var(--ig-hairline) var(--ig-code-line);
+  border: 0; background: var(--ig-term-button); color: var(--ig-term-fg); box-shadow: 0 0 0 var(--ig-hairline) var(--ig-term-line);
   transition: background-color var(--ig-duration-fast), transform var(--ig-duration-fast) ease;
 }
-.copy:hover { background: var(--ig-code-button-hover); }
-.copy:active { background: var(--ig-code-button-hover); transform: scale(.97); }
+.copy:hover { background: var(--ig-term-button-hover); }
+.copy:active { background: var(--ig-term-button-hover); transform: scale(.97); }
 
 .empty { text-align: center; padding: var(--ig-space-6) 0; }
 .empty p { margin: 0 auto; color: var(--ig-fg-muted); max-width: 440px; }

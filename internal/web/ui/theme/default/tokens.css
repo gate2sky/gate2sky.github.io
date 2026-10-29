@@ -115,8 +115,19 @@
   --ig-code-yellow: #a35b00;
   --ig-code-purple: #7547c9;
   --ig-code-teal: #0f7a8e;
-  --ig-code-button: #f3f2ea;
-  --ig-code-button-hover: #e9e8de;
+
+  /* A command to copy: a terminal line, Monokai as it is on its dark ground,
+     on #555. */
+  --ig-term-bg: #555;
+  --ig-term-line: rgb(0 0 0 / .2);
+  --ig-term-fg: #f8f8f2;
+  --ig-term-comment: #75715e;
+  --ig-term-pink: #f92672;
+  --ig-term-green: #a6e22e;
+  --ig-term-yellow: #e6db74;
+  --ig-term-purple: #ae81ff;
+  --ig-term-button: rgb(255 255 255 / .12);
+  --ig-term-button-hover: rgb(255 255 255 / .2);
 
   /* ---- type --------------------------------------------------------------- */
 

@@ -113,6 +113,11 @@
   .btn:focus-visible { outline: none; box-shadow: var(--ig-ring); }
   .btn:disabled { opacity: .45; cursor: default; filter: none; transform: none; }
 
+  /* The blue one, without the blur behind its glass. */
+  .variant-primary {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
   .variant-danger { --tone: var(--ig-danger); }
   .variant-dark { --tone: var(--ig-dark); }
 
