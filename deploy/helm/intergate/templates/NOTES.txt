@@ -23,6 +23,16 @@ TCP ports {{ .Values.tcp.first }}-{{ .Values.tcp.last }} are served by the Servi
 ({{ .Values.tcp.service.type }}). Point {{ .Values.tcp.publicHost | default (.Values.ssh.publicHost | default .Values.domain) }} at its address.
 
 {{ end -}}
+Unless config sets email delivery and admins, set them up in the dashboard
+with a one-time link (run it again for a new one):
+
+  kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "intergate.fullname" . }} -- intergate setup-url
+{{- if not .Values.persistence.enabled }}
+
+persistence.enabled is false: a restart loses the setup, with the users,
+subdomains and SSH host key.
+{{- end }}
+
 Manage subdomains, SSH keys and users from the dashboard, or from a shell:
 
   kubectl -n {{ .Release.Namespace }} exec -it deploy/{{ include "intergate.fullname" . }} -- intergate config

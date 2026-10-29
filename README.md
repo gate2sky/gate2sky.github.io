@@ -152,12 +152,16 @@ does the same: the installer then downloads with wget too.
 
 The installer downloads the release for your machine, checks it against the
 release's `SHA256SUMS`, runs it once before it replaces anything, opens the
-setup wizard and, on Linux with systemd, installs the service. Run it again to
-update (the service is restarted), reconfigure or uninstall:
+setup wizard and, on Linux with systemd, installs the service. The wizard can
+leave email delivery and the owner to the dashboard: the service then prints
+a one-time link to [the dashboard's setup](#the-dashboards-setup). Run the
+installer again to update (the service is restarted), reconfigure, get a new
+setup link or uninstall:
 
 ```sh
 curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh -s -- reinstall
 curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh -s -- configure
+curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh -s -- setup-url
 curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh -s -- uninstall --purge
 ```
 
@@ -189,15 +193,54 @@ sudo ./intergate config                     # interactive setup
 sudo ./intergate service --install          # run it as a systemd service
 ```
 
-Then sign in at `https://gate.example.com` with an administrator email,
-register a subdomain, paste your public key (`~/.ssh/id_ed25519.pub`) and
-connect with the `ssh -R` command the dashboard shows.
+Then open the setup link (or, with email and administrators in the
+configuration, sign in at `https://gate.example.com` with an administrator
+email), register a subdomain, paste your public key (`~/.ssh/id_ed25519.pub`)
+and connect with the `ssh -R` command the dashboard shows.
+
+### The dashboard's setup
+
+Until intergate can send sign-in codes and someone may sign in, its
+dashboard shows a setup instead of anything else, in two steps:
+
+1. **Email delivery:** the SMTP server, its encryption, user, password and
+   sender. intergate signs in to the server before saving.
+2. **The owner:** an email address, confirmed with a code sent to it, which
+   also shows that emails arrive. The owner is then signed in, and the setup
+   is gone for good.
+
+Only the browser that opens a one-time link can do it. intergate writes one
+to its log when it starts (and `intergate service --install` and
+`intergate start --detached` print it), and `intergate setup-url` prints a
+new one, which replaces the one before and ends a setup in progress: the
+way back in when a link was used, expired or seen by someone else. A setup
+session ends after an hour without use; what it saved stays.
+
+What the setup saves lives in the database, not the configuration file,
+which stays read-only (a ConfigMap in Kubernetes). The SMTP password is
+encrypted (AES-256-GCM, with a key derived from the data directory's
+`secret.key`) and never shown again. `intergate config` can instead read it
+from an environment variable or a file, checking it with the SMTP server
+first: a secrets manager such as Vault can then provide it (Vault Agent
+writes files, the External Secrets Operator fills Kubernetes Secrets), and a
+file is read for every email, so a renewed secret applies at once. With
+`auth.email` and `auth.admins` in the configuration file there is no setup,
+and the file wins over what a setup saved.
+
+Later, owners change email delivery in the Admin page's **SMTP relay** tab
+(admins see it, read-only). intergate signs in to the new relay and sends a
+code through it to the owner making the change; the new relay is saved only
+once they enter that code, so a relay that can't deliver never replaces one
+that can. Code emails come as plain text and HTML, with the code leading the
+subject and standing alone in the message, the way Gmail's "Copy code" and
+Apple's AutoFill find it.
 
 ### Commands
 
 | Command | |
 |---|---|
-| `intergate config` | Interactive wizard. Creates the configuration on first run; then manages subdomains, SSH keys, users and server settings. `--accessible` uses plain prompts (also for screen readers and scripts: it accepts piped answers). |
+| `intergate config` | Interactive wizard. Creates the configuration on first run; then manages subdomains, SSH keys, users, server settings and where the SMTP password of the dashboard's setup comes from. `--accessible` uses plain prompts (also for screen readers and scripts: it accepts piped answers). |
+| `intergate setup-url` | Print a new one-time link to [the dashboard's setup](#the-dashboards-setup), replacing the one before. Only the URL goes to stdout. |
 | `intergate start` | Run in the foreground. `--detached` runs in the background, logging to `<data_dir>/intergate.log`. |
 | `intergate stop` / `status` | Stop a detached server / show whether it runs, with live counters. |
 | `intergate service --install` | Install a hardened systemd service: binary in `/usr/local/bin`, a dedicated `intergate` user owning the data directory, `CAP_NET_BIND_SERVICE` for ports 80/443. `--uninstall` and `--status` too; `--dry-run` shows what would happen. |
@@ -216,7 +259,8 @@ apply to live tunnels immediately.
 As above: `intergate config`, then `intergate service --install`. Secrets
 can stay out of the configuration file: write `${SMTP_PASSWORD}` and put
 `SMTP_PASSWORD=...` in `/etc/intergate/intergate.env`, which systemd reads
-as root.
+as root. That file also serves the SMTP password of the dashboard's setup,
+once `intergate config` reads it from the environment.
 
 ### Docker
 
@@ -229,6 +273,7 @@ docker run -d --name intergate --restart unless-stopped -v intergate:/data \
   -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/jgermade/intergate
 # with tcp.ports: 30000-30019, publish the range as well, TCP and UDP:
 #   -p 30000-30019:30000-30019 -p 30000-30019:30000-30019/udp
+docker exec intergate intergate setup-url       # the link to the dashboard's setup
 docker exec -it intergate intergate config     # manage subdomains, keys and users
 ```
 
@@ -261,11 +306,18 @@ to clone (from a clone, `deploy/helm/intergate` works the same):
 ```bash
 helm install intergate oci://ghcr.io/jgermade/charts/intergate \
   --set domain=gate.example.com \
-  --set traefik.tls.certResolver=letsencrypt-dns \
-  --set secretEnv.SMTP_PASSWORD=... \
-  -f my-values.yaml      # config.auth.admins, SMTP settings...
+  --set traefik.tls.certResolver=letsencrypt-dns
+kubectl exec deploy/intergate -- intergate setup-url    # the link to the dashboard's setup
 kubectl exec -it deploy/intergate -- intergate config
 ```
+
+The setup saves email delivery and the owner on the volume, so the release's
+values need neither. To manage them with Helm instead, set
+`config.auth.admins` and `config.auth.email` in the values, with the SMTP
+password as `${SMTP_PASSWORD}` in `secretEnv` or `existingSecret`; then
+there is no setup. `existingSecret` is also where a password the setup saved
+can move to, from Vault through the External Secrets Operator: put it in the
+Secret, then choose the environment variable in `intergate config`.
 
 Or from the classic repository:
 
@@ -334,7 +386,8 @@ Highlights:
   (`cert_file`/`key_file`). Leave it out behind a TLS-terminating proxy and
   set `http.trust_proxy_headers`.
 - `auth.email`: SMTP settings for sign-in codes (`log_only: true` writes them
-  to the log for local development).
+  to the log for local development). Without it, [the dashboard's
+  setup](#the-dashboards-setup) asks for them.
 - `auth.providers`: optional `github` or `oidc` providers (Google, GitLab,
   Microsoft Entra ID, Keycloak, Authentik...). Their callback URL is
   `<public_url>/auth/<id>/callback`.
@@ -343,7 +396,8 @@ Highlights:
   the dashboard or `intergate config` may sign in too. On the dashboard's
   Admin page each user is an owner, an admin or a user: admins manage every
   subdomain and account but owners', owners manage everything, and
-  `auth.admins` are always owners.
+  `auth.admins` are always owners. With none of them, the dashboard's setup
+  asks for the owner.
 - `ssh.proxy_protocol`: expect a PROXY protocol header from a load balancer.
 - `tcp.ports`: the range TCP and UDP ports are allocated from (e.g. `30000-30019`);
   `tcp.max_ports` per subdomain (5), `tcp.public_host` for their addresses
@@ -368,6 +422,21 @@ auth:
   burned after 5 wrong guesses and rate limited per address and IP. The
   response is the same whether or not an address may sign in, and no email is
   sent to addresses that may not.
+- **Setup:** while intergate has no email delivery or nobody may sign in,
+  only the browser that redeemed the one-time link (24 random bytes, only a
+  hash kept in memory) can set it up; the link is spent when the setup
+  starts, not when the page loads, so link previews can't burn it. Its
+  session is a host-only `HttpOnly` cookie that ends after an hour without
+  use or with a new link. The owner proves their address with a code.
+- **SMTP relay changes** from the Admin page are for owners only, and save
+  only after the owner enters a code the new relay delivered to their
+  address (6 digits, single use, 10 minutes, 5 tries, kept in memory).
+- **SMTP password** saved by the setup: AES-256-GCM with a key derived
+  (HKDF-SHA256) from the data directory's `secret.key`, so the database alone
+  (a backup, a copy) does not give it away; whoever has the whole data
+  directory has it, as they have the SSH host key. Never sent back to the
+  browser or the admin socket. It can come from an environment variable or
+  a file instead (`intergate config`).
 - **Passkeys** require user verification. Tunnel subdomains may claim the same
   WebAuthn RP ID as the dashboard, so assertions are only accepted from the
   dashboard's exact origin; challenges are single use.
@@ -437,11 +506,14 @@ The landing is built from [`scripts/landing`](scripts/landing): edit
 then run `python3 scripts/landing/gen.py scripts/landing/template.html
 pages/index.html`. Build checks that the two agree. The icon is
 [`pages/favicon.svg`](pages/favicon.svg), the same file as the dashboard's
-[`internal/web/ui/logo.svg`](internal/web/ui/logo.svg) (the landing's header
-inlines it, without its dark tile); after changing it, copy it to both and
-run `node scripts/landing/icons.js`, which renders `favicon.ico` and
-`apple-touch-icon.png` from it and writes the dashboard header's
-[`logo-mark.svg`](internal/web/ui/logo-mark.svg), the logo without its tile.
+[`internal/web/ui/favicon.svg`](internal/web/ui/favicon.svg) (the landing's
+header inlines it, without its dark tile); after changing it, copy it to both
+and run `node scripts/landing/icons.js`, which renders `favicon.ico` and
+`apple-touch-icon.png` from it and writes
+[`logo-mark.svg`](internal/web/ui/logo-mark.svg), the logo without its tile,
+for the dashboard's header and sign-in page. Link previews show
+[`pages/og.png`](pages/og.png), the hero at 1200×630: after changing the
+hero, regenerate the landing, then run `node scripts/landing/og.js`.
 
 ## Roadmap
 

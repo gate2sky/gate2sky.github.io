@@ -180,17 +180,32 @@ func (s *Server) handleUpdateSubdomain(w http.ResponseWriter, r *http.Request) {
 	if d == nil {
 		return
 	}
+	// Either or both: a new name, who can open it.
 	var req struct {
+		Name   string       `json:"name"`
 		Access store.Access `json:"access"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	if err := s.manage.SetAccess(r.Context(), d, req.Access, currentAuth(r).User.Email); err != nil {
-		s.fail(w, "set access", err)
+	actor := currentAuth(r).User.Email
+	if req.Name == "" && req.Access == "" {
+		jsonError(w, http.StatusBadRequest, "Nothing to change.")
 		return
 	}
-	d.Access = req.Access
+	if req.Name != "" {
+		if err := s.manage.RenameSubdomain(r.Context(), d, req.Name, actor); err != nil {
+			s.fail(w, "rename subdomain", err)
+			return
+		}
+	}
+	if req.Access != "" {
+		if err := s.manage.SetAccess(r.Context(), d, req.Access, actor); err != nil {
+			s.fail(w, "set access", err)
+			return
+		}
+		d.Access = req.Access
+	}
 	writeJSON(w, http.StatusOK, s.view(d))
 }
 

@@ -1,0 +1,236 @@
+<script :setup>
+  // The setup, while intergate can't send sign-in codes or nobody may sign
+  // in: email delivery (SMTP), then the owner, who confirms their address
+  // with a code and is signed in. Only the browser that opened the
+  // one-time link from `intergate setup-url` gets the forms.
+  const { app, query } = await import("@ui/lib/store.js")
+  const { api } = await import("@ui/lib/api.js")
+  const CopyText = await import("@ui/components/copy-text.html")
+
+  document.title = "Set up · intergate"
+
+  let token = query("setup") || ""
+  let setup = app.setup
+  let error = ""
+  let busy = false
+
+  // Email delivery: what was saved before, or the usual.
+  const PORTS = { starttls: "587", tls: "465", none: "25" }
+  let host = ""
+  let port = PORTS.starttls
+  let tls = "starttls"
+  let username = ""
+  let password = ""
+  let from = "intergate <no-reply@" + app.domain + ">"
+  let savedPassword = false
+  const fill = smtp => {
+    if (!smtp) return
+    host = smtp.host
+    port = String(smtp.port)
+    tls = smtp.tls
+    username = smtp.username
+    from = smtp.from
+    savedPassword = smtp.password
+  }
+  fill(setup.smtp)
+  // The port follows the encryption, unless it was changed.
+  const setTLS = value => {
+    if (port === PORTS[tls]) port = PORTS[value]
+    tls = value
+  }
+
+  // Where intergate runs, for the command that prints a setup link.
+  const COMMANDS = {
+    server: "sudo intergate setup-url",
+    docker: "docker exec intergate intergate setup-url",
+    kubernetes: "kubectl exec deploy/intergate -- intergate setup-url",
+  }
+  let runsOn = "server"
+
+  let ownerEmail = ""
+  let code = ""
+  // The address the owner's code went to, in this browser.
+  let sentTo = setup.owner_flow || ""
+  // The email step, opened again from the owner's.
+  let editEmail = false
+
+  $: step = setup.email || editEmail ? "email" : "owner"
+  // Both steps show when email delivery is set up here, not in the
+  // configuration file.
+  $: steps = setup.email || !!setup.smtp
+
+  const run = async fn => {
+    busy = true
+    error = ""
+    try {
+      await fn()
+    } catch (e) {
+      error = e.message
+      // The setup session ended (a new link, an hour without use).
+      if (e.status === 403 && e.body.expired) {
+        setup = { ...setup, session: false }
+        token = ""
+      }
+    }
+    busy = false
+  }
+
+  const start = () => run(async () => {
+    setup = (await api("POST", "/setup/start", { token })).setup
+    token = ""
+    history.replaceState(null, "", location.pathname)
+    fill(setup.smtp)
+    sentTo = setup.owner_flow || ""
+  })
+
+  const saveEmail = () => run(async () => {
+    setup = (await api("POST", "/setup/email", { host, port: Number(port), tls, username, password, from })).setup
+    fill(setup.smtp)
+    password = ""
+    editEmail = false
+  })
+
+  const sendCode = () => run(async () => {
+    sentTo = (await api("POST", "/setup/owner", { email: ownerEmail })).email
+    code = ""
+  })
+
+  const verify = async () => {
+    busy = true
+    error = ""
+    try {
+      const result = await api("POST", "/setup/owner/code", { code })
+      return location.assign(result.redirect || "/")
+    } catch (e) {
+      error = e.message
+      if (e.body.expired) sentTo = ""
+      if (e.status === 403 && e.body.expired) setup = { ...setup, session: false }
+    }
+    busy = false
+  }
+
+  const otherAddress = async () => {
+    await api("DELETE", "/setup/owner").catch(() => {})
+    sentTo = ""
+    error = ""
+  }
+
+  const changeEmail = async () => {
+    await otherAddress()
+    editEmail = true
+  }
+</script>
+
+<section class="card login setup">
+  <img class="app-icon" src="/ui/logo-mark.svg" alt="">
+
+  <div :if="!setup.session && token">
+    <h1>Set up intergate</h1>
+    <p class="muted">This link opens the setup of intergate at <strong>{{ app.domain }}</strong>: how it sends email, and who owns it. It works once.</p>
+    <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+    <div class="providers">
+      <button type="button" class="button button-block" :disabled="busy" @click="start">Start the setup</button>
+    </div>
+  </div>
+
+  <div :elseif="!setup.session">
+    <h1>intergate is not set up yet</h1>
+    <p class="muted">Its owner sets it up with a one-time link. To get one, run this where intergate runs:</p>
+    <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+    <div class="setup-command">
+      <div class="segmented" role="group" aria-label="Where intergate runs">
+        <button type="button" :aria-pressed="runsOn === 'server' ? 'true' : 'false'" @click="runsOn = 'server'">Server</button>
+        <button type="button" :aria-pressed="runsOn === 'docker' ? 'true' : 'false'" @click="runsOn = 'docker'">Docker</button>
+        <button type="button" :aria-pressed="runsOn === 'kubernetes' ? 'true' : 'false'" @click="runsOn = 'kubernetes'">Kubernetes</button>
+      </div>
+      <CopyText :command="COMMANDS[runsOn]" />
+    </div>
+  </div>
+
+  <div :else>
+    <ol :if="steps" class="setup-steps">
+      <li :class.current="step === 'email'" :class.done="step !== 'email'">
+        <span class="step-mark" aria-hidden="true">
+          <svg :if="step !== 'email'" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+          <span :else>1</span>
+        </span>
+        Email delivery
+      </li>
+      <li :class.current="step === 'owner'">
+        <span class="step-mark" aria-hidden="true">2</span>
+        Owner
+      </li>
+    </ol>
+
+    <div :if="step === 'email'">
+      <h1>Email delivery</h1>
+      <p class="muted">intergate signs people in with codes sent by email. Which SMTP server sends them?</p>
+      <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+      <form class="form form-login" @submit.prevent="saveEmail">
+        <label>SMTP server
+          <input name="host" required autocapitalize="off" spellcheck="false" placeholder="smtp.example.com"
+                 :value="host" @input="host = $event.target.value">
+        </label>
+        <div class="form-pair">
+          <label>Encryption
+            <select class="field" name="tls" @change="setTLS($event.target.value)">
+              <option value="starttls" :selected="tls === 'starttls'">STARTTLS</option>
+              <option value="tls" :selected="tls === 'tls'">TLS</option>
+              <option value="none" :selected="tls === 'none'">None (local relay)</option>
+            </select>
+          </label>
+          <label>Port
+            <input name="port" required inputmode="numeric" pattern="[0-9]{1,5}" :value="port" @input="port = $event.target.value">
+          </label>
+        </div>
+        <label>Username
+          <input name="username" autocomplete="off" autocapitalize="off" spellcheck="false"
+                 :value="username" @input="username = $event.target.value">
+          <span class="hint">Leave it empty if the server needs no sign-in.</span>
+        </label>
+        <label>Password
+          <input name="password" type="password" autocomplete="new-password"
+                 :placeholder="savedPassword ? 'Saved: leave it empty to keep it' : ''"
+                 :value="password" @input="password = $event.target.value">
+        </label>
+        <label>Sender
+          <input name="from" required spellcheck="false" :value="from" @input="from = $event.target.value">
+          <span class="hint">Who the emails come from: an address the SMTP server may send as.</span>
+        </label>
+        <button type="submit" class="button button-block" :disabled="busy">{{ busy ? "Checking the SMTP server…" : "Check and save" }}</button>
+        <p class="hint setup-note">intergate signs in to the SMTP server before saving. The password is stored encrypted in its data directory; to read it from an environment variable or a file instead, use <code>intergate config</code> on the server.</p>
+      </form>
+    </div>
+
+    <div :elseif="!sentTo">
+      <h1>The owner</h1>
+      <p class="muted">The owner manages everything here: subdomains, users and who may sign in. A code sent to their email confirms the address, and that emails arrive.</p>
+      <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+      <form class="form form-login" @submit.prevent="sendCode">
+        <label>Owner’s email
+          <input type="email" name="email" required autocomplete="email" autocapitalize="off" spellcheck="false"
+                 placeholder="you@example.com" :value="ownerEmail" @input="ownerEmail = $event.target.value">
+        </label>
+        <button type="submit" class="button button-block" :disabled="busy">{{ busy ? "Sending…" : "Email me a code" }}</button>
+      </form>
+      <p :if="setup.smtp" class="small muted"><button type="button" class="link" @click="editEmail = true">Change the email settings</button></p>
+    </div>
+
+    <div :else>
+      <h1>Check your email</h1>
+      <p class="muted">We sent a 6-digit code to <strong>{{ sentTo }}</strong>. With it, the setup is done and you are signed in as the owner.</p>
+      <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+      <form class="form form-login" @submit.prevent="verify">
+        <label>Code
+          <input class="code-input" name="code" required inputmode="numeric" autocomplete="one-time-code"
+                 pattern="[0-9 ]{6,7}" maxlength="7" placeholder="123456" autofocus
+                 :value="code" @input="code = $event.target.value">
+        </label>
+        <button type="submit" class="button button-block" :disabled="busy">Finish the setup</button>
+      </form>
+      <p class="small muted">Didn’t get it? Check your spam folder,
+        <button type="button" class="link" @click="otherAddress">use another address</button><span :if="setup.smtp"> or
+        <button type="button" class="link" @click="changeEmail">change the email settings</button></span>.</p>
+    </div>
+  </div>
+</section>

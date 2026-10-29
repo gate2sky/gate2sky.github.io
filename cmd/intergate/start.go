@@ -115,6 +115,7 @@ func startDetached(path string, cfg *config.Config, debug bool) error {
 			fmt.Printf("intergate %s started in the background (PID %d)\n", st.Version, st.PID)
 			fmt.Printf("  dashboard: %s\n  ssh:       %s\n  logs:      %s\n", st.DashboardURL, st.SSH, logPath)
 			fmt.Println("Stop it with `intergate stop`.")
+			printSetupLink(client, st, os.Stdout)
 			return nil
 		}
 	}
@@ -202,6 +203,64 @@ func cmdStatus(args []string, out io.Writer) error {
 	fmt.Fprintf(out, "intergate %s is running %s (PID %d, up %s)\n", st.Version, how, st.PID, time.Since(st.StartedAt).Round(time.Second))
 	fmt.Fprintf(out, "  dashboard:  %s\n  ssh:        %s\n", st.DashboardURL, st.SSH)
 	fmt.Fprintf(out, "  subdomains: %d registered, %d online\n  users:      %d\n", st.Subdomains, st.TunnelsOnline, st.Users)
+	if st.Setup {
+		fmt.Fprintln(out, "  setup:      not done yet: run `intergate setup-url` for the link")
+	}
+	return nil
+}
+
+// printSetupLink prints a link to the dashboard's setup when the server
+// st describes is not set up yet.
+func printSetupLink(client *admin.Client, st *admin.Status, out io.Writer) {
+	if !st.Setup {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	link, err := client.SetupURL(ctx)
+	if err != nil {
+		fmt.Fprintln(out, "\nIt is not set up yet: `intergate setup-url` gives the link to its setup.")
+		return
+	}
+	fmt.Fprintf(out, "\nFinish the setup in the dashboard, email delivery and the owner, with this link.\n"+
+		"It works once; `intergate setup-url` gives a new one.\n\n  %s\n", link)
+}
+
+// waitForSetupLink waits for a server that was just started to answer,
+// and prints a link to its setup when it needs one.
+func waitForSetupLink(client *admin.Client, out io.Writer) {
+	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		st, err := client.Status(ctx)
+		cancel()
+		if err == nil {
+			printSetupLink(client, st, out)
+			return
+		}
+	}
+	fmt.Fprintln(out, "\nIf intergate is not set up yet, `sudo intergate setup-url` gives the link to its setup.")
+}
+
+// cmdSetupURL prints a new link to the dashboard's setup: the URL alone on
+// stdout, for scripts, and what to do with it on stderr.
+func cmdSetupURL(args []string, out io.Writer) error {
+	fs, cfgFlag := newFlags("setup-url")
+	if err := fs.Parse(args); err != nil {
+		return errQuiet
+	}
+	cfg, err := loadConfig(configPath(*cfgFlag))
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	link, err := admin.NewClient(cfg.Admin.Socket).SetupURL(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stderr, "Open this link to set up email delivery and the owner. It works once, and replaces")
+	fmt.Fprintln(os.Stderr, "any link given before; run `intergate setup-url` again for a new one.")
+	fmt.Fprintln(out, link)
 	return nil
 }
 
@@ -232,7 +291,11 @@ func cmdService(args []string, out io.Writer) error {
 			return err
 		}
 		opts.Config = cfg
-		return service.Install(opts)
+		if err := service.Install(opts); err != nil || *dryRun {
+			return err
+		}
+		waitForSetupLink(admin.NewClient(cfg.Admin.Socket), out)
+		return nil
 	case *uninstall:
 		return service.Uninstall(opts)
 	case *status:

@@ -43,6 +43,9 @@ type boot struct {
 	CSRF      string      `json:"csrf,omitempty"`
 	EmailFlow string      `json:"email_flow,omitempty"`
 	Error     *pageErrMsg `json:"error,omitempty"`
+	// Setup is set while intergate is not set up: the page shows the
+	// setup instead of anything else.
+	Setup *bootSetup `json:"setup,omitempty"`
 }
 
 type bootLink struct {
@@ -86,7 +89,7 @@ func (s *Server) serveApp(w http.ResponseWriter, r *http.Request, status int, pe
 	b := boot{
 		Version:   s.version,
 		Domain:    s.cfg.Domain(),
-		Email:     s.cfg.Auth.Email.Enabled(),
+		Email:     s.settings.EmailEnabled(),
 		Passkeys:  s.webauthn != nil,
 		Providers: []bootLink{},
 		Limits:    bootLimits{Subdomains: s.cfg.Limits.SubdomainsPerUser, Keys: s.cfg.Limits.KeysPerSubdomain},
@@ -106,6 +109,11 @@ func (s *Server) serveApp(w http.ResponseWriter, r *http.Request, status int, pe
 	} else if f, ok := s.emailFlow(r); ok {
 		b.EmailFlow = f.Email
 	}
+	setup, err := s.setupState(r)
+	if err != nil {
+		s.log.Error("setup state", "err", err)
+	}
+	b.Setup = setup
 
 	nonce := make([]byte, 18)
 	rand.Read(nonce)

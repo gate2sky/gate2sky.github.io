@@ -20,6 +20,7 @@ import (
 	"github.com/jgermade/intergate/internal/admin"
 	"github.com/jgermade/intergate/internal/config"
 	"github.com/jgermade/intergate/internal/names"
+	appsettings "github.com/jgermade/intergate/internal/settings"
 	"github.com/jgermade/intergate/internal/store"
 )
 
@@ -279,8 +280,10 @@ func (w *Wizard) setupForms(s *settings) error {
 	err = w.form(huh.NewGroup(
 		huh.NewSelect[string]().
 			Title("Sign-in codes by email").
-			Description("Users sign in with a one-time code sent to their email, then can add a passkey.").
+			Description("Users sign in with a one-time code sent to their email, then can add a passkey.\n"+
+				"The dashboard can ask for the SMTP server, and for the owner, through a one-time link.").
 			Options(
+				huh.NewOption("Set them up in the dashboard, once intergate runs", emailDashboard),
 				huh.NewOption("Send them through an SMTP server", emailSMTP),
 				huh.NewOption("Write them to the server log (development only)", emailLog),
 				huh.NewOption("Disabled (sign in with OAuth only)", emailOff),
@@ -329,11 +332,16 @@ func (w *Wizard) setupForms(s *settings) error {
 				Value(&s.GitHubSecret).Validate(orCurrent(&s.GitHubSecret, required("the client secret"))),
 		))
 	}
+	// Without administrators, the dashboard's setup asks for the owner.
+	adminsHelp := "Emails, separated by commas. They can always sign in and see every subdomain."
+	if s.EmailMode == emailDashboard {
+		adminsHelp += "\nOptional: the dashboard's setup asks for the owner."
+	}
 	groups = append(groups,
 		huh.NewGroup(
 			huh.NewInput().Title("Administrators").
-				Description("Emails, separated by commas. They can always sign in and see every subdomain.").
-				Value(&s.Admins).Validate(orCurrent(&s.Admins, validateEmails(true))),
+				Description(adminsHelp).
+				Value(&s.Admins).Validate(orCurrent(&s.Admins, validateEmails(s.EmailMode != emailDashboard))),
 			huh.NewInput().Title("Allowed email domains").
 				Description("Anyone with a verified email on these domains can sign in, e.g. example.com. Optional.").
 				Value(&s.AllowedDomains),
@@ -400,7 +408,12 @@ func (w *Wizard) saved(s *settings, isNew bool) {
 		"       intergate start                     in the foreground\n" +
 		"       intergate start --detached          in the background\n" +
 		"       sudo intergate service --install    as a system service (Linux)\n")
-	w.printf("  3. Sign in at %s as %s.\n", s.PublicURL, splitList(s.Admins)[0])
+	if admins := splitList(s.Admins); s.EmailMode == emailDashboard || len(admins) == 0 {
+		w.printf("  3. Finish the setup in the dashboard: open the one-time link intergate writes to its log\n" +
+			"     when it starts, or get a new one with `intergate setup-url`.\n")
+	} else {
+		w.printf("  3. Sign in at %s as %s.\n", s.PublicURL, admins[0])
+	}
 	w.printf("Run `intergate config` again to manage subdomains, SSH keys and users.\n")
 }
 
@@ -440,22 +453,31 @@ func (w *Wizard) menu() error {
 		}
 		c := admin.NewClient(socketPath(w.Path, d))
 		status := "intergate is not running: start it to manage subdomains and users."
+		options := []huh.Option[string]{
+			huh.NewOption("Subdomains and SSH keys", "subdomains"),
+			huh.NewOption("Users", "users"),
+			huh.NewOption("Server settings", "settings"),
+		}
 		if st, err := c.Status(w.ctx); err == nil {
 			status = fmt.Sprintf("Running %s · %d subdomains, %d online · %d users", st.DashboardURL, st.Subdomains, st.TunnelsOnline, st.Users)
+			// What the dashboard set up, or has yet to.
+			if st.Setup {
+				status += " · not set up yet"
+				options = append(options, huh.NewOption("Link to the dashboard's setup", "setup"))
+			}
+			if e, err := c.Email(w.ctx); err == nil && e.Source == appsettings.SourceDashboard {
+				options = append(options, huh.NewOption("Email delivery (the SMTP password)", "email"))
+			}
 		} else if !errors.Is(err, admin.ErrNotRunning) {
 			status = "Can't reach the server: " + err.Error()
 		}
 		w.note(status)
 		var choice string
 		err = w.form(huh.NewGroup(huh.NewSelect[string]().
-			Title("intergate — "+w.Path).
+			Title("intergate — " + w.Path).
 			Description(status).
-			Options(
-				huh.NewOption("Subdomains and SSH keys", "subdomains"),
-				huh.NewOption("Users", "users"),
-				huh.NewOption("Server settings", "settings"),
-				huh.NewOption("Exit", "exit"),
-			).Value(&choice)))
+			Options(append(options, huh.NewOption("Exit", "exit"))...).
+			Value(&choice)))
 		if aborted(err) || choice == "exit" {
 			return nil
 		}
@@ -469,6 +491,10 @@ func (w *Wizard) menu() error {
 			err = w.users(c)
 		case "settings":
 			err = w.setup(d)
+		case "setup":
+			err = w.setupLink(c)
+		case "email":
+			err = w.email(c)
 		}
 		if err != nil && !aborted(err) {
 			w.problem(err)

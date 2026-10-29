@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>{{.Title}}</title>
+<style>
+  @media (prefers-color-scheme: dark) {
+    .page { background: #05070d !important; }
+    .card { background: #0f1524 !important; border-color: #222b42 !important; }
+    .fg { color: #e9edf7 !important; }
+    .muted { color: #96a0ba !important; }
+    .gate { color: #5ad8ff !important; }
+    .code { background: #05070d !important; border-color: #222b42 !important; color: #5ad8ff !important; }
+    .rule { border-color: #222b42 !important; }
+  }
+</style>
+</head>
+<body class="page" style="margin:0; padding:0; background:#f4f6fb;">
+<div style="display:none; max-height:0; overflow:hidden; opacity:0;">{{.Preheader}}</div>
+<table role="presentation" class="page" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f6fb;">
+<tr><td align="center" style="padding:32px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <tr><td class="fg" style="padding:0 4px 16px; font-size:22px; font-weight:700; letter-spacing:-0.02em; color:#141a2b;">inter<span class="gate" style="color:#0b9fd8;">gate</span></td></tr>
+    <tr><td class="card" style="background:#ffffff; border:1px solid #dfe4ef; border-radius:14px; padding:28px 28px 24px;">
+      <h1 class="fg" style="margin:0 0 10px; font-size:20px; line-height:1.3; font-weight:700; color:#141a2b;">{{.Heading}}</h1>
+      <p class="fg" style="margin:0; font-size:15px; line-height:1.55; color:#333b52;">{{.Intro}}</p>
+      <div class="code" style="margin:22px 0 10px; padding:16px 12px; text-align:center; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:34px; line-height:1.1; font-weight:700; letter-spacing:0.3em; text-indent:0.3em; color:#141a2b; background:#f4f6fb; border:1px solid #dfe4ef; border-radius:10px;">{{.Code}}</div>
+      <p class="muted" style="margin:0; font-size:13px; line-height:1.5; text-align:center; color:#6b7590;">It expires in {{.Minutes}} minutes and works once.</p>
+      {{- if .Details}}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="rule" style="margin:22px 0 0; border-top:1px solid #dfe4ef;">
+        {{- range .Details}}
+        <tr>
+          <td class="muted" style="padding:9px 12px 0 0; font-size:13px; color:#6b7590; white-space:nowrap; vertical-align:top;">{{index . 0}}</td>
+          <td class="fg" style="padding:9px 0 0; font-size:13px; color:#141a2b; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break:break-all;">{{index . 1}}</td>
+        </tr>
+        {{- end}}
+      </table>
+      {{- end}}
+      <p class="muted rule" style="margin:22px 0 0; padding-top:16px; border-top:1px solid #dfe4ef; font-size:13px; line-height:1.5; color:#6b7590;">{{.Note}}</p>
+    </td></tr>
+    <tr><td class="muted" style="padding:16px 4px 0; font-size:12px; line-height:1.5; color:#8a93ab;">Sent by intergate at <a href="{{.Site}}" style="color:#0b9fd8; text-decoration:none;">{{.Host}}</a>, automatically: replies are not read.</td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>

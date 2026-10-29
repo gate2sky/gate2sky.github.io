@@ -24,6 +24,8 @@ Usage:
   intergate status                 show whether the server is running
   intergate config                 set up intergate or manage subdomains, SSH keys
                                    and users in an interactive wizard
+  intergate setup-url              print a new one-time link to the dashboard's
+                                   setup (email delivery and the owner)
   intergate service --install      install and start intergate as a systemd service
   intergate service --uninstall    stop and remove the systemd service
   intergate service --status       show the systemd service status
@@ -63,6 +65,8 @@ func run(args []string, out io.Writer) error {
 		return cmdStatus(args, out)
 	case "config":
 		return cmdConfig(args)
+	case "setup-url":
+		return cmdSetupURL(args, out)
 	case "service":
 		return cmdService(args, out)
 	case "tunnel":

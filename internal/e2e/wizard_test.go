@@ -13,6 +13,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/jgermade/intergate/internal/config"
+	appsettings "github.com/jgermade/intergate/internal/settings"
 	"github.com/jgermade/intergate/internal/store"
 	"github.com/jgermade/intergate/internal/wizard"
 )
@@ -61,7 +62,7 @@ func TestWizardSetup(t *testing.T) {
 		// Let's Encrypt email, then HTTP, HTTPS and SSH listen addresses.
 		"ops@example.org", "", "", "",
 		// Email codes over SMTP, passkeys, GitHub too.
-		"1", "", "y",
+		"2", "", "y",
 		// SMTP: host, port, encryption, user, password, sender.
 		"smtp.example.org", "", "", "mailer", "s3cret", "",
 		// GitHub client ID and secret.
@@ -106,6 +107,71 @@ func TestWizardSetup(t *testing.T) {
 	}
 	if !cfg.HTTP.TLS.ACME.Enabled || cfg.Auth.Email.SMTP.Port != 587 || !cfg.PasskeysEnabled() {
 		t.Errorf("config = %+v", cfg)
+	}
+}
+
+// TestWizardLeavesSetupToDashboard creates a configuration that leaves
+// email delivery and the owner to the dashboard's setup.
+func TestWizardLeavesSetupToDashboard(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "intergate.yaml")
+	out := runWizard(t, path,
+		"https://gate.example.org", "1",
+		"ops@example.org", "", "", "",
+		// Email set up in the dashboard (the default), passkeys, no GitHub.
+		"", "", "",
+		// No admins: the setup asks for the owner.
+		"", "", "", "",
+		"",
+	)
+	if !strings.Contains(out, "intergate setup-url") {
+		t.Fatalf("output:\n%s", out)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		raw, _ := os.ReadFile(path)
+		t.Fatalf("written config does not load: %v\n%s", err, raw)
+	}
+	if cfg.Auth.Email.Enabled() || len(cfg.Auth.Providers) > 0 || !cfg.NobodyAllowed() {
+		t.Errorf("auth = %+v", cfg.Auth)
+	}
+}
+
+// TestWizardEmailPassword moves the SMTP password set up in the dashboard
+// to an environment variable, and back.
+func TestWizardEmailPassword(t *testing.T) {
+	h, checked := newSetupHarness(t)
+	ctx := t.Context()
+	if err := h.srv.Settings().SaveEmail(ctx, appsettings.Email{Host: "smtp.example.org", Port: 587, TLS: "starttls", Username: "me", From: "intergate <no-reply@gate.test>"}, "s3cret"); err != nil {
+		t.Fatal(err)
+	}
+	h.serveAdminOnce()
+	path := filepath.Join(t.TempDir(), "intergate.yaml")
+	os.WriteFile(path, h.yaml, 0o600)
+
+	// Not set up yet (no owner): the menu offers a setup link.
+	out := runWizard(t, path, "4", "6")
+	if !strings.Contains(out, "http://"+domain+"/?setup=") {
+		t.Fatalf("setup link:\n%s", out)
+	}
+	t.Setenv("INTERGATE_TEST_SMTP", "from-env")
+	out = runWizard(t, path, "5", "2", "INTERGATE_TEST_SMTP", "6")
+	if !strings.Contains(out, "SMTP password: stored in intergate's database") || !strings.Contains(out, "now the environment variable INTERGATE_TEST_SMTP") {
+		t.Fatalf("to the environment:\n%s", out)
+	}
+	if e := h.srv.Settings().Email(); e.PasswordRef != "env:INTERGATE_TEST_SMTP" || e.Sealed != "" {
+		t.Errorf("settings = %+v", e)
+	}
+	if last := (*checked)[len(*checked)-1]; last.Password != "from-env" {
+		t.Errorf("checked %+v", last)
+	}
+	// A password the SMTP server refuses changes nothing.
+	out = runWizard(t, path, "5", "1", "wrong", "6")
+	if !strings.Contains(out, "refused the password, nothing changed") || h.srv.Settings().Email().PasswordRef == "" {
+		t.Fatalf("refused password:\n%s", out)
+	}
+	runWizard(t, path, "5", "1", "typed", "6")
+	if e := h.srv.Settings().Email(); e.PasswordSource() != "stored" {
+		t.Errorf("back to stored: %+v", e)
 	}
 }
 

@@ -2,10 +2,13 @@
 #
 #   docker compose run --rm intergate config    # create /data/intergate.yaml
 #   docker compose up -d
+#   docker compose exec intergate intergate setup-url   # the link to the dashboard's setup
 #   docker compose exec intergate intergate config   # manage subdomains, keys, users
 #
 # Point gate.example.com and *.gate.example.com to this host. In the setup,
-# choose Let's Encrypt and keep the default ports (80, 443 and 2222).
+# choose Let's Encrypt and keep the default ports (80, 443 and 2222). Email
+# delivery and the owner can be left to the dashboard's setup, opened with
+# the one-time link `intergate setup-url` prints (the log has one too).
 services:
   intergate:
     image: ghcr.io/jgermade/intergate:latest
@@ -21,7 +24,9 @@ services:
       # - "30000-30019:30000-30019/udp"
     volumes:
       - intergate:/data
-    # Secrets referenced as ${VAR} in the configuration:
+    # Secrets referenced as ${VAR} in the configuration, or the SMTP
+    # password of the dashboard's setup once `intergate config` reads it
+    # from the environment:
     # environment:
     #   SMTP_PASSWORD: change-me
     healthcheck:

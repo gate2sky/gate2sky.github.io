@@ -253,6 +253,13 @@ func (s *Store) DeleteUser(ctx context.Context, id int64) error {
 	return nil
 }
 
+// HasManagers reports whether an enabled account is an owner or an admin.
+func (s *Store) HasManagers(ctx context.Context) (bool, error) {
+	var ok bool
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE role IN (?, ?) AND disabled = 0)`, RoleOwner, RoleAdmin).Scan(&ok)
+	return ok, err
+}
+
 // SetUserAdded records that an administrator added the user, which lets
 // them sign in whatever auth.allowed_* says.
 func (s *Store) SetUserAdded(ctx context.Context, id int64) error {

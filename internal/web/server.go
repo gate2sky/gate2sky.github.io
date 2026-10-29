@@ -25,6 +25,7 @@ import (
 	"github.com/jgermade/intergate/internal/config"
 	"github.com/jgermade/intergate/internal/mail"
 	"github.com/jgermade/intergate/internal/manage"
+	"github.com/jgermade/intergate/internal/settings"
 	"github.com/jgermade/intergate/internal/store"
 	"github.com/jgermade/intergate/internal/tunnel"
 )
@@ -38,8 +39,15 @@ type Options struct {
 	Store    *store.Store
 	Registry *tunnel.Registry
 	Manage   *manage.Service
-	// Mailer sends sign-in codes. Defaults to the configured SMTP server.
+	// Settings holds email delivery set up from the dashboard, and the
+	// setup itself.
+	Settings *settings.Settings
+	// Mailer sends sign-in codes. Defaults to the email delivery set up,
+	// in the configuration file or from the dashboard.
 	Mailer mail.Sender
+	// MailerFor sends through email delivery that is not saved yet, to
+	// confirm it. Defaults to its SMTP server, or to Mailer when set.
+	MailerFor func(config.EmailConfig) mail.Sender
 	// Secret signs OAuth state and tunnel access cookies. Keep it stable
 	// across restarts so visitors stay signed in to private tunnels.
 	Secret []byte
@@ -59,7 +67,10 @@ type Server struct {
 	store     *store.Store
 	registry  *tunnel.Registry
 	manage    *manage.Service
+	settings  *settings.Settings
 	mailer    mail.Sender
+	mailerFor func(config.EmailConfig) mail.Sender
+	relay     relayChanges
 	log       *slog.Logger
 	signer    signer
 	nonces    *nonceSet
@@ -79,7 +90,7 @@ type Server struct {
 }
 
 type cookieNames struct {
-	session, oauth, access, emailLogin, passkey string
+	session, oauth, access, emailLogin, passkey, setup, setupOwner string
 }
 
 // New builds the handler.
@@ -92,20 +103,29 @@ func New(o Options) (*Server, error) {
 		client = &http.Client{Timeout: 15 * time.Second}
 	}
 	s := &Server{
-		cfg:      o.Config,
-		store:    o.Store,
-		registry: o.Registry,
-		manage:   o.Manage,
-		mailer:   o.Mailer,
-		log:      o.Logger,
-		signer:   signer{key: o.Secret},
-		nonces:   newNonceSet(),
-		codes:    newCodeStore(),
-		version:  o.Version,
-		hostKey:  o.HostKey,
+		cfg:       o.Config,
+		store:     o.Store,
+		registry:  o.Registry,
+		manage:    o.Manage,
+		settings:  o.Settings,
+		mailer:    o.Mailer,
+		mailerFor: o.MailerFor,
+		log:       o.Logger,
+		signer:    signer{key: o.Secret},
+		nonces:    newNonceSet(),
+		codes:     newCodeStore(),
+		version:   o.Version,
+		hostKey:   o.HostKey,
+	}
+	switch {
+	case s.mailerFor != nil:
+	case s.mailer != nil:
+		s.mailerFor = func(config.EmailConfig) mail.Sender { return o.Mailer }
+	default:
+		s.mailerFor = func(c config.EmailConfig) mail.Sender { return mail.New(c, s.log) }
 	}
 	if s.mailer == nil {
-		s.mailer = mail.New(s.cfg.Auth.Email, s.log)
+		s.mailer = s.settings.Mailer(s.log)
 	}
 	// The __Host- prefix stops tunnel subdomains, which serve arbitrary
 	// content, from planting cookies for the dashboard (or each other).
@@ -119,6 +139,8 @@ func New(o Options) (*Server, error) {
 		access:     prefix + "intergate-access",
 		emailLogin: prefix + "intergate-email",
 		passkey:    prefix + "intergate-passkey",
+		setup:      prefix + "intergate-setup",
+		setupOwner: prefix + "intergate-setup-owner",
 	}
 	if s.cfg.PasskeysEnabled() {
 		wa, err := webauthn.New(&webauthn.Config{
@@ -211,11 +233,15 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, "Not found.")
 	})
-	if s.cfg.Auth.Email.Enabled() {
-		mux.Handle("POST /api/login/email", s.sameOrigin(s.handleEmailLogin))
-		mux.Handle("DELETE /api/login/email", s.sameOrigin(s.handleEmailCancel))
-		mux.Handle("POST /api/login/code", s.sameOrigin(s.handleCodeLogin))
-	}
+	// Email delivery can be set up while intergate runs, from the setup.
+	mux.Handle("POST /api/login/email", s.sameOrigin(s.withEmail(s.handleEmailLogin)))
+	mux.Handle("DELETE /api/login/email", s.sameOrigin(s.withEmail(s.handleEmailCancel)))
+	mux.Handle("POST /api/login/code", s.sameOrigin(s.withEmail(s.handleCodeLogin)))
+	mux.Handle("POST /api/setup/start", s.setupCall(true, s.handleSetupStart))
+	mux.Handle("POST /api/setup/email", s.setupCall(false, s.handleSetupEmail))
+	mux.Handle("POST /api/setup/owner", s.setupCall(false, s.handleSetupOwner))
+	mux.Handle("DELETE /api/setup/owner", s.setupCall(false, s.handleSetupOwnerCancel))
+	mux.Handle("POST /api/setup/owner/code", s.setupCall(false, s.handleSetupOwnerCode))
 	if s.webauthn != nil {
 		mux.Handle("POST /api/login/passkey/options", s.sameOrigin(s.handlePasskeyLoginOptions))
 		mux.Handle("POST /api/login/passkey", s.sameOrigin(s.handlePasskeyLogin))
@@ -249,6 +275,10 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("POST /api/admin/users", admin(s.handleAdminCreateUser))
 	mux.Handle("PATCH /api/admin/users/{id}", admin(s.handleAdminUpdateUser))
 	mux.Handle("DELETE /api/admin/users/{id}", admin(s.handleAdminDeleteUser))
+	mux.Handle("GET /api/admin/email", admin(s.handleAdminRelay))
+	mux.Handle("POST /api/admin/email", admin(s.relayOwner(s.handleAdminRelayChange)))
+	mux.Handle("POST /api/admin/email/confirm", admin(s.relayOwner(s.handleAdminRelayConfirm)))
+	mux.Handle("DELETE /api/admin/email/pending", admin(s.relayOwner(s.handleAdminRelayCancel)))
 
 	return s.securityHeaders(s.withSession(mux))
 }
@@ -423,7 +453,8 @@ func (s *Server) ssh() string {
 	return "ssh"
 }
 
-// sshCommand is the command a user runs to expose localhost:3000.
+// sshCommand is the command a user runs to expose localhost:3000. The
+// dashboard swaps in the port its user types.
 func (s *Server) sshCommand(name string) string {
 	return fmt.Sprintf("%s -R %s:80:localhost:3000 %s", s.ssh(), name, s.cfg.SSHHost())
 }

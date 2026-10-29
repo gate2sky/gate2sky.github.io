@@ -294,3 +294,46 @@ func TestPorts(t *testing.T) {
 		t.Errorf("port of a deleted subdomain: %v", err)
 	}
 }
+
+func TestSettingsAndManagers(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	if _, err := s.Setting(ctx, "email"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing setting: %v", err)
+	}
+	for _, v := range []string{`{"a":1}`, `{"a":2}`} {
+		if err := s.SetSetting(ctx, "email", v); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := s.Setting(ctx, "email"); err != nil || got != v {
+			t.Fatalf("setting = %q, %v; want %q", got, err, v)
+		}
+	}
+	if err := s.DeleteSetting(ctx, "email"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Setting(ctx, "email"); !errors.Is(err, ErrNotFound) || s.DeleteSetting(ctx, "email") != nil {
+		t.Errorf("deleted setting: %v", err)
+	}
+
+	has := func() bool {
+		t.Helper()
+		ok, err := s.HasManagers(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ok
+	}
+	u, _ := s.CreateUser(ctx, "owner@example.com", "")
+	if has() {
+		t.Error("a plain user counts as a manager")
+	}
+	s.SetUserRole(ctx, u.ID, RoleOwner)
+	if !has() {
+		t.Error("an owner does not count")
+	}
+	s.SetUserDisabled(ctx, u.ID, true)
+	if has() {
+		t.Error("a disabled owner counts")
+	}
+}
