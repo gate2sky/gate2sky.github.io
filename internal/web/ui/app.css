@@ -462,16 +462,15 @@ select.field:focus { outline: none; border-color: var(--accent); box-shadow: var
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   font: inherit; font-size: 14px; font-weight: 600; line-height: 20px; padding: 9px 16px; border-radius: var(--radius-control);
   border: 0; color: var(--accent-fg); cursor: pointer; white-space: nowrap;
-  /* Glossy glass: a sheen over the top half and a glow coming up from the
-     bottom, on a tinted fill that lets what is behind show, blurred. */
+  /* Glossy glass, flat: a soft sheen fading down from a bright top edge,
+     on a tinted fill that lets what is behind show, blurred. */
   background:
-    linear-gradient(180deg, rgb(255 255 255 / .34), rgb(255 255 255 / .12) 48%, transparent 52%),
-    radial-gradient(120% 60% at 50% 115%, color-mix(in srgb, color-mix(in srgb, var(--accent) 40%, #fff) 80%, transparent) 0, transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, color-mix(in srgb, var(--accent) 88%, #fff) 72%, transparent), color-mix(in srgb, color-mix(in srgb, var(--accent) 88%, #000) 82%, transparent));
+    linear-gradient(180deg, rgb(255 255 255 / .26), rgb(255 255 255 / .06) 60%, rgb(255 255 255 / 0)),
+    linear-gradient(180deg, color-mix(in srgb, color-mix(in srgb, var(--accent) 92%, #fff) 76%, transparent), color-mix(in srgb, color-mix(in srgb, var(--accent) 96%, #000) 80%, transparent));
   -webkit-backdrop-filter: blur(12px) saturate(170%);
   backdrop-filter: blur(12px) saturate(170%);
-  box-shadow: 0 1px 0 rgb(255 255 255 / .45) inset, 0 -1px 0 rgb(0 0 0 / .12) inset,
-    0 0 0 .5px color-mix(in srgb, var(--accent) 65%, #000), 0 1px 3px rgb(0 0 0 / .2);
+  box-shadow: 0 1px 0 rgb(255 255 255 / .5) inset,
+    0 0 0 .5px color-mix(in srgb, var(--accent) 65%, #000), 0 1px 2px rgb(0 0 0 / .16);
   text-shadow: 0 -.5px 0 rgb(0 0 0 / .18);
   transition: filter .12s, transform .06s;
 }
