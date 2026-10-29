@@ -267,6 +267,7 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 .muted { color: var(--muted); font-weight: normal; }
 .small { font-size: 12px; }
 .right { text-align: right; }
+.center, .table th.center { text-align: center; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Messages and the HUD toast */
@@ -402,8 +403,6 @@ select.role:disabled { opacity: .6; cursor: default; }
 .switch input:disabled { opacity: .45; cursor: default; }
 @media (prefers-reduced-motion: reduce) { .switch input, .switch input::before { transition: none; } }
 
-.row-tools { white-space: nowrap; }
-.row-tools > * + * { margin-left: 10px; }
 .icon-button {
   display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; vertical-align: middle;
   padding: 0; border: 0; border-radius: 7px; background: none; color: var(--muted); cursor: pointer;

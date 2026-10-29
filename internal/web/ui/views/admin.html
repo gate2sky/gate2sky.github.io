@@ -106,7 +106,7 @@
 <section :if="tab === 'users'" class="card" role="tabpanel" aria-label="Users">
   <div class="table-wrap">
     <table class="table">
-      <thead><tr><th>User</th><th>Role</th><th class="hide-narrow">Sign-in</th><th class="hide-narrow">Subdomains</th><th class="hide-narrow">Last sign-in</th><th class="right">Enabled</th></tr></thead>
+      <thead><tr><th>User</th><th>Role</th><th class="hide-narrow">Sign-in</th><th class="hide-narrow">Subdomains</th><th class="hide-narrow">Last sign-in</th><th class="center">Enabled</th><th></th></tr></thead>
       <tbody>
         <tr :each="user in users" :key="user.id" :class.disabled="user.disabled">
           <td>
@@ -127,11 +127,13 @@
           <td class="small hide-narrow">{{ signIn(user) }}</td>
           <td class="hide-narrow">{{ user.subdomains }}</td>
           <td class="hide-narrow">{{ ago(user.last_login_at) }}</td>
-          <td class="right keep row-tools">
+          <td class="center keep">
             <label class="switch" :title="user.disabled ? 'Disabled' : 'Enabled'">
               <input type="checkbox" role="switch" :checked="!user.disabled" :disabled="user.id === app.user.id || (!owner && user.role === 'owner')"
                      :aria-label="(user.disabled ? 'Enable ' : 'Disable ') + user.email" @change="setDisabled(user, !$event.target.checked)">
             </label>
+          </td>
+          <td class="right keep">
             <button type="button" class="icon-button danger" :disabled="!canManage(user)" :aria-label="'Delete ' + user.email" title="Delete"
                     @click="askDelete(user)">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
