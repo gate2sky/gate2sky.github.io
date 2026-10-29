@@ -40,6 +40,16 @@
     load()
   }
 
+  const setAdmin = async (user, admin) => {
+    try {
+      await api("PATCH", "/admin/users/" + user.id, { admin })
+      toast(admin ? `${user.email} is now an administrator.` : `${user.email} is no longer an administrator.`)
+    } catch (e) {
+      toast(e.message, "error")
+    }
+    load()
+  }
+
   let email = ""
   let error = ""
   const addUser = async () => {
@@ -47,10 +57,7 @@
     try {
       const user = await api("POST", "/admin/users", { email })
       email = ""
-      toast(user.allowed
-        ? `Added ${user.email}. They can now sign in with their email.`
-        : `Added ${user.email}, but auth.allowed_* in the configuration does not let them sign in yet.`,
-        user.allowed ? "ok" : "error")
+      toast(`Added ${user.email}. They can now sign in with their email.`)
       load()
     } catch (e) {
       error = e.message
@@ -92,17 +99,20 @@
         <tr :each="user in users" :key="user.id" :class.disabled="user.disabled">
           <td>
             <strong>{{ user.name || user.email }}</strong>
-            <span :if="user.admin" class="badge">admin</span>
+            <span :if="user.admin" class="badge" :title="user.config_admin ? 'Set by auth.admins in the configuration' : null">admin</span>
             <div :if="user.name" class="muted small">{{ user.email }}</div>
-            <div :if="!user.allowed" class="small danger">not allowed by the configuration</div>
+            <div :if="!user.allowed" class="small danger">not allowed by the configuration: add them again to let them in</div>
           </td>
           <td class="small hide-narrow">{{ signIn(user) }}</td>
           <td class="hide-narrow">{{ user.subdomains }}</td>
           <td class="hide-narrow">{{ ago(user.last_login_at) }}</td>
-          <td class="right">
+          <td class="right row-actions">
             <span :if="user.id === app.user.id" class="muted small">you</span>
-            <button :elseif="user.disabled" type="button" class="link" @click="setDisabled(user, false)">Enable</button>
-            <button :else type="button" class="link danger" @click="setDisabled(user, true)">Disable</button>
+            <span :elseif="user.config_admin" class="muted small" title="Set by auth.admins in the configuration">admin by configuration</span>
+            <button :elseif="user.admin" type="button" class="link" @click="setAdmin(user, false)">Remove admin</button>
+            <button :else type="button" class="link" @click="setAdmin(user, true)">Make admin</button>
+            <button :if="user.id !== app.user.id && user.disabled" type="button" class="link" @click="setDisabled(user, false)">Enable</button>
+            <button :elseif="user.id !== app.user.id" type="button" class="link danger" @click="setDisabled(user, true)">Disable</button>
           </td>
         </tr>
       </tbody>
@@ -114,5 +124,5 @@
            autocomplete="off" :value="email" @input="email = $event.target.value">
     <button type="submit" class="button button-secondary">Add user</button>
   </form>
-  <p class="hint">Added users sign in with that email address. Who may sign in at all is set by <code>auth.allowed_*</code> in the configuration.</p>
+  <p class="hint">Added users sign in with that email address, whatever <code>auth.allowed_*</code> says. Administrators listed in <code>auth.admins</code> keep the role; others get and lose it here.</p>
 </section>

@@ -67,7 +67,7 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user *stor
 	if user.Disabled {
 		return "Your account has been disabled by an administrator.", false
 	}
-	if !s.cfg.EmailAllowed(user.Email) {
+	if !s.cfg.UserAllowed(user.Email, user.Added, user.Admin) {
 		s.log.Info("sign-in denied", "method", method, "email", user.Email)
 		return fmt.Sprintf("The account %s is not allowed to use this gate2sky.", user.Email), false
 	}
@@ -154,7 +154,7 @@ func (s *Server) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		id.AvatarURL = "" // the dashboard's CSP only loads HTTPS images
 	}
 	// Check before creating an account for someone who may not sign in.
-	if !s.cfg.EmailAllowed(id.Email) {
+	if !s.emailAllowed(r.Context(), id.Email) {
 		s.log.Info("sign-in denied", "method", p.ID(), "email", id.Email)
 		s.pageError(w, r, http.StatusForbidden, fmt.Sprintf("The account %s is not allowed to use this gate2sky.", id.Email))
 		return

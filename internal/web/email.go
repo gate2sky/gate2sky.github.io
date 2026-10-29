@@ -206,11 +206,18 @@ func (s *Server) handleEmailCancel(w http.ResponseWriter, r *http.Request) {
 
 // mayUseEmail reports whether a code should be sent to email.
 func (s *Server) mayUseEmail(ctx context.Context, email string) bool {
-	if !s.cfg.EmailAllowed(email) {
-		return false
-	}
 	u, err := s.store.UserByEmail(ctx, email)
-	return err != nil || !u.Disabled
+	return s.emailAllowed(ctx, email) && (err != nil || !u.Disabled)
+}
+
+// emailAllowed reports whether whoever proves they own email may sign in:
+// the configuration allows it, or its account was added by an
+// administrator or made one.
+func (s *Server) emailAllowed(ctx context.Context, email string) bool {
+	if u, err := s.store.UserByEmail(ctx, email); err == nil {
+		return s.cfg.UserAllowed(u.Email, u.Added, u.Admin)
+	}
+	return s.cfg.EmailAllowed(email)
 }
 
 func (s *Server) emailFlow(r *http.Request) (*emailFlow, bool) {

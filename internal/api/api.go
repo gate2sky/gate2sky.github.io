@@ -72,6 +72,9 @@ type User struct {
 	Name        string    `json:"name"`
 	Disabled    bool      `json:"disabled"`
 	Admin       bool      `json:"admin"`
+	// ConfigAdmin is set when auth.admins makes the user an administrator,
+	// which the dashboard cannot take away.
+	ConfigAdmin bool      `json:"config_admin"`
 	Allowed     bool      `json:"allowed"`
 	Subdomains  int       `json:"subdomains"`
 	Passkeys    int       `json:"passkeys"`
@@ -83,7 +86,7 @@ type User struct {
 func NewUser(cfg *config.Config, u store.UserSummary) User {
 	return User{
 		ID: u.ID, Email: u.Email, Name: u.Name, Disabled: u.Disabled,
-		Admin: cfg.IsAdmin(u.Email), Allowed: cfg.EmailAllowed(u.Email),
+		Admin: cfg.UserAdmin(u.Email, u.Admin), ConfigAdmin: cfg.IsAdmin(u.Email), Allowed: cfg.UserAllowed(u.Email, u.Added, u.Admin),
 		Subdomains: u.Subdomains, Passkeys: u.Passkeys, Providers: u.Providers, LastLoginAt: u.LastLoginAt,
 	}
 }

@@ -314,21 +314,35 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	var req struct {
 		Disabled *bool `json:"disabled"`
+		Admin    *bool `json:"admin"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	if req.Disabled == nil {
+	if req.Disabled == nil && req.Admin == nil {
 		jsonError(w, http.StatusBadRequest, "Nothing to change.")
 		return
 	}
-	if id == a.User.ID && *req.Disabled {
+	if id == a.User.ID && req.Disabled != nil && *req.Disabled {
 		jsonError(w, http.StatusBadRequest, "You can't disable your own account.")
 		return
 	}
-	if err := s.manage.SetUserDisabled(r.Context(), id, *req.Disabled, a.User.Email); err != nil {
-		s.fail(w, "set user disabled", err)
+	// Another administrator has to take the role away, so there is always one.
+	if id == a.User.ID && req.Admin != nil && !*req.Admin {
+		jsonError(w, http.StatusBadRequest, "You can't remove your own administrator role.")
 		return
+	}
+	if req.Disabled != nil {
+		if err := s.manage.SetUserDisabled(r.Context(), id, *req.Disabled, a.User.Email); err != nil {
+			s.fail(w, "set user disabled", err)
+			return
+		}
+	}
+	if req.Admin != nil {
+		if err := s.manage.SetUserAdmin(r.Context(), id, *req.Admin, a.User.Email); err != nil {
+			s.fail(w, "set user admin", err)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

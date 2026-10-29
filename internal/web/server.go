@@ -267,8 +267,8 @@ func (s *Server) withSession(next http.Handler) http.Handler {
 		if c, err := r.Cookie(s.cookies.session); err == nil && c.Value != "" {
 			sess, user, err := s.store.SessionByToken(r.Context(), c.Value)
 			switch {
-			case err == nil && s.cfg.EmailAllowed(user.Email):
-				a := &authInfo{Session: sess, User: user, Admin: s.cfg.IsAdmin(user.Email)}
+			case err == nil && s.cfg.UserAllowed(user.Email, user.Added, user.Admin):
+				a := &authInfo{Session: sess, User: user, Admin: s.cfg.UserAdmin(user.Email, user.Admin)}
 				r = r.WithContext(context.WithValue(r.Context(), authKey, a))
 			case err != nil && !errors.Is(err, store.ErrNotFound):
 				s.log.Error("load session", "err", err)

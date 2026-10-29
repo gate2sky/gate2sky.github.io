@@ -463,6 +463,19 @@ func (c *Config) EmailAllowed(email string) bool {
 	return at >= 0 && contains(c.Auth.AllowedDomains, email[at+1:])
 }
 
+// UserAllowed reports whether an account may sign in and keep using
+// gate2sky: the configuration allows its email, or an administrator added
+// it or made it an administrator.
+func (c *Config) UserAllowed(email string, added, admin bool) bool {
+	return added || admin || c.EmailAllowed(email)
+}
+
+// UserAdmin reports whether an account is an administrator: listed in
+// auth.admins, or given the role from the dashboard.
+func (c *Config) UserAdmin(email string, admin bool) bool {
+	return admin || c.IsAdmin(email)
+}
+
 func contains(list []string, v string) bool {
 	for _, s := range list {
 		if s == v {

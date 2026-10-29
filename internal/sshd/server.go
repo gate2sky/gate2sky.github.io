@@ -97,7 +97,8 @@ func (s *Server) authenticate(meta ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Pe
 }
 
 // grants returns the subdomains a key may use right now: the owner must
-// still be enabled and allowed by the auth configuration.
+// still be enabled, and allowed by the auth configuration or added by an
+// administrator.
 func (s *Server) grants(ctx context.Context, fingerprint, publicKey string) ([]store.Grant, error) {
 	all, err := s.store.GrantsForKey(ctx, fingerprint)
 	if err != nil {
@@ -105,7 +106,7 @@ func (s *Server) grants(ctx context.Context, fingerprint, publicKey string) ([]s
 	}
 	out := all[:0]
 	for _, g := range all {
-		if g.PublicKey == publicKey && s.cfg.EmailAllowed(g.OwnerEmail) {
+		if g.PublicKey == publicKey && s.cfg.UserAllowed(g.OwnerEmail, g.OwnerAdded, g.OwnerAdmin) {
 			out = append(out, g)
 		}
 	}

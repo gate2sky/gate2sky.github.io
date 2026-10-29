@@ -217,7 +217,9 @@ Highlights:
   Microsoft Entra ID, Keycloak, Authentik...). Their callback URL is
   `<public_url>/auth/<id>/callback`.
 - `auth.admins`, `auth.allowed_emails`, `auth.allowed_domains`,
-  `auth.allow_everyone`: who may sign in.
+  `auth.allow_everyone`: who may sign in. Users an administrator adds from
+  the dashboard or `gate2sky config` may sign in too, and administrators can
+  give and take the administrator role there; `auth.admins` always keep it.
 - `ssh.proxy_protocol`: expect a PROXY protocol header from a load balancer.
 
 For local development, `*.localhost` resolves to 127.0.0.1 in browsers:

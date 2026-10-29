@@ -240,7 +240,9 @@ func validEmail(email string) error {
 	return nil
 }
 
-// CreateUser adds an account that can then sign in with its email.
+// CreateUser adds an account that can then sign in with its email, whatever
+// auth.allowed_* says. An account that exists but may not sign in, such as
+// one the configuration no longer allows, gets that access too.
 func (s *Service) CreateUser(ctx context.Context, email, actor string) (*store.User, error) {
 	email = store.NormalizeEmail(email)
 	if err := validEmail(email); err != nil {
@@ -248,15 +250,20 @@ func (s *Service) CreateUser(ctx context.Context, email, actor string) (*store.U
 	}
 	u, err := s.store.CreateUser(ctx, email, "")
 	if errors.Is(err, store.ErrConflict) {
-		return nil, Errorf("%s already has an account", email)
-	}
-	if err != nil {
+		if u, err = s.store.UserByEmail(ctx, email); err != nil {
+			return nil, err
+		}
+		if s.cfg.UserAllowed(u.Email, u.Added, u.Admin) {
+			return nil, Errorf("%s already has an account", email)
+		}
+	} else if err != nil {
 		return nil, err
 	}
-	if !s.cfg.EmailAllowed(email) {
-		s.log.Warn("created a user the auth configuration does not allow to sign in", "email", email)
+	if err := s.store.SetUserAdded(ctx, u.ID); err != nil {
+		return nil, err
 	}
-	s.log.Info("user created", "email", email, "by", actor)
+	u.Added = true
+	s.log.Info("user added", "email", email, "by", actor)
 	return u, nil
 }
 
@@ -290,6 +297,26 @@ func (s *Service) SetUserDisabled(ctx context.Context, userID int64, disabled bo
 		}
 	}
 	s.log.Info("user updated", "user_id", userID, "disabled", disabled, "by", actor)
+	return nil
+}
+
+// SetUserAdmin gives or takes the administrator role. Addresses in
+// auth.admins stay administrators whatever it is set to.
+func (s *Service) SetUserAdmin(ctx context.Context, userID int64, admin bool, actor string) error {
+	u, err := s.store.UserByID(ctx, userID)
+	if errors.Is(err, store.ErrNotFound) {
+		return Errorf("user not found")
+	}
+	if err != nil {
+		return err
+	}
+	if !admin && s.cfg.IsAdmin(u.Email) {
+		return Errorf("%s is an administrator in the configuration (auth.admins)", u.Email)
+	}
+	if err := s.store.SetUserAdmin(ctx, userID, admin); err != nil {
+		return err
+	}
+	s.log.Info("user updated", "user_id", userID, "admin", admin, "by", actor)
 	return nil
 }
 

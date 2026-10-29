@@ -802,6 +802,65 @@ func TestDisableUserClosesTunnels(t *testing.T) {
 	}
 }
 
+func TestAddedUsersAndRoles(t *testing.T) {
+	h := newHarness(t)
+	admin := h.loggedIn("admin@example.com")
+	byEmail := func(email string) api.User {
+		t.Helper()
+		_, body := call(t, admin, "GET", "/api/admin/users", nil)
+		for _, u := range decode[[]api.User](t, body) {
+			if u.Email == email {
+				return u
+			}
+		}
+		t.Fatalf("no user %s", email)
+		return api.User{}
+	}
+	isAdmin := func(c *http.Client) bool {
+		resp, _ := call(t, c, "GET", "/api/admin/users", nil)
+		return resp.StatusCode == http.StatusOK
+	}
+
+	// auth.allowed_* does not let carol in, until an administrator adds her.
+	requestCode(t, h.browser(true), "carol@other.test", "/")
+	h.mail.none(t)
+	resp, body := call(t, admin, "POST", "/api/admin/users", map[string]string{"email": "carol@other.test"})
+	if u := decode[api.User](t, body); resp.StatusCode != http.StatusCreated || !u.Allowed || u.Admin {
+		t.Fatalf("add user: %d %+v", resp.StatusCode, u)
+	}
+	carol := h.browser(true)
+	h.emailLogin(carol, "carol@other.test", "/")
+	if isAdmin(carol) {
+		t.Fatal("an added user is an administrator")
+	}
+
+	// The role applies from the next request, and only another
+	// administrator takes it away; auth.admins always stays.
+	id := byEmail("carol@other.test").ID
+	if resp, _ := call(t, admin, "PATCH", fmt.Sprintf("/api/admin/users/%d", id), map[string]bool{"admin": true}); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("make admin: %d", resp.StatusCode)
+	}
+	if !isAdmin(carol) || !byEmail("carol@other.test").Admin {
+		t.Fatal("not an administrator after getting the role")
+	}
+	if resp, _ := call(t, carol, "PATCH", fmt.Sprintf("/api/admin/users/%d", id), map[string]bool{"admin": false}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("removes own role: %d", resp.StatusCode)
+	}
+	cfgAdmin := byEmail("admin@example.com")
+	if !cfgAdmin.ConfigAdmin {
+		t.Errorf("admin@example.com not marked as a configured administrator: %+v", cfgAdmin)
+	}
+	if resp, _ := call(t, carol, "PATCH", fmt.Sprintf("/api/admin/users/%d", cfgAdmin.ID), map[string]bool{"admin": false}); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("removes a configured administrator's role: %d", resp.StatusCode)
+	}
+	if resp, _ := call(t, admin, "PATCH", fmt.Sprintf("/api/admin/users/%d", id), map[string]bool{"admin": false}); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("remove admin: %d", resp.StatusCode)
+	}
+	if isAdmin(carol) {
+		t.Error("still an administrator after losing the role")
+	}
+}
+
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
