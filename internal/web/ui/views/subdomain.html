@@ -231,7 +231,7 @@
 
   <section class="card danger-zone">
     <h2>Delete subdomain</h2>
-    <p>Closes the tunnel and removes {{ sub.name }}.{{ app.domain }}, its keys and its TCP ports. The name becomes available to anyone.</p>
+    <p>Closes the tunnel and removes {{ sub.name }}.{{ app.domain }}, its keys and its ports. The name becomes available to anyone.</p>
     <form class="form form-row" @submit.prevent="remove">
       <input name="confirm" required autocomplete="off" spellcheck="false" :placeholder="'type ' + sub.name + ' to confirm'"
              :aria-label="'Type ' + sub.name + ' to confirm'" :value="confirmName" @input="confirmName = $event.target.value">

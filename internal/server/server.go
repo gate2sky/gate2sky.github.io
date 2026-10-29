@@ -96,6 +96,7 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 		Logger:     log.With("component", "web"),
 		HTTPClient: opts.HTTPClient,
 		Version:    opts.Version,
+		HostKey:    ssh.FingerprintSHA256(s.hostKey.PublicKey()),
 	})
 	if err != nil {
 		s.store.Close()
@@ -113,6 +114,9 @@ func (s *Server) Store() *store.Store { return s.store }
 
 // Registry returns the live tunnels.
 func (s *Server) Registry() *tunnel.Registry { return s.registry }
+
+// HostKey returns the SSH host key.
+func (s *Server) HostKey() ssh.PublicKey { return s.hostKey.PublicKey() }
 
 // Ports returns the forwarded TCP ports.
 func (s *Server) Ports() *ports.Registry { return s.ports }

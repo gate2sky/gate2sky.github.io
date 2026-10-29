@@ -1,5 +1,5 @@
 <script :setup="{ sub = null }">
-  // A subdomain's TCP ports: each with its public address, who may connect
+  // A subdomain's TCP and UDP ports: each with its public address, who may connect
   // and whether a client forwards it now; the command that forwards them
   // all; and a form to add one from a preset. Tells its page to reload
   // with a `changed` event.
@@ -25,9 +25,13 @@
     { id: "minecraft", label: "Minecraft (Java)", name: "minecraft", port: 25565, restricted: false },
     { id: "mqtt", label: "MQTT", name: "mqtt", port: 1883, restricted: true,
       warn: "Plain MQTT is unencrypted; use port 8883 if your broker has TLS." },
-    { id: "", label: "Custom", name: "", port: "", restricted: true },
+    { id: "minecraft-bedrock", label: "Minecraft Bedrock (UDP)", name: "bedrock", port: 19132, restricted: false, udp: true },
+    { id: "valheim", label: "Valheim (UDP)", name: "valheim", port: 2456, restricted: false, udp: true },
+    { id: "wireguard", label: "WireGuard (UDP)", name: "wireguard", port: 51820, restricted: false, udp: true },
+    { id: "", label: "Custom TCP", name: "", port: "", restricted: true },
+    { id: "custom-udp", label: "Custom UDP", name: "", port: "", restricted: true, udp: true },
   ]
-  const presetOf = id => PRESETS.find(p => p.id === id) || PRESETS[PRESETS.length - 1]
+  const presetOf = id => PRESETS.find(p => p.id === id) || PRESETS.find(p => p.id === "")
 
   const path = () => "/subdomains/" + encodeURIComponent(sub.name)
   const lines = text => text.split(/[\s,]+/).filter(Boolean)
@@ -68,7 +72,8 @@
     error = ""
     busy = true
     try {
-      const port = await api("POST", path() + "/ports", { ...body(name, localPort, restricted, allowText), preset })
+      const protocol = presetOf(preset).udp ? "udp" : "tcp"
+      const port = await api("POST", path() + "/ports", { ...body(name, localPort, restricted, allowText), preset, protocol })
       addDialog().close()
       toast(`Added ${port.name}: ${port.address}.`)
       $emit("changed")
@@ -133,11 +138,13 @@
   const access = port => port.allow.length ? port.allow.join(", ") : "Anyone"
   $: full = sub.port_list.length >= app.tcp.max_ports
   $: warning = presetOf(preset).warn
+  $: udp = !!presetOf(preset).udp
+  $: hasUDP = sub.port_list.some(port => port.protocol === "udp")
 </script>
 
 <section class="card tcp-ports">
   <div class="card-head">
-    <h2>TCP ports</h2>
+    <h2>Ports</h2>
     <div class="card-head-actions">
       <span class="count">{{ sub.port_list.length }} of {{ app.tcp.max_ports }}</span>
       <button :if="!full" type="button" class="button button-secondary button-small" @click="startAdd">
@@ -145,7 +152,7 @@
       </button>
     </div>
   </div>
-  <p class="muted">Raw TCP on <strong>{{ app.tcp.host }}</strong> for databases, SSH, games… Each port has a public number of its own, and only the addresses you allow can connect.</p>
+  <p class="muted">Raw TCP and UDP on <strong>{{ app.tcp.host }}</strong> for databases, SSH, games… Each port has a public number of its own, and only the addresses you allow can connect.</p>
 
   <div :if="sub.port_list.length" class="table-wrap">
     <table class="table">
@@ -154,7 +161,7 @@
         <tr :each="port in sub.port_list" :key="port.id">
           <td>
             <strong>{{ port.name }}</strong>
-            <div class="muted small">{{ presetOf(port.preset).id ? presetOf(port.preset).label + " · " : "" }}localhost:{{ port.local_port }}</div>
+            <div class="muted small"><span class="proto">{{ port.protocol }}</span> {{ presetOf(port.preset).id && !presetOf(port.preset).label.startsWith("Custom") ? presetOf(port.preset).label.replace(" (UDP)", "") + " · " : "" }}localhost:{{ port.local_port }}</div>
           </td>
           <td class="keep">
             <span class="address">
@@ -186,9 +193,14 @@
       </tbody>
     </table>
   </div>
-  <p :else class="empty-inline">No TCP ports yet.</p>
+  <p :else class="empty-inline">No ports yet.</p>
 
-  <div :if="sub.ports_command">
+  <div :if="hasUDP && sub.tunnel_command">
+    <p class="muted">To forward them, UDP included, with the gate2sky client and an authorized key (ssh-agent or <code>-i</code>):</p>
+    <CopyText :command="sub.tunnel_command" />
+    <p class="muted small">Plain <code>ssh</code> only carries TCP. The script downloads the client for this server, checks it and deletes it when it ends (<code>sh -s -- --cache …</code> keeps it). Add <code>--http 3000</code> for the HTTP tunnel. UDP over SSH suits games and DNS-like traffic; fast-paced games and calls may feel jittery.</p>
+  </div>
+  <div :elseif="sub.ports_command">
     <p class="muted">To forward them, with an authorized key:</p>
     <CopyText :command="sub.ports_command" />
     <p class="muted small">Each <code>-R</code> names a port as <code>&lt;port&gt;.{{ sub.name }}</code>; change the local ports to yours. You can add these to the HTTP tunnel’s command.</p>
@@ -216,6 +228,7 @@
       </label>
     </div>
     <div :if="warning" class="flash flash-warn">{{ warning }}</div>
+    <div :if="udp" class="flash flash-info">UDP ports are forwarded with the gate2sky client, not plain <code>ssh</code>: the page shows the command once the port exists.</div>
     <fieldset>
       <legend>Who can connect</legend>
       <label class="radio tone-green">

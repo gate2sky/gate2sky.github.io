@@ -163,7 +163,7 @@
 <section :elseif="tab === 'subdomains'" class="card" role="tabpanel" aria-label="Subdomains">
   <div :if="subdomains.length" class="table-wrap">
     <table class="table">
-      <thead><tr><th>Subdomain</th><th class="hide-narrow">Owner</th><th>Access</th><th class="hide-narrow">Keys</th><th :if="app.tcp" class="hide-narrow">TCP ports</th><th>Status</th><th class="hide-narrow">Requests</th></tr></thead>
+      <thead><tr><th>Subdomain</th><th class="hide-narrow">Owner</th><th>Access</th><th class="hide-narrow">Keys</th><th :if="app.tcp" class="hide-narrow">Ports</th><th>Status</th><th class="hide-narrow">Requests</th></tr></thead>
       <tbody>
         <tr :each="sub in subdomains" :key="sub.name">
           <td><a class="name-cell" :href="'/subdomains/' + encodeURIComponent(sub.name)"><span class="tile" :class="'tile-' + sub.access" aria-hidden="true">{{ sub.name[0] }}</span><strong>{{ sub.name }}</strong></a></td>
@@ -181,7 +181,7 @@
     </table>
   </div>
   <p :else class="empty-inline">No subdomains registered.</p>
-  <p :if="app.tcp" class="hint">TCP ports {{ app.tcp.first }}–{{ app.tcp.last }}: {{ portsUsed }} of {{ app.tcp.last - app.tcp.first + 1 }} in use, at most {{ app.tcp.max_ports }} per subdomain.</p>
+  <p :if="app.tcp" class="hint">Ports {{ app.tcp.first }}–{{ app.tcp.last }}: {{ portsUsed }} of {{ app.tcp.last - app.tcp.first + 1 }} in use, at most {{ app.tcp.max_ports }} per subdomain.</p>
 </section>
 
 

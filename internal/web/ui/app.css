@@ -440,6 +440,7 @@ select.field {
   border: .5px solid var(--field-line); border-radius: var(--radius-control); box-shadow: 0 .5px 1px rgb(0 0 0 / .12) inset;
 }
 select.field:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+.proto { text-transform: uppercase; font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 1px 5px; border-radius: 4px; background: var(--fill); }
 .address { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .address code { font-size: 13px; }
 .warn { color: var(--warn); font-weight: 600; }

@@ -3,6 +3,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"embed"
@@ -14,7 +15,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
 	"strings"
+	texttemplate "text/template"
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -46,6 +49,8 @@ type Options struct {
 	HTTPClient *http.Client
 	// Version is shown in the dashboard's footer.
 	Version string
+	// HostKey is the SSH host key's fingerprint, for /tunnel.sh.
+	HostKey string
 }
 
 // Server is the HTTP handler for the dashboard and all tunnels.
@@ -64,6 +69,8 @@ type Server struct {
 	providers []provider
 	shell     *template.Template
 	tunnelErr *template.Template
+	tunnelSh  *texttemplate.Template
+	hostKey   string
 	ui        map[string]uiFile
 	dashboard http.Handler
 	proxy     *httputil.ReverseProxy
@@ -94,6 +101,7 @@ func New(o Options) (*Server, error) {
 		nonces:   newNonceSet(),
 		codes:    newCodeStore(),
 		version:  o.Version,
+		hostKey:  o.HostKey,
 	}
 	if s.mailer == nil {
 		s.mailer = mail.New(s.cfg.Auth.Email, s.log)
@@ -140,6 +148,9 @@ func New(o Options) (*Server, error) {
 	if s.tunnelErr, err = template.ParseFS(assets, "templates/tunnel_error.html"); err != nil {
 		return nil, fmt.Errorf("web: %w", err)
 	}
+	if s.tunnelSh, err = texttemplate.ParseFS(assets, "templates/tunnel.sh"); err != nil {
+		return nil, fmt.Errorf("web: %w", err)
+	}
 	if s.ui, err = loadUI(); err != nil {
 		return nil, fmt.Errorf("web: %w", err)
 	}
@@ -174,6 +185,7 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /ui/", s.serveUI)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
+	mux.HandleFunc("GET /tunnel.sh", s.handleTunnelScript)
 
 	// Pages: the same shell for each, and the app draws the one its path
 	// names. Signed out, every page is the sign-in form.
@@ -425,6 +437,55 @@ func (s *Server) portsCommand(name string, list []*store.Port) string {
 		return ""
 	}
 	return cmd + " " + s.cfg.SSHHost()
+}
+
+// tunnelCommand runs the gate2sky client for every port of a subdomain,
+// or is "" without any.
+func (s *Server) tunnelCommand(name string, list []*store.Port) string {
+	if len(list) == 0 {
+		return ""
+	}
+	cmd := "curl -fsSL " + s.cfg.DashboardURL("/tunnel.sh") + " | sh -s -- " + name
+	for _, p := range list {
+		cmd += fmt.Sprintf(" --%s %s=%d", p.Protocol, p.Name, p.LocalPort)
+	}
+	return cmd
+}
+
+// sshServer is HOST:PORT of the SSH endpoint, for the gate2sky client.
+func (s *Server) sshServer() string {
+	return net.JoinHostPort(s.cfg.SSHHost(), fmt.Sprint(s.cfg.SSHPort()))
+}
+
+// The values written into tunnel.sh between single quotes.
+var (
+	releaseVersion = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+	shellSafe      = regexp.MustCompile(`^[A-Za-z0-9.:+/=\[\]_-]*$`)
+)
+
+// handleTunnelScript serves the script that runs the gate2sky client
+// without installing it, set up for this server.
+func (s *Server) handleTunnelScript(w http.ResponseWriter, r *http.Request) {
+	version := s.version
+	if !releaseVersion.MatchString(version) {
+		version = "" // a build from source: the latest release
+	}
+	data := struct{ Dashboard, URL, Version, Server, HostKey string }{
+		s.cfg.DashboardURL("/"), s.cfg.DashboardURL("/tunnel.sh"), version, s.sshServer(), s.hostKey,
+	}
+	if !shellSafe.MatchString(data.Server) || !shellSafe.MatchString(data.HostKey) {
+		http.Error(w, "the SSH host can't be written into a script", http.StatusInternalServerError)
+		return
+	}
+	var buf bytes.Buffer
+	if err := s.tunnelSh.Execute(&buf, data); err != nil {
+		s.log.Error("render tunnel.sh", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Write(buf.Bytes())
 }
 
 // localPath returns rd if it is a path on this host, else "/". It stops
