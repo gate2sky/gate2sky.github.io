@@ -19,11 +19,12 @@
   const Modal = await import("@theme/components/modal.html")
   const { ICONS } = await import("@theme/icons.js")
   const Inspector = await import("@theme/demo/inspector.html")
+  const { highlight } = await import("@theme/demo/highlight.js")
 
   document.title = "Default theme · intergate"
 
   const GROUPS = [
-    ["Foundations", [["colours", "Colours"], ["type", "Type"], ["shape", "Space · Shape · Motion"], ["icons", "Icons"]]],
+    ["Foundations", [["setup", "Setup"], ["colours", "Colours"], ["type", "Type"], ["shape", "Space · Shape · Motion"], ["icons", "Icons"]]],
     ["Display", [["button", "Button"], ["badge", "Badge"], ["alert", "Alert"], ["card", "Card"], ["facts", "Facts"]]],
     ["Forms", [["switch", "Switch"], ["segmented", "Segmented"], ["choice-cards", "ChoiceCards"]]],
     ["Navigation · Overlays", [["tabs", "Tabs"], ["modal", "Modal"]]],
@@ -102,6 +103,7 @@
 
   // ---- how the theme is loaded, and recoloured ---------------------------------
   //
+  // As markup, so `highlight` colours all of it, as the inspector's code.
   // How each component is used is the inspector's (`demo/usage.js`).
 
   const USAGE = {
@@ -109,11 +111,15 @@
 <link rel="stylesheet" href="/ui/app.css">
 <script type="importmap">{ "imports": { "@theme/": "/ui/theme/default/" } }<\/script>
 
-<!-- in a component's :setup -->
-const Button = await import("@theme/components/button.html")`,
-    colours: `/* After tokens.css: a brand of your own, in both tones. */
-:root { --ig-accent: #6d28d9; --ig-radius-control: 10px; }
-[data-tone="light"] { --ig-link: #5b21b6; }
+<!-- in a component -->
+<script :setup>
+  const Button = await import("@theme/components/button.html")
+<\/script>`,
+    colours: `<!-- After tokens.css: a brand of your own, in both tones. -->
+<style>
+  :root { --ig-accent: #6d28d9; --ig-radius-control: 10px; }
+  [data-tone="light"] { --ig-link: #5b21b6; }
+</style>
 
 <!-- An island of the other tone. -->
 <div data-tone="light">…</div>`,
@@ -129,7 +135,6 @@ const Button = await import("@theme/components/button.html")`,
     <p class="kicker">intergate · design system</p>
     <h1>Default theme</h1>
     <p class="lead">Every value lives in <code>tokens.css</code>; every component in <code>components/</code> draws with those alone. Shown on the wallpaper and on a card: the two tones the dashboard draws in. <strong>Inspect</strong>, beside each component, shows a parent that uses it, and its code — editable, with a preview, and ready to copy as a patch.</p>
-    <pre class="usage">{{ USAGE.load }}</pre>
   </header>
 
   <nav class="index" aria-label="Sections">
@@ -141,6 +146,12 @@ const Button = await import("@theme/components/button.html")`,
 
   <main class="sections">
     <p class="group">Foundations</p>
+
+    <section id="setup" class="section">
+      <h2>Setup</h2>
+      <p class="about">The tokens first, then the app's own styles. An import map names the theme's folder <code>@theme/</code>, and a component imports from there what it draws with.</p>
+      <pre class="usage"><code :html="highlight(USAGE.load)"></code></pre>
+    </section>
 
     <section id="colours" class="section">
       <h2>Colours</h2>
@@ -165,7 +176,7 @@ const Button = await import("@theme/components/button.html")`,
           <div :each="n in group[1]" :key="n" class="swatch"><span class="chip" :data-paint="'background:' + n"></span><code>{{ n }}</code><small>{{ read.root[n] }}</small></div>
         </div>
       </div>
-      <pre class="usage">{{ USAGE.colours }}</pre>
+      <pre class="usage"><code :html="highlight(USAGE.colours)"></code></pre>
     </section>
 
     <section id="type" class="section">
@@ -398,7 +409,7 @@ const Button = await import("@theme/components/button.html")`,
   .top { max-width: 760px; }
   .kicker { margin: 0; color: var(--ig-fg-muted); font-size: var(--ig-text-sm); font-weight: var(--ig-weight-semibold); text-transform: uppercase; letter-spacing: .06em; }
   h1 { margin: var(--ig-space-2) 0 var(--ig-space-3); font-size: var(--ig-text-4xl); letter-spacing: -.022em; }
-  .lead { margin: 0 0 var(--ig-space-7); color: var(--ig-fg-muted); }
+  .lead { margin: 0; color: var(--ig-fg-muted); }
   .index { display: none; }
   .group { margin: var(--ig-space-3) 0 0; color: var(--ig-fg-muted); font-size: var(--ig-text-xs); font-weight: var(--ig-weight-heavy); text-transform: uppercase; letter-spacing: .08em; }
   .sections { display: grid; gap: var(--ig-space-9); min-width: 0; }
@@ -419,6 +430,7 @@ const Button = await import("@theme/components/button.html")`,
     font-size: var(--ig-text-sm);
     line-height: 1.55;
   }
+  .usage code { font-size: inherit; }
   code { font-family: var(--ig-font-mono); font-size: .92em; }
 
   .tones { display: grid; gap: var(--ig-space-5); }
