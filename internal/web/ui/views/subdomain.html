@@ -3,16 +3,18 @@
   // its SSH keys; and the danger zone, to rename or delete it.
   const { app, go, toast } = await import("@ui/lib/store.js")
   const { api } = await import("@ui/lib/api.js")
-  const { ago, bytes, plural } = await import("@ui/lib/format.js")
+  const { ago, bytes } = await import("@ui/lib/format.js")
   const AccessOptions = await import("@ui/components/access-options.html")
   const StatusBadge = await import("@ui/components/status-badge.html")
   const CopyText = await import("@ui/components/copy-text.html")
   const TcpPorts = await import("@ui/components/tcp-ports.html")
+  const KeysForm = await import("@ui/components/keys-form.html")
   const Alert = await import("@theme/components/alert.html")
   const Button = await import("@theme/components/button.html")
   const Card = await import("@theme/components/card.html")
   const Facts = await import("@theme/components/facts.html")
   const Icon = await import("@theme/components/icon.html")
+  const Modal = await import("@theme/components/modal.html")
   const Tabs = await import("@theme/components/tabs.html")
   const Badge = await import("@theme/components/badge.html")
 
@@ -111,29 +113,19 @@
     load()
   }
 
-  let newKeys = ""
-  let keyName = ""
-  let busy = false
-  let keyError = ""
-
-  const addKeys = async () => {
-    busy = true
-    keyError = ""
-    try {
-      const result = await api("POST", path() + "/keys", { keys: newKeys, name: keyName })
-      const problems = result.problems || []
-      if (problems.length) keyError = `Added ${plural(result.added, "key")}, but: ${problems.join("; ")}.`
-      else toast(`Added ${plural(result.added, "key")}.`)
-      if (result.added) {
-        newKeys = ""
-        keyName = ""
-      }
-      await load()
-    } catch (e) {
-      keyError = e.message
-    }
-    busy = false
+  // With a key, the form that adds more opens in a dialog, new each time:
+  // it stays while the dialog plays its way out, and goes once it has.
+  let addingKeys = false
+  let keysForm = false
+  const startAddKeys = () => {
+    keysForm = true
+    addingKeys = true
   }
+  const keysAdded = () => {
+    addingKeys = false
+    load()
+  }
+  $: keysFull = sub && sub.key_list.length >= app.limits.keys
 
   // The key whose name is being edited, by id, and its new name.
   let renaming = 0
@@ -239,10 +231,13 @@
 
   <div :elseif="tab === 'keys'" role="tabpanel" aria-label="SSH keys">
     <Card title="SSH keys">
-      <template :slot.aside><Badge>{{ sub.key_list.length }} of {{ app.limits.keys }}</Badge></template>
+      <template :slot.aside>
+        <Badge>{{ sub.key_list.length }} of {{ app.limits.keys }}</Badge>
+        <Button :if="sub.key_list.length && !keysFull" variant="secondary" size="sm" icon="plus" @click="startAddKeys">Add keys</Button>
+      </template>
       <p class="muted intro">Only these keys can open the tunnel for {{ sub.name }}.{{ app.domain }}.</p>
       <div :if="sub.key_list.length" class="table-wrap">
-        <table class="table">
+        <table class="table tiles">
           <thead><tr><th>Name</th><th>Fingerprint</th><th class="hide-narrow">Added</th><th class="hide-narrow">Last used</th><th></th></tr></thead>
           <tbody>
             <tr :each="key in sub.key_list" :key="key.id">
@@ -268,20 +263,13 @@
         </table>
       </div>
       <p :else class="empty-inline">No keys yet — nobody can connect.</p>
-
-      <form class="form" @submit.prevent="addKeys">
-        <Alert :if="keyError" tone="bad" flush>{{ keyError }}</Alert>
-        <label>Public keys
-          <span class="hint">One per line: the contents of <code>~/.ssh/id_ed25519.pub</code>, or of <code>https://github.com/&lt;user&gt;.keys</code>.</span>
-          <textarea name="keys" rows="3" required spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"
-                    :value="newKeys" @input="newKeys = $event.target.value"></textarea>
-        </label>
-        <label>Name <span class="hint">Optional. Defaults to the key comment.</span>
-          <input name="name" maxlength="64" autocomplete="off" :value="keyName" @input="keyName = $event.target.value">
-        </label>
-        <div><Button type="submit" :disabled="busy">Add keys</Button></div>
-      </form>
+      <KeysForm :if="!sub.key_list.length" :sub="sub" @added="load()" />
+      <p :if="keysFull" class="hint">A subdomain can have at most {{ app.limits.keys }} keys: remove one to add another.</p>
     </Card>
+
+    <Modal :open="addingKeys" size="lg" :title="'Add SSH keys to ' + sub.name" @close="addingKeys = false" @closed="keysForm = false">
+      <KeysForm :if="keysForm" :sub="sub" :cancel="true" @added="keysAdded" @cancel="addingKeys = false" />
+    </Modal>
   </div>
 
   <div :else role="tabpanel" aria-label="Danger zone">
