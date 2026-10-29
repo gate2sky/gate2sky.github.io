@@ -4,6 +4,7 @@
 #   curl -fsSL https://gate2sky.github.io/setup.sh | sh
 #   curl -fsSL https://gate2sky.github.io/setup.sh | sh -s -- reinstall
 #   curl -fsSL https://gate2sky.github.io/setup.sh | sh -s -- uninstall
+#   wget -qO- https://gate2sky.github.io/setup.sh | sh     # without curl
 #
 # With no command and a terminal to ask on, it asks what to do: install, and —
 # when it finds gate2sky already there — update, reinstall, configure or
@@ -71,9 +72,24 @@ die() {
 }
 need() { command -v "$1" >/dev/null 2>&1; }
 
-# fetch URL FILE: false on any failure, a 404 included.
+# fetch URL FILE: false on any failure, a 404 included. With curl, or else
+# wget, so `wget -qO- … | sh` works where curl is missing.
 fetch() {
-	curl -fsSL --retry 3 --connect-timeout 20 -o "$2" "$1"
+	if need curl; then
+		curl -fsSL --retry 3 --connect-timeout 20 -o "$2" "$1"
+	else
+		wget -q --tries=3 --timeout=20 -O "$2" "$1"
+	fi
+}
+
+# redirect URL: where URL redirects to, without following it.
+redirect() {
+	if need curl; then
+		curl -fsSLI --retry 3 --connect-timeout 20 -o /dev/null -w '%{url_effective}' "$1"
+	else
+		wget -q -S --tries=3 --timeout=20 --max-redirect=0 -O /dev/null "$1" 2>&1 |
+			sed -n 's/^ *Location: *//p' | tr -d '\r' | grep .
+	fi
 }
 
 has_tty() { (: </dev/tty) 2>/dev/null; }
@@ -137,8 +153,7 @@ resolve_release() {
 	else
 		# The redirect GitHub answers `latest` with names the tag, and costs
 		# none of the API's rate limit.
-		latest=$(curl -fsSLI --retry 3 --connect-timeout 20 -o /dev/null -w '%{url_effective}' \
-			"https://github.com/$REPO/releases/latest") ||
+		latest=$(redirect "https://github.com/$REPO/releases/latest") ||
 			die "could not reach GitHub to find the latest release"
 		TAG=${latest##*/}
 		case "$TAG" in
@@ -257,7 +272,7 @@ already_installed() {
 
 install_gate2sky() {
 	force=$1
-	need curl || die "curl is needed to download gate2sky"
+	need curl || need wget || die "curl or wget is needed to download gate2sky"
 	need tar || die "tar is needed to unpack gate2sky"
 	detect_target
 	resolve_release

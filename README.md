@@ -67,6 +67,9 @@ point to the server. Then, on Linux or macOS:
 curl -fsSL https://gate2sky.github.io/setup.sh | sh
 ```
 
+Without curl, `wget -qO- https://gate2sky.github.io/setup.sh | sh` does the
+same: the installer then downloads with wget too.
+
 The installer downloads the release for your machine, checks it against the
 release's `SHA256SUMS`, runs it once before it replaces anything, opens the
 setup wizard and, on Linux with systemd, installs the service. Run it again to
