@@ -379,7 +379,7 @@ select.role {
 }
 /* What a user can't change: the value itself, not a control. */
 .value { display: inline-flex; align-items: center; gap: 6px; padding: 0 7px; font-size: 13px; font-weight: 500; white-space: nowrap; }
-.state { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
+.state { display: inline-block; vertical-align: middle; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); }
 .state-off { background: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
 .role-icon { flex: none; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .role-owner { color: #e08a00; }

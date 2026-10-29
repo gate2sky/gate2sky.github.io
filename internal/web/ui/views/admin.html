@@ -136,7 +136,7 @@
               <input type="checkbox" role="switch" :checked="!user.disabled"
                      :aria-label="(user.disabled ? 'Enable ' : 'Disable ') + user.email" @change="setDisabled(user, !$event.target.checked)">
             </label>
-            <span :else class="value"><span class="state" :class.state-off="user.disabled"></span>{{ user.disabled ? "Disabled" : "Enabled" }}</span>
+            <span :else class="state" :class.state-off="user.disabled" role="img" :aria-label="user.disabled ? 'Disabled' : 'Enabled'" :title="user.disabled ? 'Disabled' : 'Enabled'"></span>
           </td>
           <td class="right keep">
             <button :if="canManage(user)" type="button" class="icon-button danger" :aria-label="'Delete ' + user.email" title="Delete"
