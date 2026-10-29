@@ -57,10 +57,14 @@
     border-radius: 50%;
     background: var(--ig-switch-knob);
     box-shadow: var(--ig-switch-knob-shadow);
-    transition: transform var(--ig-duration-slow) var(--ig-ease-knob);
+    transition: transform var(--ig-duration-slow) var(--ig-ease-knob), width var(--ig-duration) var(--ig-ease-knob);
   }
   input:checked { background: var(--ig-switch-on); }
   input:checked::before { transform: translateX(16px); }
+  /* Held, the knob stretches toward where it would go, its far edge where
+     it was. */
+  input:active:not(:disabled)::before { width: 22px; }
+  input:checked:active:not(:disabled)::before { transform: translateX(12px); }
   input:focus-visible { outline: none; box-shadow: var(--ig-ring); }
   input:disabled { opacity: .45; cursor: default; }
 </style>
