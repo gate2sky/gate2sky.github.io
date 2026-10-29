@@ -319,6 +319,7 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 .card > .table-wrap + * { margin-top: 14px; }
 .row-actions { white-space: nowrap; }
 .row-actions button + button, .row-actions span + button { margin-left: 14px; }
+.row-actions .icon-button + .icon-button { margin-left: 2px; }
 
 .name-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
 a.name-cell:hover { text-decoration: none; }
