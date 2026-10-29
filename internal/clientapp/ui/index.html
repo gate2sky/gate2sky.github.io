@@ -45,7 +45,8 @@
   button:disabled { opacity: .45; cursor: default; filter: none; }
   button.secondary { color: var(--fg); background: var(--field); box-shadow: 0 0 0 .5px var(--field-line), 0 1px 2px rgb(0 0 0 / .08); }
   button.danger { --accent: var(--red); }
-  button.icon { background: none; box-shadow: none; color: var(--muted); padding: 4px 7px; font-size: 16px; line-height: 1; }
+  button.icon { background: none; box-shadow: none; color: var(--muted); padding: 5px; line-height: 1; }
+  button.icon svg { display: block; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
   button.icon:hover { background: var(--fill); color: var(--red); filter: none; }
   .pill { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgb(255 255 255 / .16); }
   .pill.connected { background: var(--green); } .pill.connecting, .pill.waiting { background: var(--orange); } .pill.failed { background: var(--red); }
@@ -176,7 +177,8 @@
         cellState.append(a)
       }
       const del = document.createElement("button")
-      del.className = "icon"; del.type = "button"; del.title = "Remove"; del.textContent = "×"
+      del.className = "icon"; del.type = "button"; del.title = "Remove"; del.setAttribute("aria-label", "Remove")
+      del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>'
       del.onclick = () => { settings.forwards.splice(i, 1); renderForwards(); save() }
       const cells = [[kind, "kind"], [name, ""], [local, "local"]].map(([el, cls]) => {
         const td = document.createElement("td"); td.className = cls; td.append(el); return td })

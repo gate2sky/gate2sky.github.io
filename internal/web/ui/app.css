@@ -158,6 +158,9 @@ body::after {
 
 a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; text-underline-offset: 2px; }
+/* Links with an arrow beside their text. */
+.icon-link { display: inline-flex; align-items: center; gap: 4px; }
+.icon-link svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 :focus-visible { outline: none; box-shadow: var(--ring); border-radius: 6px; }
 
 code, pre, textarea { font-family: var(--mono); }
@@ -249,7 +252,7 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 .panel-tabs .count { padding: 1px 8px; }
 .count-online { color: #0f3d1c; background: color-mix(in srgb, var(--green) 75%, #fff); }
 .crumbs { margin: 0 0 10px; font-size: 13px; }
-.crumbs a { display: inline-flex; align-items: center; gap: 2px; font-weight: 500; }
+.crumbs a { font-weight: 500; }
 
 /* Cards: the main material. */
 

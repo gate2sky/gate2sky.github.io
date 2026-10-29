@@ -269,6 +269,9 @@ h1 .glow, .brand .glow { background: linear-gradient(90deg, var(--cyan), var(--b
 .cta { display: flex; justify-content: center; gap: 18px; margin-top: 16px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
 .cta a { color: var(--muted); }
 .cta a:hover { color: var(--fg); }
+/* Icons beside text: arrows, the lock, the terminal's check. */
+svg.i { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cta .i { width: 14px; height: 14px; margin-left: 4px; vertical-align: -2px; }
 
 /* Sections */
 section { padding: 56px 0; }
@@ -305,6 +308,7 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 .flow .block.b2 { fill: color-mix(in srgb, var(--cyan) 22%, var(--surface-2)); }
 .legend { display: flex; justify-content: center; gap: 18px; margin-top: 12px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.legend .i { display: inline-block; width: 13px; height: 13px; margin-right: 5px; vertical-align: -2px; }
 
 /* Terminal */
 .term { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow);
@@ -359,6 +363,7 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 @keyframes o5 { 0%, 55% { opacity: 0 } 56%, 100% { opacity: 1 } }
 @keyframes o6 { 0%, 68% { opacity: 0 } 69%, 100% { opacity: 1 } }
 .term .ps { color: var(--cyan); } .term .k { color: var(--amber); } .term .g { color: var(--ok); } .term .d { color: var(--code-dim); }
+.term .i { width: 1em; height: 1em; vertical-align: -.15em; stroke-width: 2.5; }
 
 /* Features */
 .grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
@@ -839,9 +844,9 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
         </button>
       </div>
       <div class="cta">
-        <a href="#how">How it works ↓</a>
+        <a href="#how">How it works<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></a>
         <a href="./setup.sh">Read the script</a>
-        <a href="https://github.com/jgermade/intergate">Source on GitHub ↗</a>
+        <a href="https://github.com/jgermade/intergate">Source on GitHub<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
       </div>
     </div>
   </div>
@@ -966,7 +971,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
           <rect class="block" x="68" y="572" width="120" height="12" rx="4"/>
           <rect class="block b2" x="68" y="592" width="184" height="26" rx="6"/>
         </svg>
-        <div class="legend"><span><i style="background:var(--cyan)"></i>requests</span><span><i style="background:var(--amber)"></i>responses</span><span>🔒 SSH encryption end to end</span></div>
+        <div class="legend"><span><i style="background:var(--cyan)"></i>requests</span><span><i style="background:var(--amber)"></i>responses</span><span><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>SSH encryption end to end</span></div>
       </div>
     </div>
   </section>
@@ -993,8 +998,8 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span>
           </button>
         </div>
-<pre class="k-default" role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, intergate answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">intergate: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
-<pre class="k-file" role="img" aria-label="A terminal: ssh -i ~/.ssh/intergate -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, intergate answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:74">ssh -i ~/.ssh/intergate -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">intergate: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g">✔</span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+<pre class="k-default" role="img" aria-label="A terminal: ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, intergate answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:55">ssh -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">intergate: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
+<pre class="k-file" role="img" aria-label="A terminal: ssh -i ~/.ssh/intergate -p 2222 -R myapp:80:localhost:3000 gate.example.com connects, intergate answers that https://myapp.gate.example.com is forwarding, and requests are logged as they arrive."><span class="l"><span class="ps">~ $ </span><span class="typed" style="--n:74">ssh -i ~/.ssh/intergate -p 2222 -R myapp:80:localhost:3000 gate.example.com</span><span class="caret"></span></span><span class="l o o1"><span class="d">intergate: connected with key SHA256:9fQx…kLm2</span></span><span class="l o o2"><span class="g"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span> <span class="k">https://myapp.gate.example.com</span> is now forwarding</span><span class="l o o3"><span class="d">  access: private — manage it at https://gate.example.com</span></span><span class="l o o4"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /             <span class="d">(4ms)</span></span><span class="l o o5"><span class="d">12:04:31</span>  <span class="g">200</span>  GET    /app.js       <span class="d">(2ms)</span></span><span class="l o o6"><span class="d">12:04:33</span>  <span class="g">101</span>  GET    /live         <span class="d">(websocket)</span></span></pre>
         <p class="tfoot k-default">ssh offers the keys in <code>~/.ssh</code> (<code>id_ed25519</code>, <code>id_ecdsa</code>, <code>id_rsa</code>…) and those in your agent: nothing to add when one of them is on the subdomain.</p>
         <p class="tfoot k-file">For a key kept elsewhere, such as one made just for intergate with <code>ssh-keygen -t ed25519 -f ~/.ssh/intergate</code>. With many keys in your agent, add <code>-o IdentitiesOnly=yes</code>.</p>
       </div>

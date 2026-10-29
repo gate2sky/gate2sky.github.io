@@ -102,7 +102,7 @@
   <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
   <div class="actions">
     <button type="button" class="button" :disabled="busy || !supported" @click="addPasskey">Add a passkey</button>
-    <a :href="next">Skip for now →</a>
+    <a class="icon-link" :href="next">Skip for now<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
   </div>
 </section>
 
