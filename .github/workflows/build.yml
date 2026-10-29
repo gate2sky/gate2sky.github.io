@@ -16,10 +16,6 @@ on:
         description: Version stamped into the binaries. Defaults to VERSION plus -dev and the commit.
         type: string
         default: ""
-      pages:
-        description: Upload the GitHub Pages artifact for the caller to deploy.
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -152,7 +148,7 @@ jobs:
           grep -q "image: \"ghcr.io/gate2sky/gate2sky:$(cat VERSION)\"" default.yaml
 
   # What Pages serves: pages/ as it is, the landing and setup.sh. Every push
-  # checks it; only a release deploys it.
+  # checks it; only a release deploys it, with the Helm repository's index.
   pages:
     runs-on: ubuntu-latest
     steps:
@@ -173,7 +169,3 @@ jobs:
           }
           test -s pages/setup.sh
           for icon in favicon.svg favicon.ico apple-touch-icon.png; do test -s "pages/$icon"; done
-      - uses: actions/upload-pages-artifact@v3
-        if: ${{ inputs.pages }}
-        with:
-          path: pages

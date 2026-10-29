@@ -111,8 +111,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* The wallpaper the materials blur: two layers of color glows that drift
-   slowly, each its own way. Only transforms move, so it stays cheap. */
+/* The wallpaper the materials blur: two layers of color glows that wander
+   around the page, each on its own path and clock, so they never line up
+   the same way twice. Only transforms move, so it stays cheap. */
 body::before, body::after {
   content: "";
   position: fixed;
@@ -125,21 +126,25 @@ body::before {
   background:
     radial-gradient(40% 36% at 24% 22%, var(--wall-1), transparent 70%),
     radial-gradient(34% 32% at 78% 26%, var(--wall-2), transparent 70%);
-  animation: drift-a 38s ease-in-out infinite alternate;
+  animation: drift-a 24s ease-in-out infinite;
 }
 body::after {
   background:
     radial-gradient(42% 34% at 66% 78%, var(--wall-3), transparent 70%),
     radial-gradient(30% 28% at 22% 76%, var(--wall-4), transparent 70%);
-  animation: drift-b 46s ease-in-out infinite alternate;
+  animation: drift-b 31s ease-in-out infinite;
 }
 @keyframes drift-a {
-  from { transform: translate(-4%, -3%) rotate(0deg) scale(1); }
-  to { transform: translate(5%, 4%) rotate(14deg) scale(1.12); }
+  0%, 100% { transform: translate(-6%, -4%) rotate(0deg) scale(1); }
+  25% { transform: translate(8%, -2%) rotate(18deg) scale(1.12); }
+  50% { transform: translate(10%, 8%) rotate(34deg) scale(.95); }
+  75% { transform: translate(-4%, 9%) rotate(14deg) scale(1.08); }
 }
 @keyframes drift-b {
-  from { transform: translate(4%, 3%) rotate(0deg) scale(1.08); }
-  to { transform: translate(-5%, -4%) rotate(-12deg) scale(.96); }
+  0%, 100% { transform: translate(6%, 4%) rotate(0deg) scale(1.06); }
+  30% { transform: translate(-8%, 6%) rotate(-20deg) scale(.94); }
+  60% { transform: translate(-9%, -8%) rotate(-36deg) scale(1.14); }
+  80% { transform: translate(5%, -6%) rotate(-12deg) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }
@@ -210,6 +215,13 @@ a.who.active { background: var(--fill); }
 
 main.wrap { padding-top: 24px; padding-bottom: 40px; }
 .footer { color: var(--muted); font-size: 12px; padding-bottom: 32px; text-align: center; }
+.footer a { color: inherit; font-weight: 600; }
+.footer a:hover { color: var(--fg); }
+
+/* While the next page loads, the one showing dims (after a beat, so a
+   quick change doesn't flicker) and can't be clicked. */
+main.wrap { transition: opacity .2s; }
+main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s; }
 
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 16px; margin-bottom: 22px; flex-wrap: wrap; }
 .page-head > div { min-width: 0; }

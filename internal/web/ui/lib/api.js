@@ -12,7 +12,24 @@ export class ApiError extends Error {
   }
 }
 
+// Responses fetched ahead of a page change (see go in store.js), for the
+// page to pick up as it mounts instead of asking again. Each is used once,
+// and only for a few seconds.
+const ahead = new Map()
+
+export const prefetch = path => {
+  ahead.delete(path)
+  const response = api("GET", path)
+  ahead.set(path, { response, until: Date.now() + 5000 })
+  return response
+}
+
 export const api = async (method, path, body) => {
+  const early = method === "GET" && ahead.get(path)
+  if (early) {
+    ahead.delete(path)
+    if (early.until > Date.now()) return early.response
+  }
   const headers = {}
   if (body !== undefined) headers["Content-Type"] = "application/json"
   if (method !== "GET" && app.csrf) headers["X-CSRF-Token"] = app.csrf

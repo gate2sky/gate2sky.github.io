@@ -32,6 +32,7 @@ func isAPI(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, "/api/")
 // boot is what the app knows before its first API call, embedded in the
 // page as JSON.
 type boot struct {
+	Version   string      `json:"version"`
 	Domain    string      `json:"domain"`
 	Email     bool        `json:"email"`
 	Passkeys  bool        `json:"passkeys"`
@@ -73,6 +74,7 @@ type pageErrMsg struct {
 
 func (s *Server) serveApp(w http.ResponseWriter, r *http.Request, status int, perr *pageErrMsg) {
 	b := boot{
+		Version:   s.version,
 		Domain:    s.cfg.Domain(),
 		Email:     s.cfg.Auth.Email.Enabled(),
 		Passkeys:  s.webauthn != nil,

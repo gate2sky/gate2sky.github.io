@@ -1,6 +1,7 @@
 """Builds pages/index.html from template.html: splices in the drawings whose
 geometry is computed (the hero's two gates and their link, the How it works
-gates and strands, the logo) and the stars of the sky.
+gates and strands, the logo), the stars of the sky and the version in
+VERSION, which the release regenerates the page for.
 
     python3 scripts/landing/gen.py scripts/landing/template.html pages/index.html
 """
@@ -29,6 +30,8 @@ def stars(n, w, h):
 
 
 tpl = open(sys.argv[1]).read()
+root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+tpl = tpl.replace("@@VERSION@@", open(os.path.join(root, "VERSION")).read().strip())
 tpl = tpl.replace("@@HERO@@", hero.hero())
 tpl = tpl.replace("@@BRAND@@", hero.brand())
 # How it works: the gate at your machine, the tube, gate2sky's gate.
