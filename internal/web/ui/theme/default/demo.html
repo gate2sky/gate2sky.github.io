@@ -125,9 +125,57 @@
 <div data-tone="light">…</div>`,
   }
 
+  // ---- where the page is -----------------------------------------------------
+  //
+  // The section being read, lit in the index: the last whose top has passed
+  // a line a third of the way down the window, or the last of all at the
+  // very end. One picked in the index stays lit until the page moves on
+  // from where it took you, though a shorter one after it may be at the
+  // line. The bookkeeping lives in a closure, out of jq79's reach, and the
+  // page is read once a frame at most.
+  let current = GROUPS[0][1][0][0]
+  const spy = (() => {
+    let frame = 0
+    let picked = ""
+    let pickedAt = null
+    const at = () => {
+      frame = 0
+      if (picked) {
+        if (pickedAt === null) pickedAt = scrollY
+        if (scrollY === pickedAt) return
+        picked = ""
+      }
+      const sections = [...$self(".sections").querySelectorAll(".section")]
+      const line = innerHeight / 3
+      let id = sections[0].id
+      for (const section of sections) if (section.getBoundingClientRect().top <= line) id = section.id
+      if (innerHeight + scrollY >= document.documentElement.scrollHeight - 2) id = sections[sections.length - 1].id
+      if (id !== current) current = id
+    }
+    const schedule = () => { frame ||= requestAnimationFrame(at) }
+    return {
+      schedule,
+      // After the link has moved the page: the frame reads where it went.
+      pick: id => {
+        picked = current = id
+        pickedAt = null
+        schedule()
+      },
+      stop: () => cancelAnimationFrame(frame),
+    }
+  })()
+
   await $mounted()
   readTokens()
   paint()
+  spy.schedule()
+  addEventListener("scroll", spy.schedule, { passive: true })
+  addEventListener("resize", spy.schedule, { passive: true })
+  $destroyed(() => {
+    removeEventListener("scroll", spy.schedule, { passive: true })
+    removeEventListener("resize", spy.schedule, { passive: true })
+    spy.stop()
+  })
 </script>
 
 <div class="page">
@@ -140,7 +188,8 @@
   <nav class="index" aria-label="Sections">
     <div :each="group in GROUPS" :key="group[0]">
       <p class="group">{{ group[0] }}</p>
-      <a :each="s in group[1]" :key="s[0]" :href="'#' + s[0]">{{ s[1] }}</a>
+      <a :each="s in group[1]" :key="s[0]" :href="'#' + s[0]" :class.current="current === s[0]"
+         :aria-current="current === s[0] ? 'location' : null" @click="spy.pick(s[0])">{{ s[1] }}</a>
     </div>
   </nav>
 
@@ -477,8 +526,19 @@
     .page { grid-template-columns: 180px minmax(0, 1fr); }
     .top { grid-column: 1 / -1; }
     .index { display: block; position: sticky; top: var(--ig-space-7); align-self: start; }
-    .index a { display: block; padding: 3px 0; color: var(--ig-fg); font-size: var(--ig-text-md); text-decoration: none; }
-    .index a:hover { color: var(--ig-link); }
+    .index a {
+      display: block;
+      margin-left: calc(-1 * var(--ig-space-3));
+      padding: 3px var(--ig-space-3);
+      border-radius: var(--ig-radius-sm);
+      color: var(--ig-fg-muted);
+      font-size: var(--ig-text-md);
+      text-decoration: none;
+      transition: color var(--ig-duration) ease, background-color var(--ig-duration) ease;
+    }
+    .index a:hover { color: var(--ig-fg); }
+    .index a:active { background: var(--ig-fill-2); }
+    .index a.current { color: var(--ig-fg); background: var(--ig-fill); font-weight: var(--ig-weight-semibold); }
     .index .group { margin-top: var(--ig-space-7); }
     .tones { grid-template-columns: 1fr 1fr; }
   }
