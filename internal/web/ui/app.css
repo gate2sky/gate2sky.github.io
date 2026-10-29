@@ -271,7 +271,7 @@ select.field {
   font: inherit; font-size: 16px; color: var(--ig-fg); background: var(--ig-field); width: 100%; padding: 9px 12px;
   border: var(--ig-hairline) solid var(--ig-field-line); border-radius: var(--ig-radius-control); box-shadow: var(--ig-shadow-inset);
 }
-select.field:focus { outline: none; border-color: var(--ig-accent); box-shadow: var(--ig-ring); }
+select.field:focus { outline: none; border-color: var(--ig-accent); box-shadow: var(--ig-ring); background: var(--ig-field-focus); }
 .proto { text-transform: uppercase; font-size: var(--ig-text-2xs); font-weight: var(--ig-weight-heavy); letter-spacing: .04em; padding: 1px 5px; border-radius: var(--ig-radius-xs); background: var(--ig-fill); }
 .address { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .address code { font-size: var(--ig-text-md); }
@@ -315,11 +315,11 @@ input:not([type=radio]):not([type=checkbox]), textarea {
   border: var(--ig-hairline) solid var(--ig-field-line); border-radius: var(--ig-radius-control);
   box-shadow: var(--ig-shadow-inset);
   padding: 9px 12px; width: 100%;
-  transition: box-shadow var(--ig-duration), border-color var(--ig-duration);
+  transition: box-shadow var(--ig-duration), border-color var(--ig-duration), background-color var(--ig-duration);
 }
 input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--ig-fg-muted) 80%, transparent); opacity: 1; }
 textarea { font-size: var(--ig-text-base); line-height: 1.55; resize: vertical; }
-input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: none; border-color: var(--ig-accent); box-shadow: var(--ig-ring); }
+input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: none; border-color: var(--ig-accent); box-shadow: var(--ig-ring); background: var(--ig-field-focus); }
 
 .input-suffix { display: flex; align-items: stretch; max-width: 520px; border-radius: var(--ig-radius-control); }
 .input-suffix input:not([type=radio]):not([type=checkbox]) { border-top-right-radius: 0; border-bottom-right-radius: 0; }

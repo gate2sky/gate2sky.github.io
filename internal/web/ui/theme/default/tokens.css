@@ -30,7 +30,7 @@
      toolbar, and what floats over everything (a dialog, the toast, a
      picker): white, a card letting the wallpaper's glows through. */
   --ig-material: rgb(255 255 255 / .75);
-  --ig-material-bar: rgb(40 43 53 / .62);
+  --ig-material-bar: rgb(10 10 10 / .62);
   --ig-material-hud: rgb(255 255 255 / .88);
   --ig-blur: blur(12px);
   /* What a dialog lays over the page behind it. */
@@ -122,11 +122,11 @@
   --ig-code-purple: #7547c9;
   --ig-code-teal: #0f7a8e;
 
-  /* A command to copy: a terminal line on #333a3e, in Monokai's hues at
+  /* A command to copy: a terminal line on #222a2e, in Monokai's hues at
      their most saturated. Green and yellow full; pink, purple and grey as
-     saturated as they could be on #444 and still read at 4:1, and at 4.7:1
+     saturated as they could be on #444 and still read at 4:1, and at 6:1
      on this. */
-  --ig-term-bg: #333a3e;
+  --ig-term-bg: #222a2e;
   --ig-term-line: rgb(0 0 0 / .2);
   --ig-term-fg: #f8f8f2;
   --ig-term-comment: #aca893;
@@ -221,9 +221,11 @@
   --ig-warn: #ffd08a;
 
   /* Hover and chosen: a veil of the ink over whatever is there. */
-  --ig-fill: rgb(255 255 255 / .13);
+  --ig-fill: rgb(255 255 255 / .25);
   --ig-fill-2: rgb(255 255 255 / .07);
   --ig-field: rgb(26 28 35 / .5);
+  /* A field being typed in is solid: its colour, with no glass. */
+  --ig-field-focus: rgb(26 28 35);
   --ig-field-line: rgb(255 255 255 / .24);
   --ig-line: rgb(255 255 255 / .2);
   --ig-separator: rgb(255 255 255 / .15);
@@ -255,6 +257,7 @@
   --ig-fill: rgb(0 0 0 / .06);
   --ig-fill-2: rgb(255 255 255 / .35);
   --ig-field: rgb(255 255 255 / .92);
+  --ig-field-focus: #fff;
   --ig-field-line: rgb(0 0 0 / .16);
   --ig-line: rgb(0 0 0 / .1);
   --ig-separator: rgb(0 0 0 / .09);
