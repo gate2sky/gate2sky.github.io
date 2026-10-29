@@ -70,6 +70,7 @@
   --strand-1: #8ff0ff;
   --strand-2: #ffe066;
   --haze: .55;
+  --note: 11%;
 }
 [data-theme="light"] {
   --bg: #f4f6fb;
@@ -100,6 +101,7 @@
   --strand-1: #0b9fd8;
   --strand-2: #d06a00;
   --haze: .35;
+  --note: 16%;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -320,7 +322,8 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 #k-default:checked ~ .tbar [for="k-default"], #k-file:checked ~ .tbar [for="k-file"] {
   color: var(--code-fg); border-bottom-color: var(--cyan); }
 #k-default:focus-visible ~ .tbar [for="k-default"], #k-file:focus-visible ~ .tbar [for="k-file"] { outline: 2px solid var(--cyan); outline-offset: -2px; }
-.term .tfoot { margin: 0; padding: 10px 18px; background: var(--code-bar); border-top: 1px solid var(--code-border); color: var(--code-dim); font-size: 13px; line-height: 1.5; }
+.term .tfoot { margin: 0; padding: 10px 18px; background: color-mix(in srgb, #ffd23f var(--note), var(--code-bg));
+  border-top: 1px solid color-mix(in srgb, #ffd23f calc(var(--note) * 2), var(--code-border)); color: var(--code-dim); font-size: 13px; line-height: 1.5; }
 .term .tfoot code { color: var(--code-fg); font-size: 12px; }
 .term .copy.k-file, .term pre.k-file, .term .tfoot.k-file, #k-file:checked ~ .tbar .copy.k-default, #k-file:checked ~ .k-default { display: none; }
 #k-file:checked ~ .tfoot.k-file { display: block; }
