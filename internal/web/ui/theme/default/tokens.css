@@ -122,10 +122,11 @@
   --ig-code-purple: #7547c9;
   --ig-code-teal: #0f7a8e;
 
-  /* A command to copy: a terminal line on #444, in Monokai's hues at their
-     most saturated. Green and yellow full; pink, purple and grey as
-     saturated as they can be and still read at 4:1. */
-  --ig-term-bg: #444;
+  /* A command to copy: a terminal line on #333a3e, in Monokai's hues at
+     their most saturated. Green and yellow full; pink, purple and grey as
+     saturated as they could be on #444 and still read at 4:1, and at 4.7:1
+     on this. */
+  --ig-term-bg: #333a3e;
   --ig-term-line: rgb(0 0 0 / .2);
   --ig-term-fg: #f8f8f2;
   --ig-term-comment: #aca893;

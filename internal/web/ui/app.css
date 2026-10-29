@@ -26,40 +26,42 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* The wallpaper the materials blur: two layers of color glows that wander
-   around the page, each on its own path and clock, so they never line up
-   the same way twice. Only transforms move, so it stays cheap. */
+/* The wallpaper the materials blur: two layers of wide, soft color glows
+   that run into each other and wander around the page, each on its own
+   path and clock, so they never line up the same way twice. Only
+   transforms move, so it stays cheap. Each glow fades out before the edge
+   of its layer, which is twice the page, so no edge shows as it turns. */
 body::before, body::after {
   content: "";
   position: fixed;
-  inset: -25%;
+  inset: -50%;
   z-index: -1;
   pointer-events: none;
   will-change: transform;
 }
 body::before {
   background:
-    radial-gradient(40% 36% at 24% 22%, var(--ig-wall-1), transparent 70%),
-    radial-gradient(34% 32% at 78% 26%, var(--ig-wall-2), transparent 70%);
+    radial-gradient(29% 28% at 30% 29%, var(--ig-wall-1), color-mix(in srgb, var(--ig-wall-1) 35%, transparent) 30%, color-mix(in srgb, var(--ig-wall-1) 10%, transparent) 60%, transparent 85%),
+    radial-gradient(26% 30% at 71% 32%, var(--ig-wall-2), color-mix(in srgb, var(--ig-wall-2) 35%, transparent) 30%, color-mix(in srgb, var(--ig-wall-2) 10%, transparent) 60%, transparent 85%);
   animation: drift-a 24s ease-in-out infinite;
 }
 body::after {
   background:
-    radial-gradient(42% 34% at 66% 78%, var(--ig-wall-3), transparent 70%),
-    radial-gradient(30% 28% at 22% 76%, var(--ig-wall-4), transparent 70%);
+    radial-gradient(30% 28% at 62% 71%, var(--ig-wall-3), color-mix(in srgb, var(--ig-wall-3) 35%, transparent) 30%, color-mix(in srgb, var(--ig-wall-3) 10%, transparent) 60%, transparent 85%),
+    radial-gradient(25% 28% at 29% 70%, var(--ig-wall-4), color-mix(in srgb, var(--ig-wall-4) 35%, transparent) 30%, color-mix(in srgb, var(--ig-wall-4) 10%, transparent) 60%, transparent 85%);
   animation: drift-b 31s ease-in-out infinite;
 }
 @keyframes drift-a {
-  0%, 100% { transform: translate(-12%, -8%) rotate(0deg) scale(1); }
-  25% { transform: translate(14%, -4%) rotate(28deg) scale(1.15); }
-  50% { transform: translate(16%, 14%) rotate(52deg) scale(.92); }
-  75% { transform: translate(-8%, 15%) rotate(22deg) scale(1.1); }
+  0%, 100% { transform: translate(-9%, -6%) rotate(0deg) scale(1); }
+  25% { transform: translate(10%, -3%) rotate(28deg) scale(1.15); }
+  50% { transform: translate(12%, 10%) rotate(52deg) scale(.92); }
+  75% { transform: translate(-6%, 11%) rotate(22deg) scale(1.1); }
 }
 @keyframes drift-b {
-  0%, 100% { transform: translate(12%, 8%) rotate(0deg) scale(1.06); }
-  30% { transform: translate(-15%, 10%) rotate(-30deg) scale(.92); }
-  60% { transform: translate(-16%, -14%) rotate(-54deg) scale(1.16); }
-  80% { transform: translate(9%, -12%) rotate(-18deg) scale(1); }
+  0%, 100% { transform: translate(9%, 6%) rotate(0deg) scale(1.06); }
+  30% { transform: translate(-11%, 8%) rotate(-30deg) scale(.92); }
+  60% { transform: translate(-12%, -10%) rotate(-54deg) scale(1.16); }
+  80% { transform: translate(7%, -9%) rotate(-18deg) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }

@@ -12,10 +12,10 @@ body {
   font: var(--ig-text-base)/var(--ig-leading) var(--ig-font-sans);
   -webkit-font-smoothing: antialiased;
   background:
-    radial-gradient(40% 36% at 18% 12%, var(--ig-wall-1), transparent 70%),
-    radial-gradient(34% 32% at 82% 18%, var(--ig-wall-2), transparent 70%),
-    radial-gradient(42% 34% at 70% 70%, var(--ig-wall-3), transparent 70%),
-    radial-gradient(30% 28% at 20% 80%, var(--ig-wall-4), transparent 70%),
+    radial-gradient(58% 64% at 18% 12%, var(--ig-wall-1), color-mix(in srgb, var(--ig-wall-1) 35%, transparent) 30%, color-mix(in srgb, var(--ig-wall-1) 10%, transparent) 60%, transparent 85%),
+    radial-gradient(52% 60% at 82% 18%, var(--ig-wall-2), color-mix(in srgb, var(--ig-wall-2) 35%, transparent) 30%, color-mix(in srgb, var(--ig-wall-2) 10%, transparent) 60%, transparent 85%),
+    radial-gradient(60% 62% at 70% 70%, var(--ig-wall-3), color-mix(in srgb, var(--ig-wall-3) 35%, transparent) 30%, color-mix(in srgb, var(--ig-wall-3) 10%, transparent) 60%, transparent 85%),
+    radial-gradient(50% 56% at 20% 80%, var(--ig-wall-4), color-mix(in srgb, var(--ig-wall-4) 35%, transparent) 30%, color-mix(in srgb, var(--ig-wall-4) 10%, transparent) 60%, transparent 85%),
     var(--ig-bg);
   background-attachment: fixed;
 }
