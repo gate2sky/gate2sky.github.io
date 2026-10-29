@@ -255,6 +255,9 @@ h1 .glow, .brand .glow { background: linear-gradient(90deg, var(--cyan), var(--b
 .install code { flex: 1; min-width: 0; color: var(--code-fg); font-size: 13.5px; white-space: nowrap; overflow-x: auto; scrollbar-width: none; padding: 8px 0; }
 .install code::-webkit-scrollbar { display: none; }
 .install code .p { color: var(--cyan); user-select: none; }
+/* Just the icon here: the button's aria-label names it, and turning green says it copied. */
+.install .copy { padding: 9px; }
+.install .copy span { display: none; }
 .copy { flex: none; border: 1px solid var(--code-button-border); background: var(--code-button); color: var(--code-fg); border-radius: 10px;
   font: 600 13px system-ui, sans-serif; padding: 9px 12px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
 .copy:hover { border-color: var(--cyan); }
