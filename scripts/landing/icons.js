@@ -1,7 +1,7 @@
 // Writes internal/web/ui/logo-mark.svg, the logo without its dark tile, for
-// the dashboard's header (as the landing's header inlines it), and renders
-// pages/favicon.svg into the bitmaps for what does not take an SVG
-// icon: favicon.ico (16 and 32 px; older Safari, and the /favicon.ico every
+// the dashboard's header and sign-in page (as the landing's header inlines
+// it), and renders pages/favicon.svg into the bitmaps for what does not take
+// an SVG icon: favicon.ico (16 and 32 px; older Safari, and the /favicon.ico every
 // browser asks for) and apple-touch-icon.png (180 px, the tile edge to edge,
 // without its rounded corners: iOS rounds them itself and fills
 // transparency with black).
