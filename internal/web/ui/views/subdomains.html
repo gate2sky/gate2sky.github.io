@@ -62,7 +62,6 @@
         <tr :each="sub in subdomains" :key="sub.name">
           <td>
             <a class="name-cell" :href="'/subdomains/' + encodeURIComponent(sub.name)">
-              <span class="tile" :class="'tile-' + sub.access" aria-hidden="true">{{ sub.name[0] }}</span>
               <span><strong>{{ sub.name }}</strong><span class="url muted small">{{ sub.url }}</span></span>
             </a>
           </td>
