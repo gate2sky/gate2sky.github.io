@@ -7,6 +7,7 @@
   const AccessOptions = await import("@ui/components/access-options.html")
   const StatusBadge = await import("@ui/components/status-badge.html")
   const CopyText = await import("@ui/components/copy-text.html")
+  const TcpPorts = await import("@ui/components/tcp-ports.html")
 
   let sub = null
   let missing = false
@@ -36,8 +37,9 @@
   $: document.title = `${name} · gate2sky`
 
   $attached(() => {
-    // Not while a key is being renamed: a reload would redraw its form.
-    const timer = setInterval(() => document.hidden || renaming || load(), 5000)
+    // Not while a key is being renamed or a dialog is open: a reload would
+    // redraw its form.
+    const timer = setInterval(() => document.hidden || renaming || document.querySelector("dialog[open]") || load(), 5000)
     const off = $detached(() => {
       clearInterval(timer)
       off()
@@ -225,9 +227,11 @@
     </form>
   </section>
 
+  <TcpPorts :if="app.tcp" :sub="sub" @changed="load()" />
+
   <section class="card danger-zone">
     <h2>Delete subdomain</h2>
-    <p>Closes the tunnel and removes {{ sub.name }}.{{ app.domain }} and its keys. The name becomes available to anyone.</p>
+    <p>Closes the tunnel and removes {{ sub.name }}.{{ app.domain }}, its keys and its TCP ports. The name becomes available to anyone.</p>
     <form class="form form-row" @submit.prevent="remove">
       <input name="confirm" required autocomplete="off" spellcheck="false" :placeholder="'type ' + sub.name + ' to confirm'"
              :aria-label="'Type ' + sub.name + ' to confirm'" :value="confirmName" @input="confirmName = $event.target.value">

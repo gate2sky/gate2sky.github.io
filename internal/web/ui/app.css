@@ -432,6 +432,22 @@ select.role {
 .dialog h2 { font-size: 17px; margin-bottom: 6px; }
 .dialog p { margin: 0 0 18px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+/* TCP ports. */
+.form-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .form-grid { grid-template-columns: 1.4fr 1fr .8fr; } }
+select.field {
+  font: inherit; font-size: 16px; color: var(--fg); background: var(--field); width: 100%; padding: 9px 12px;
+  border: .5px solid var(--field-line); border-radius: var(--radius-control); box-shadow: 0 .5px 1px rgb(0 0 0 / .12) inset;
+}
+select.field:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+.address { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+.address code { font-size: 13px; }
+.warn { color: var(--warn); font-weight: 600; }
+.flash-warn { --tone: var(--orange); color: var(--warn); }
+.form > .flash { margin-bottom: 0; }
+.tcp-ports fieldset { display: grid; gap: 10px; }
+.tcp-ports fieldset .hint { margin: -4px 0 0; }
+
 .dialog-wide { width: min(620px, calc(100vw - 32px)); margin-top: max(40px, 6vh); max-height: calc(100dvh - 80px); overflow: auto; }
 @keyframes dialog-in { from { opacity: 0; transform: translateY(-8px) scale(.97); } }
 @media (prefers-reduced-motion: reduce) { .dialog[open] { animation: none; } }
