@@ -52,7 +52,11 @@ func newFakeSMTP(t *testing.T) *fakeSMTP {
 			case strings.HasPrefix(cmd, "AUTH PLAIN "):
 				dec, _ := base64.StdEncoding.DecodeString(strings.TrimPrefix(cmd, "AUTH PLAIN "))
 				f.auth <- string(dec)
-				say("235 ok")
+				if strings.HasSuffix(string(dec), "\x00wrong") {
+					say("535 5.7.8 authentication failed")
+				} else {
+					say("235 ok")
+				}
 			case strings.HasPrefix(cmd, "MAIL FROM:"):
 				from = cmd
 				say("250 ok")
@@ -110,5 +114,36 @@ func TestSMTPSender(t *testing.T) {
 	body, _ := io.ReadAll(msg.Body)
 	if !strings.Contains(string(body), "    123456") {
 		t.Errorf("body = %q", body)
+	}
+}
+
+func TestCheck(t *testing.T) {
+	smtpConfig := func(addr, password string) config.SMTPConfig {
+		host, port, _ := net.SplitHostPort(addr)
+		p, _ := strconv.Atoi(port)
+		return config.SMTPConfig{Host: host, Port: p, TLS: "none", Username: "user", Password: password}
+	}
+	f := newFakeSMTP(t)
+	if err := Check(context.Background(), smtpConfig(f.addr, "pw")); err != nil {
+		t.Fatal(err)
+	}
+	if got := <-f.auth; got != "\x00user\x00pw" {
+		t.Errorf("AUTH PLAIN = %q", got)
+	}
+	select {
+	case env := <-f.envelope:
+		t.Errorf("Check sent a message: %q", env)
+	default:
+	}
+
+	f = newFakeSMTP(t)
+	if err := Check(context.Background(), smtpConfig(f.addr, "wrong")); err == nil || !strings.Contains(err.Error(), "authenticate") {
+		t.Errorf("wrong password: %v", err)
+	}
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	closed := ln.Addr().String()
+	ln.Close()
+	if err := Check(context.Background(), smtpConfig(closed, "pw")); err == nil || !strings.Contains(err.Error(), "connect") {
+		t.Errorf("nothing listening: %v", err)
 	}
 }

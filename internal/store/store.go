@@ -125,6 +125,12 @@ var migrations = []string{
 		UNIQUE (subdomain_id, name)
 	);
 	CREATE INDEX tcp_ports_subdomain ON tcp_ports(subdomain_id);`,
+	// Settings made from the dashboard's setup or the admin socket, such as
+	// email delivery: JSON by key.
+	`CREATE TABLE settings (
+		key   TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	);`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

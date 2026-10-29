@@ -18,6 +18,7 @@ import (
 	"github.com/jgermade/intergate/internal/api"
 	"github.com/jgermade/intergate/internal/config"
 	"github.com/jgermade/intergate/internal/manage"
+	"github.com/jgermade/intergate/internal/settings"
 	"github.com/jgermade/intergate/internal/store"
 )
 
@@ -31,6 +32,32 @@ type Status struct {
 	Subdomains    int       `json:"subdomains"`
 	TunnelsOnline int       `json:"tunnels_online"`
 	Users         int       `json:"users"`
+	// Setup is set while intergate is not set up: email delivery or an
+	// owner is missing (see `intergate setup-url`).
+	Setup bool `json:"setup,omitempty"`
+}
+
+// Email describes email delivery, without its password.
+type Email struct {
+	// Source is "config" (the configuration file), "dashboard" (set up
+	// from the dashboard) or "" (none).
+	Source   settings.Source `json:"source"`
+	Host     string          `json:"host,omitempty"`
+	Port     int             `json:"port,omitempty"`
+	TLS      string          `json:"tls,omitempty"`
+	Username string          `json:"username,omitempty"`
+	From     string          `json:"from,omitempty"`
+	// Password says where the SMTP password of email delivery set up from
+	// the dashboard comes from: "stored" (sealed in the database),
+	// env:NAME, file:/path, or "" for none.
+	Password string `json:"password,omitempty"`
+}
+
+// PasswordRequest changes where the SMTP password comes from: Ref env:NAME
+// or file:/path, or "" to store Password.
+type PasswordRequest struct {
+	Ref      string `json:"ref"`
+	Password string `json:"password,omitempty"`
 }
 
 // The shapes the socket answers with are the dashboard API's.
@@ -60,19 +87,23 @@ const actor = "local admin"
 
 // Handler serves the admin API.
 type Handler struct {
-	cfg     *config.Config
-	store   *store.Store
-	manage  *manage.Service
-	log     *slog.Logger
-	version string
-	started time.Time
-	mux     *http.ServeMux
+	cfg      *config.Config
+	store    *store.Store
+	manage   *manage.Service
+	settings *settings.Settings
+	log      *slog.Logger
+	version  string
+	started  time.Time
+	mux      *http.ServeMux
 }
 
 // NewHandler returns the admin API handler.
-func NewHandler(cfg *config.Config, st *store.Store, svc *manage.Service, log *slog.Logger, version string) *Handler {
-	h := &Handler{cfg: cfg, store: st, manage: svc, log: log, version: version, started: time.Now(), mux: http.NewServeMux()}
+func NewHandler(cfg *config.Config, st *store.Store, svc *manage.Service, set *settings.Settings, log *slog.Logger, version string) *Handler {
+	h := &Handler{cfg: cfg, store: st, manage: svc, settings: set, log: log, version: version, started: time.Now(), mux: http.NewServeMux()}
 	h.mux.HandleFunc("GET /v1/status", h.status)
+	h.mux.HandleFunc("POST /v1/setup/url", h.setupURL)
+	h.mux.HandleFunc("GET /v1/email", h.email)
+	h.mux.HandleFunc("PUT /v1/email/password", h.setPassword)
 	h.mux.HandleFunc("GET /v1/subdomains", h.listSubdomains)
 	h.mux.HandleFunc("POST /v1/subdomains", h.createSubdomain)
 	h.mux.HandleFunc("GET /v1/subdomains/{name}", h.getSubdomain)
@@ -164,7 +195,13 @@ func (h *Handler) status(w http.ResponseWriter, r *http.Request) {
 			online++
 		}
 	}
+	setup, err := h.settings.SetupPending(r.Context())
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, Status{
+		Setup:         setup,
 		Version:       h.version,
 		PID:           os.Getpid(),
 		StartedAt:     h.started,
@@ -358,4 +395,61 @@ func (h *Handler) setDisabled(disabled bool) http.HandlerFunc {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+// setupURL answers a new link to the dashboard's setup, which replaces the
+// previous one.
+func (h *Handler) setupURL(w http.ResponseWriter, r *http.Request) {
+	pending, err := h.settings.SetupPending(r.Context())
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	if !pending {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "intergate is already set up: sign in at " + h.cfg.DashboardURL("/")})
+		return
+	}
+	h.log.Info("new setup link", "by", actor)
+	writeJSON(w, http.StatusOK, map[string]string{"url": h.settings.SetupURL()})
+}
+
+func (h *Handler) emailInfo() Email {
+	e := Email{Source: h.settings.EmailSource()}
+	switch e.Source {
+	case settings.SourceConfig:
+		c := h.cfg.Auth.Email
+		e.Host, e.Port, e.TLS, e.Username, e.From = c.SMTP.Host, c.SMTP.Port, c.SMTP.TLS, c.SMTP.Username, c.From
+	case settings.SourceDashboard:
+		d := h.settings.Email()
+		e.Host, e.Port, e.TLS, e.Username, e.From, e.Password = d.Host, d.Port, d.TLS, d.Username, d.From, d.PasswordSource()
+	}
+	return e
+}
+
+func (h *Handler) email(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, h.emailInfo())
+}
+
+// setPassword changes where the SMTP password comes from, once the SMTP
+// server takes it.
+func (h *Handler) setPassword(w http.ResponseWriter, r *http.Request) {
+	var req PasswordRequest
+	if err := decode(r, &req); err != nil {
+		h.fail(w, err)
+		return
+	}
+	if err := h.settings.SetPassword(r.Context(), req.Ref, req.Password); err != nil {
+		var smtpErr *settings.SMTPError
+		if errors.As(err, &smtpErr) {
+			err = fmt.Errorf("the SMTP server refused the password, nothing changed: %w", err)
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	source := "stored"
+	if req.Ref != "" {
+		source = req.Ref
+	}
+	h.log.Info("SMTP password source changed", "source", source, "by", actor)
+	writeJSON(w, http.StatusOK, h.emailInfo())
 }

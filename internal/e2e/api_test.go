@@ -19,6 +19,7 @@ type bootData struct {
 	User *struct {
 		Email string `json:"email"`
 		Admin bool   `json:"admin"`
+		Role  string `json:"role"`
 	} `json:"user"`
 	CSRF      string `json:"csrf"`
 	EmailFlow string `json:"email_flow"`
@@ -26,6 +27,23 @@ type bootData struct {
 		Status  int    `json:"status"`
 		Message string `json:"message"`
 	} `json:"error"`
+	Setup *setupState `json:"setup"`
+}
+
+// setupState is the setup's state, in the page and in the setup's answers.
+type setupState struct {
+	Email   bool `json:"email"`
+	Owner   bool `json:"owner"`
+	Session bool `json:"session"`
+	SMTP    *struct {
+		Host     string `json:"host"`
+		Port     int    `json:"port"`
+		TLS      string `json:"tls"`
+		Username string `json:"username"`
+		From     string `json:"from"`
+		Password bool   `json:"password"`
+	} `json:"smtp"`
+	OwnerFlow string `json:"owner_flow"`
 }
 
 var bootRE = regexp.MustCompile(`<script type="application/json" id="boot">(.*?)</script>`)

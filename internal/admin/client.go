@@ -158,3 +158,24 @@ func (c *Client) SetUserDisabled(ctx context.Context, id int64, disabled bool) e
 	}
 	return c.do(ctx, http.MethodPost, fmt.Sprintf("/v1/users/%d/%s", id, verb), nil, nil)
 }
+
+// SetupURL returns a new link to the dashboard's setup, replacing the
+// previous one.
+func (c *Client) SetupURL(ctx context.Context) (string, error) {
+	var out struct {
+		URL string `json:"url"`
+	}
+	return out.URL, c.do(ctx, http.MethodPost, "/v1/setup/url", nil, &out)
+}
+
+// Email describes email delivery.
+func (c *Client) Email(ctx context.Context) (*Email, error) {
+	var out Email
+	return &out, c.do(ctx, http.MethodGet, "/v1/email", nil, &out)
+}
+
+// SetEmailPassword changes where the SMTP password comes from.
+func (c *Client) SetEmailPassword(ctx context.Context, req PasswordRequest) (*Email, error) {
+	var out Email
+	return &out, c.do(ctx, http.MethodPut, "/v1/email/password", req, &out)
+}

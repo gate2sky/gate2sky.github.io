@@ -114,6 +114,9 @@ func startDetached(path string, cfg *config.Config, debug bool) error {
 		if err == nil {
 			fmt.Printf("intergate %s started in the background (PID %d)\n", st.Version, st.PID)
 			fmt.Printf("  dashboard: %s\n  ssh:       %s\n  logs:      %s\n", st.DashboardURL, st.SSH, logPath)
+			if st.Setup {
+				fmt.Println("It is not set up yet: run `intergate setup-url` for the link to the setup.")
+			}
 			fmt.Println("Stop it with `intergate stop`.")
 			return nil
 		}
@@ -202,6 +205,32 @@ func cmdStatus(args []string, out io.Writer) error {
 	fmt.Fprintf(out, "intergate %s is running %s (PID %d, up %s)\n", st.Version, how, st.PID, time.Since(st.StartedAt).Round(time.Second))
 	fmt.Fprintf(out, "  dashboard:  %s\n  ssh:        %s\n", st.DashboardURL, st.SSH)
 	fmt.Fprintf(out, "  subdomains: %d registered, %d online\n  users:      %d\n", st.Subdomains, st.TunnelsOnline, st.Users)
+	if st.Setup {
+		fmt.Fprintln(out, "  setup:      not done yet: run `intergate setup-url` for the link")
+	}
+	return nil
+}
+
+// cmdSetupURL prints a new link to the dashboard's setup: the URL alone on
+// stdout, for scripts, and what to do with it on stderr.
+func cmdSetupURL(args []string, out io.Writer) error {
+	fs, cfgFlag := newFlags("setup-url")
+	if err := fs.Parse(args); err != nil {
+		return errQuiet
+	}
+	cfg, err := loadConfig(configPath(*cfgFlag))
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	link, err := admin.NewClient(cfg.Admin.Socket).SetupURL(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stderr, "Open this link to set up email delivery and the owner. It works once, and replaces")
+	fmt.Fprintln(os.Stderr, "any link given before; run `intergate setup-url` again for a new one.")
+	fmt.Fprintln(out, link)
 	return nil
 }
 

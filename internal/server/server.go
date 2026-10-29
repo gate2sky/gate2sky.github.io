@@ -31,6 +31,7 @@ import (
 	"github.com/jgermade/intergate/internal/manage"
 	"github.com/jgermade/intergate/internal/names"
 	"github.com/jgermade/intergate/internal/ports"
+	"github.com/jgermade/intergate/internal/settings"
 	"github.com/jgermade/intergate/internal/sshd"
 	"github.com/jgermade/intergate/internal/store"
 	"github.com/jgermade/intergate/internal/tunnel"
@@ -55,6 +56,7 @@ type Server struct {
 	registry *tunnel.Registry
 	ports    *ports.Registry
 	manage   *manage.Service
+	settings *settings.Settings
 	hostKey  ssh.Signer
 	ssh      *sshd.Server
 	web      *web.Server
@@ -79,6 +81,10 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 		s.store.Close()
 		return nil, fmt.Errorf("load secret: %w", err)
 	}
+	if s.settings, err = settings.Open(context.Background(), cfg, s.store, secret); err != nil {
+		s.store.Close()
+		return nil, err
+	}
 	hostKeyPath := cfg.SSH.HostKeyFile
 	if hostKeyPath == "" {
 		hostKeyPath = filepath.Join(cfg.DataDir, "ssh_host_ed25519_key")
@@ -94,6 +100,7 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 		Store:      s.store,
 		Registry:   s.registry,
 		Manage:     s.manage,
+		Settings:   s.settings,
 		Mailer:     opts.Mailer,
 		Secret:     secret,
 		Logger:     log.With("component", "web"),
@@ -105,7 +112,7 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 		s.store.Close()
 		return nil, err
 	}
-	s.admin = admin.NewHandler(cfg, s.store, s.manage, log.With("component", "admin"), opts.Version)
+	s.admin = admin.NewHandler(cfg, s.store, s.manage, s.settings, log.With("component", "admin"), opts.Version)
 	return s, nil
 }
 
@@ -120,6 +127,9 @@ func (s *Server) Registry() *tunnel.Registry { return s.registry }
 
 // HostKey returns the SSH host key.
 func (s *Server) HostKey() ssh.PublicKey { return s.hostKey.PublicKey() }
+
+// Settings returns what is set up from the dashboard.
+func (s *Server) Settings() *settings.Settings { return s.settings }
 
 // Ports returns the forwarded TCP ports.
 func (s *Server) Ports() *ports.Registry { return s.ports }
@@ -228,7 +238,7 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	var methods []string
-	if cfg.Auth.Email.Enabled() {
+	if s.settings.EmailEnabled() {
 		methods = append(methods, "email")
 	}
 	if cfg.PasskeysEnabled() {
@@ -250,6 +260,12 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	if cfg.Auth.Email.LogOnly {
 		log.Warn("auth.email.log_only is set: sign-in codes are written to this log instead of being emailed")
+	}
+	if pending, err := s.settings.SetupPending(ctx); err != nil {
+		log.Error("setup state", "err", err)
+	} else if pending {
+		log.Warn("intergate is not set up yet: open this link to set up email and the owner (it works once; `intergate setup-url` gives a new one)",
+			"url", s.settings.SetupURL())
 	}
 
 	go cleanSessions(ctx, s.store, log)

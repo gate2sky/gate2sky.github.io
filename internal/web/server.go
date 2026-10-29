@@ -25,6 +25,7 @@ import (
 	"github.com/jgermade/intergate/internal/config"
 	"github.com/jgermade/intergate/internal/mail"
 	"github.com/jgermade/intergate/internal/manage"
+	"github.com/jgermade/intergate/internal/settings"
 	"github.com/jgermade/intergate/internal/store"
 	"github.com/jgermade/intergate/internal/tunnel"
 )
@@ -38,7 +39,11 @@ type Options struct {
 	Store    *store.Store
 	Registry *tunnel.Registry
 	Manage   *manage.Service
-	// Mailer sends sign-in codes. Defaults to the configured SMTP server.
+	// Settings holds email delivery set up from the dashboard, and the
+	// setup itself.
+	Settings *settings.Settings
+	// Mailer sends sign-in codes. Defaults to the email delivery set up,
+	// in the configuration file or from the dashboard.
 	Mailer mail.Sender
 	// Secret signs OAuth state and tunnel access cookies. Keep it stable
 	// across restarts so visitors stay signed in to private tunnels.
@@ -59,6 +64,7 @@ type Server struct {
 	store     *store.Store
 	registry  *tunnel.Registry
 	manage    *manage.Service
+	settings  *settings.Settings
 	mailer    mail.Sender
 	log       *slog.Logger
 	signer    signer
@@ -79,7 +85,7 @@ type Server struct {
 }
 
 type cookieNames struct {
-	session, oauth, access, emailLogin, passkey string
+	session, oauth, access, emailLogin, passkey, setup, setupOwner string
 }
 
 // New builds the handler.
@@ -96,6 +102,7 @@ func New(o Options) (*Server, error) {
 		store:    o.Store,
 		registry: o.Registry,
 		manage:   o.Manage,
+		settings: o.Settings,
 		mailer:   o.Mailer,
 		log:      o.Logger,
 		signer:   signer{key: o.Secret},
@@ -105,7 +112,7 @@ func New(o Options) (*Server, error) {
 		hostKey:  o.HostKey,
 	}
 	if s.mailer == nil {
-		s.mailer = mail.New(s.cfg.Auth.Email, s.log)
+		s.mailer = s.settings.Mailer(s.log)
 	}
 	// The __Host- prefix stops tunnel subdomains, which serve arbitrary
 	// content, from planting cookies for the dashboard (or each other).
@@ -119,6 +126,8 @@ func New(o Options) (*Server, error) {
 		access:     prefix + "intergate-access",
 		emailLogin: prefix + "intergate-email",
 		passkey:    prefix + "intergate-passkey",
+		setup:      prefix + "intergate-setup",
+		setupOwner: prefix + "intergate-setup-owner",
 	}
 	if s.cfg.PasskeysEnabled() {
 		wa, err := webauthn.New(&webauthn.Config{
@@ -211,11 +220,15 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/", func(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, "Not found.")
 	})
-	if s.cfg.Auth.Email.Enabled() {
-		mux.Handle("POST /api/login/email", s.sameOrigin(s.handleEmailLogin))
-		mux.Handle("DELETE /api/login/email", s.sameOrigin(s.handleEmailCancel))
-		mux.Handle("POST /api/login/code", s.sameOrigin(s.handleCodeLogin))
-	}
+	// Email delivery can be set up while intergate runs, from the setup.
+	mux.Handle("POST /api/login/email", s.sameOrigin(s.withEmail(s.handleEmailLogin)))
+	mux.Handle("DELETE /api/login/email", s.sameOrigin(s.withEmail(s.handleEmailCancel)))
+	mux.Handle("POST /api/login/code", s.sameOrigin(s.withEmail(s.handleCodeLogin)))
+	mux.Handle("POST /api/setup/start", s.setupCall(true, s.handleSetupStart))
+	mux.Handle("POST /api/setup/email", s.setupCall(false, s.handleSetupEmail))
+	mux.Handle("POST /api/setup/owner", s.setupCall(false, s.handleSetupOwner))
+	mux.Handle("DELETE /api/setup/owner", s.setupCall(false, s.handleSetupOwnerCancel))
+	mux.Handle("POST /api/setup/owner/code", s.setupCall(false, s.handleSetupOwnerCode))
 	if s.webauthn != nil {
 		mux.Handle("POST /api/login/passkey/options", s.sameOrigin(s.handlePasskeyLoginOptions))
 		mux.Handle("POST /api/login/passkey", s.sameOrigin(s.handlePasskeyLogin))

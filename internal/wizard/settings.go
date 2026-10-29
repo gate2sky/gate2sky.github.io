@@ -21,9 +21,11 @@ const (
 
 // Email sign-in modes.
 const (
-	emailSMTP = "smtp"
-	emailLog  = "log"
-	emailOff  = "off"
+	// emailDashboard leaves email delivery to the dashboard's setup.
+	emailDashboard = "dashboard"
+	emailSMTP      = "smtp"
+	emailLog       = "log"
+	emailOff       = "off"
 )
 
 // settings are the server options the wizard edits.
@@ -108,7 +110,7 @@ func (s *settings) load(d *doc) {
 	case d.boolean("auth", "email", "log_only"):
 		s.EmailMode = emailLog
 	case d.value("auth", "email") == nil && d.value("auth", "providers") == nil:
-		s.EmailMode = emailSMTP // new configuration
+		s.EmailMode = emailDashboard // a new configuration, or set up there
 	default:
 		s.EmailMode = emailOff
 	}
@@ -198,7 +200,7 @@ func (s *settings) apply(d *doc) {
 		d.del("http", "trust_proxy_headers")
 	}
 
-	d.setList(splitList(s.Admins), "auth", "admins")
+	setOrDelList(d, splitList(s.Admins), "auth", "admins")
 	setOrDelList(d, splitList(s.AllowedDomains), "auth", "allowed_domains")
 	setOrDelList(d, splitList(s.AllowedEmails), "auth", "allowed_emails")
 	if s.AllowEveryone {

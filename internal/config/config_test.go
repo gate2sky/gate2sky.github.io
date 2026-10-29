@@ -99,8 +99,6 @@ func TestParseErrors(t *testing.T) {
 		"bad type":        strings.Replace(base, "type: github", "type: saml", 1),
 		"tls without https": strings.Replace(base, "https://", "http://", 1) +
 			"http:\n  tls:\n    cert_file: a\n    key_file: b\n",
-		"nobody allowed": strings.Replace(strings.Replace(base, "admins: [Root@Example.com]", "", 1),
-			`allowed_domains: ["@corp.example"]`, "", 1),
 		"tcp not a range":    base + "tcp:\n  ports: lots\n",
 		"tcp reversed range": base + "tcp:\n  ports: 30099-30000\n",
 		"tcp over http":      base + "tcp:\n  ports: 1-1000\n",
@@ -110,6 +108,28 @@ func TestParseErrors(t *testing.T) {
 	for name, doc := range cases {
 		if _, err := Parse([]byte(doc)); err == nil {
 			t.Errorf("%s: expected an error", name)
+		}
+	}
+}
+
+// TestSetupMode checks that a configuration with no sign-in method and
+// nobody allowed is valid: the dashboard's setup asks for them.
+func TestSetupMode(t *testing.T) {
+	cfg, err := Parse([]byte("public_url: https://gate.example.com\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.NobodyAllowed() || cfg.Auth.Email.Enabled() || len(cfg.Auth.Providers) > 0 {
+		t.Errorf("NobodyAllowed = %v, email = %v", cfg.NobodyAllowed(), cfg.Auth.Email.Enabled())
+	}
+	t.Setenv("TEST_SECRET", "x")
+	if cfg, err := Parse([]byte(base)); err != nil || cfg.NobodyAllowed() {
+		t.Errorf("base: NobodyAllowed = %v, %v", cfg != nil && cfg.NobodyAllowed(), err)
+	}
+	for _, auth := range []string{"admins: [a@example.com]", "allowed_emails: [a@example.com]", "allowed_domains: [example.com]", "allow_everyone: true"} {
+		cfg, err := Parse([]byte("public_url: https://gate.example.com\nauth:\n  " + auth + "\n"))
+		if err != nil || cfg.NobodyAllowed() {
+			t.Errorf("%s: NobodyAllowed = %v, %v", auth, cfg != nil && cfg.NobodyAllowed(), err)
 		}
 	}
 }

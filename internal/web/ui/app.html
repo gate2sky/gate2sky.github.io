@@ -2,6 +2,7 @@
   // The page: the top bar, and the view the path names. Signed out, every
   // path shows the sign-in form, which comes back to that path.
   const { app, route, go } = await import("@ui/lib/store.js")
+  const Setup = await import("@ui/views/setup.html")
   const Login = await import("@ui/views/login.html")
   const Subdomains = await import("@ui/views/subdomains.html")
   const Subdomain = await import("@ui/views/subdomain.html")
@@ -57,6 +58,7 @@
     <p :if="app.error.retry"><button type="button" class="button" @click="retry">Try again</button></p>
     <p><a class="icon-link" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Back to intergate</a></p>
   </section>
+  <Setup :elseif="app.setup" />
   <Login :elseif="!app.user" />
   <Subdomains :elseif="current.page === 'subdomains' || current.page === 'login'" />
   <Subdomain :elseif="current.page === 'subdomain'" :name="current.name" />

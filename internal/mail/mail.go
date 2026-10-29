@@ -65,40 +65,11 @@ func (s *SMTPSender) Send(ctx context.Context, m Message) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-
-	smtpCfg := s.cfg.SMTP
-	addr := net.JoinHostPort(smtpCfg.Host, strconv.Itoa(smtpCfg.Port))
-	tlsCfg := &tls.Config{ServerName: smtpCfg.Host, MinVersion: tls.VersionTLS12}
-	var conn net.Conn
-	if smtpCfg.TLS == "tls" {
-		conn, err = (&tls.Dialer{Config: tlsCfg}).DialContext(ctx, "tcp", addr)
-	} else {
-		conn, err = (&net.Dialer{}).DialContext(ctx, "tcp", addr)
-	}
+	c, err := dial(ctx, s.cfg.SMTP)
 	if err != nil {
-		return fmt.Errorf("smtp: connect to %s: %w", addr, err)
-	}
-	if deadline, ok := ctx.Deadline(); ok {
-		conn.SetDeadline(deadline)
-	}
-	c, err := smtp.NewClient(conn, smtpCfg.Host)
-	if err != nil {
-		conn.Close()
-		return fmt.Errorf("smtp: %w", err)
+		return err
 	}
 	defer c.Close()
-	if smtpCfg.TLS == "starttls" {
-		if err := c.StartTLS(tlsCfg); err != nil {
-			return fmt.Errorf("smtp: STARTTLS: %w", err)
-		}
-	}
-	if smtpCfg.Username != "" {
-		// PlainAuth refuses to send credentials without TLS (except to
-		// localhost).
-		if err := c.Auth(smtp.PlainAuth("", smtpCfg.Username, smtpCfg.Password, smtpCfg.Host)); err != nil {
-			return fmt.Errorf("smtp: authenticate: %w", err)
-		}
-	}
 	if err := c.Mail(from.Address); err != nil {
 		return fmt.Errorf("smtp: MAIL FROM: %w", err)
 	}
@@ -116,6 +87,60 @@ func (s *SMTPSender) Send(ctx context.Context, m Message) error {
 		return fmt.Errorf("smtp: send message: %w", err)
 	}
 	return c.Quit()
+}
+
+// Check connects to the SMTP server of cfg and signs in, without sending
+// anything: it tells whether the server, its encryption and the
+// credentials are right.
+func Check(ctx context.Context, cfg config.SMTPConfig) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	c, err := dial(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+	return c.Quit()
+}
+
+// dial connects to the SMTP server, encrypts the connection as configured
+// and signs in.
+func dial(ctx context.Context, smtpCfg config.SMTPConfig) (*smtp.Client, error) {
+	addr := net.JoinHostPort(smtpCfg.Host, strconv.Itoa(smtpCfg.Port))
+	tlsCfg := &tls.Config{ServerName: smtpCfg.Host, MinVersion: tls.VersionTLS12}
+	var conn net.Conn
+	var err error
+	if smtpCfg.TLS == "tls" {
+		conn, err = (&tls.Dialer{Config: tlsCfg}).DialContext(ctx, "tcp", addr)
+	} else {
+		conn, err = (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("smtp: connect to %s: %w", addr, err)
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		conn.SetDeadline(deadline)
+	}
+	c, err := smtp.NewClient(conn, smtpCfg.Host)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("smtp: %w", err)
+	}
+	if smtpCfg.TLS == "starttls" {
+		if err := c.StartTLS(tlsCfg); err != nil {
+			c.Close()
+			return nil, fmt.Errorf("smtp: STARTTLS: %w", err)
+		}
+	}
+	if smtpCfg.Username != "" {
+		// PlainAuth refuses to send credentials without TLS (except to
+		// localhost).
+		if err := c.Auth(smtp.PlainAuth("", smtpCfg.Username, smtpCfg.Password, smtpCfg.Host)); err != nil {
+			c.Close()
+			return nil, fmt.Errorf("smtp: authenticate: %w", err)
+		}
+	}
+	return c, nil
 }
 
 // Compose renders an RFC 5322 message with a quoted-printable UTF-8 body.

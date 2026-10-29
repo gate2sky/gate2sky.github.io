@@ -31,6 +31,15 @@ func (h *harness) serveAdmin() *admin.Client {
 	return c
 }
 
+// serveAdminOnce starts the admin socket the first time, and returns its
+// client.
+func (h *harness) serveAdminOnce() *admin.Client {
+	if h.admin == nil {
+		h.admin = h.serveAdmin()
+	}
+	return h.admin
+}
+
 func TestAdminSocket(t *testing.T) {
 	h := newHarness(t)
 	c := h.serveAdmin()

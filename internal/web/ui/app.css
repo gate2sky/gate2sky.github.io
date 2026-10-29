@@ -628,6 +628,23 @@ input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: no
 .login .app-icon { width: 76px; height: 76px; margin: 0 auto 18px; display: block; }
 .providers { display: grid; gap: 10px; margin-top: 22px; }
 
+/* Setup: email delivery, then the owner. */
+.setup { max-width: 440px; }
+.setup-steps { display: flex; justify-content: center; gap: 22px; list-style: none; margin: -4px 0 18px; padding: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.setup-steps li { display: flex; align-items: center; gap: 7px; }
+.setup-steps .current { color: var(--fg); }
+.step-mark {
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px;
+  background: var(--fill); box-shadow: 0 0 0 .5px var(--line);
+}
+.current .step-mark { color: #fff; background: var(--accent); box-shadow: none; }
+.done .step-mark { color: #fff; background: var(--green); box-shadow: none; }
+.step-mark svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.form-pair { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
+.setup-command { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 12px; margin-top: 18px; text-align: left; }
+.setup-command .command { width: 100%; }
+.setup-note { margin: 0; text-align: center; }
+
 .error-page { max-width: 560px; margin: 32px auto; text-align: center; padding: 32px; }
 .error-page h1 { font-size: 22px; margin-bottom: 8px; }
 

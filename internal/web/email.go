@@ -147,6 +147,18 @@ func sixDigits() string {
 	return fmt.Sprintf("%06d", n.Int64())
 }
 
+// withEmail answers email sign-in calls with a 404 while no email
+// delivery is set up.
+func (s *Server) withEmail(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.settings.EmailEnabled() {
+			jsonError(w, http.StatusNotFound, "Not found.")
+			return
+		}
+		next(w, r)
+	}
+}
+
 // handleEmailLogin sends a sign-in code. The response is the same whether
 // or not the address may sign in, so it reveals nothing about accounts,
 // and addresses that may not sign in get no email at all.

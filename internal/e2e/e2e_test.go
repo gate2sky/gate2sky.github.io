@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/jgermade/intergate/internal/admin"
 	"github.com/jgermade/intergate/internal/api"
 	"github.com/jgermade/intergate/internal/config"
 	"github.com/jgermade/intergate/internal/mail"
@@ -45,6 +46,7 @@ type harness struct {
 	mail     *mailbox
 	web      *httptest.Server
 	sshAddr  string
+	admin    *admin.Client
 }
 
 // mailbox captures sign-in emails.
@@ -106,6 +108,14 @@ auth:
       client_id: %s
       client_secret: %s
 %s`, domain, dir, h.idp.URL, idpClientID, idpClientSecret, strings.Join(extraConfig, "\n"))
+	h.start()
+	return h
+}
+
+// start runs the server of h.yaml.
+func (h *harness) start() {
+	t := h.t
+	t.Helper()
 	var err error
 	h.cfg, err = config.Parse(h.yaml)
 	if err != nil {
@@ -132,7 +142,6 @@ auth:
 
 	h.web = httptest.NewServer(h.srv.Handler())
 	t.Cleanup(h.web.Close)
-	return h
 }
 
 type testWriter struct{ t *testing.T }

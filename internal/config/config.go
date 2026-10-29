@@ -396,9 +396,8 @@ func (c *Config) validate() error {
 		return errors.New("public_url must use https:// when http.tls is enabled")
 	}
 
-	if !c.Auth.Email.Enabled() && len(c.Auth.Providers) == 0 {
-		return errors.New("auth: configure email sign-in (auth.email.smtp) or at least one OAuth provider (auth.providers)")
-	}
+	// Without a sign-in method or anyone who may sign in, intergate starts
+	// in setup mode: the dashboard asks for them (see package settings).
 	if smtp := c.Auth.Email.SMTP; smtp.Host != "" {
 		if c.Auth.Email.From == "" {
 			return errors.New("auth.email.from is required to send sign-in codes")
@@ -437,9 +436,6 @@ func (c *Config) validate() error {
 		default:
 			return fmt.Errorf("%s.type must be github or oidc", where)
 		}
-	}
-	if !c.Auth.AllowEveryone && len(c.Auth.AllowedEmails)+len(c.Auth.AllowedDomains)+len(c.Auth.Admins) == 0 {
-		return errors.New("auth: nobody can sign in; set admins, allowed_emails, allowed_domains or allow_everyone")
 	}
 	return c.TCP.parse()
 }
@@ -516,6 +512,13 @@ func (c *Config) TCPAddress(port int) string { return c.PortAddress("tcp", port)
 // "udp": udp://gate.example.com:30043.
 func (c *Config) PortAddress(protocol string, port int) string {
 	return protocol + "://" + net.JoinHostPort(c.TCPHost(), strconv.Itoa(port))
+}
+
+// NobodyAllowed reports whether the configuration lets no one sign in: no
+// admins, allowed emails or domains, and not everyone. Only accounts the
+// database gives access to can then sign in.
+func (c *Config) NobodyAllowed() bool {
+	return !c.Auth.AllowEveryone && len(c.Auth.AllowedEmails)+len(c.Auth.AllowedDomains)+len(c.Auth.Admins) == 0
 }
 
 // IsAdmin reports whether email belongs to an administrator.
