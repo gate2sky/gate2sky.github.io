@@ -1,6 +1,8 @@
 <script :setup="{ command = '' }">
   // A command to copy, with a button that copies it. (Not `text`: on a
   // component's tag `:text` is jq79's directive, never a prop.)
+  const Icon = await import("@theme/components/icon.html")
+
   // The words of the command, each with its kind for the syntax colors.
   const kind = (word, i) =>
     i === 0 ? "cmd" : word.startsWith("-") ? "flag" : /^\d+$/.test(word) ? "num" : "arg"
@@ -21,5 +23,7 @@
 
 <div class="command">
   <code><span :each="word in words" :key="word.i" :class="'tok-' + word.kind">{{ word.text }}</span></code>
-  <button type="button" class="copy" @click="copy">{{ copied ? "Copied" : "Copy" }}</button>
+  <button type="button" class="copy" :title="copied ? 'Copied' : 'Copy'" :aria-label="copied ? 'Copied' : 'Copy'" @click="copy">
+    <Icon :name="copied ? 'check' : 'copy'" />
+  </button>
 </div>
