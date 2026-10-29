@@ -227,6 +227,35 @@ func (s *Service) Disconnect(d *store.Subdomain, actor string) bool {
 	return n > 0
 }
 
+// RenameSubdomain gives d a new name, keeping its keys, ports and access.
+// Its tunnel and ports close: clients connect again with the new name, and
+// the old one becomes free for anyone.
+func (s *Service) RenameSubdomain(ctx context.Context, d *store.Subdomain, name, actor string) error {
+	name = names.Normalize(name)
+	if name == d.Name {
+		return Errorf("%s.%s already has that name", name, s.cfg.Domain())
+	}
+	if err := s.CheckName(ctx, name); err != nil {
+		return err
+	}
+	err := s.store.RenameSubdomain(ctx, d.ID, name)
+	if errors.Is(err, store.ErrConflict) {
+		return Errorf("%s.%s is already taken", name, s.cfg.Domain())
+	}
+	if err != nil {
+		return err
+	}
+	old := d.Name
+	d.Name = name
+	reason := "the subdomain was renamed to " + name
+	if t := s.registry.Get(old); t != nil {
+		t.Close(reason)
+	}
+	s.ports.CloseSubdomain(d.ID, reason)
+	s.log.Info("subdomain renamed", "subdomain", old, "name", name, "by", actor)
+	return nil
+}
+
 // DeleteSubdomain removes d and its keys and closes its tunnel.
 func (s *Service) DeleteSubdomain(ctx context.Context, d *store.Subdomain, actor string) error {
 	if err := s.store.DeleteSubdomain(ctx, d.ID); err != nil {

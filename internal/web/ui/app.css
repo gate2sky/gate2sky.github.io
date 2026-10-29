@@ -250,6 +250,9 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 .panel-tabs button[aria-selected="true"] { color: var(--fg); background: var(--fill); }
 .panel-tabs button:focus-visible { outline: none; box-shadow: var(--ring); }
 .panel-tabs .count { padding: 1px 8px; }
+.panel-tabs .tab-danger[aria-selected="true"] { color: var(--err); }
+.form-row .input-suffix { flex: 1 1 260px; }
+.form-row .input-suffix input { flex: 1; min-width: 0; }
 .count-online { color: #0f3d1c; background: color-mix(in srgb, var(--green) 75%, #fff); }
 .crumbs { margin: 0 0 10px; font-size: 13px; }
 .crumbs a { font-weight: 500; }

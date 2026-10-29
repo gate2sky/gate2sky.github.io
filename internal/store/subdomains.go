@@ -112,6 +112,22 @@ func (s *Store) SetSubdomainAccess(ctx context.Context, id int64, access Access)
 	return nil
 }
 
+// RenameSubdomain gives a subdomain a new name, which must already be
+// validated. It returns ErrConflict if the name is taken.
+func (s *Store) RenameSubdomain(ctx context.Context, id int64, name string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE subdomains SET name = ? WHERE id = ?`, name, id)
+	if isUniqueViolation(err) {
+		return ErrConflict
+	}
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // DeleteSubdomain removes a subdomain and its keys.
 func (s *Store) DeleteSubdomain(ctx context.Context, id int64) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM subdomains WHERE id = ?`, id)
