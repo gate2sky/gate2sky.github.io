@@ -171,7 +171,7 @@ header { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
 .bar { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 12px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
 .brand:hover { text-decoration: none; }
-.brand svg { width: 30px; height: 30px; }
+.brand svg { width: 40px; height: 40px; margin: -6px -2px -6px -4px; overflow: visible; }
 nav { display: flex; align-items: center; gap: 4px; }
 nav a { color: var(--muted); font-size: 14px; padding: 6px 10px; border-radius: 8px; display: none; }
 nav a:hover { color: var(--fg); background: var(--surface-2); text-decoration: none; }
@@ -317,7 +317,7 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
   color: var(--code-dim); border-bottom: 2px solid transparent; white-space: nowrap; transition: color .15s, border-color .15s; }
 .win-tabs label:hover { color: var(--code-fg); }
 .win-tabs .narrow { display: none; }
-.win-tabs [for="k-file"], .win-tabs [for="t-curl"], .win-tabs [for="t-wget"] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-weight: 500; }
+.win-tabs [for="k-file"], .win-tabs .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-weight: 500; }
 #k-default:checked ~ .tbar [for="k-default"], #k-file:checked ~ .tbar [for="k-file"] {
   color: var(--code-fg); border-bottom-color: var(--cyan); }
 #k-default:focus-visible ~ .tbar [for="k-default"], #k-file:focus-visible ~ .tbar [for="k-file"] { outline: 2px solid var(--cyan); outline-offset: -2px; }
@@ -393,18 +393,27 @@ h2 { font-size: clamp(26px, 6vw, 40px); letter-spacing: -.025em; margin: 8px 0 6
 @keyframes access { 0%, 30% { fill: var(--hl); } 34%, 100% { fill: transparent; } }
 
 /* Deploy */
-/* The same window as the terminal, one tab per way to run gate2sky. */
-.launch .pane, .launch .tbar .copy { display: none; }
-#t-curl:checked ~ .i-curl, #t-wget:checked ~ .i-wget, #t-docker:checked ~ .i-docker, #t-k8s:checked ~ .i-k8s { display: block; }
-#t-curl:checked ~ .tbar .copy.i-curl, #t-wget:checked ~ .tbar .copy.i-wget, #t-docker:checked ~ .tbar .copy.i-docker, #t-k8s:checked ~ .tbar .copy.i-k8s { display: inline-flex; }
-#t-curl:checked ~ .tbar [for="t-curl"], #t-wget:checked ~ .tbar [for="t-wget"], #t-docker:checked ~ .tbar [for="t-docker"], #t-k8s:checked ~ .tbar [for="t-k8s"] {
-  color: var(--code-fg); border-bottom-color: var(--cyan); }
-#t-curl:focus-visible ~ .tbar [for="t-curl"], #t-wget:focus-visible ~ .tbar [for="t-wget"], #t-docker:focus-visible ~ .tbar [for="t-docker"], #t-k8s:focus-visible ~ .tbar [for="t-k8s"] { outline: 2px solid var(--cyan); outline-offset: -2px; }
-.launch pre { min-height: 0; font-size: clamp(11px, 3.1vw, 13px); }
-.launch pre .c { color: var(--code-dim); } .launch pre .p { color: var(--cyan); user-select: none; }
-.launch .sub { position: relative; padding: 9px 90px 9px 18px; background: var(--code-bar); border-top: 1px solid var(--code-border);
-  border-bottom: 1px solid var(--code-border); color: var(--code-dim); font-size: 13px; }
-.launch .sub code { color: var(--code-fg); font-size: 12px; }
+.tabs { max-width: 820px; margin: 0 auto; }
+.tabs input { position: absolute; opacity: 0; pointer-events: none; }
+.tab-labels { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+.tab-labels label { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); color: var(--muted); font-size: 14px; font-weight: 600; background: color-mix(in srgb, var(--surface) 80%, transparent); }
+.tab-labels label svg { width: 18px; height: 18px; }
+#t-line:checked ~ .tab-labels [for="t-line"], #t-docker:checked ~ .tab-labels [for="t-docker"], #t-k8s:checked ~ .tab-labels [for="t-k8s"] {
+  color: var(--fg); border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, var(--surface)); }
+.tabs input:focus-visible ~ .tab-labels label { outline: none; }
+#t-line:focus-visible ~ .tab-labels [for="t-line"], #t-docker:focus-visible ~ .tab-labels [for="t-docker"], #t-k8s:focus-visible ~ .tab-labels [for="t-k8s"] { outline: 2px solid var(--cyan); }
+.pane { display: none; }
+#t-line:checked ~ .panes .p-line, #t-docker:checked ~ .panes .p-docker, #t-k8s:checked ~ .panes .p-k8s { display: block; }
+/* Each option in a window like the terminal's; its tabs, when it has
+   variants, switch the command, the copy button and the footer. */
+.win pre { min-height: 0; font-size: clamp(11px, 3.1vw, 13px); }
+.win pre .c { color: var(--code-dim); } .win pre .p { color: var(--cyan); user-select: none; }
+.win > .v2:not(input), .win .copy.v2, .win input.v2:checked ~ .v1, .win input.v2:checked ~ .tbar .copy.v1 { display: none; }
+.win input.v2:checked ~ .v2:not(input) { display: block; }
+.win input.v2:checked ~ .tbar .copy.v2 { display: inline-flex; }
+.win input.v1:checked ~ .tbar label.v1, .win input.v2:checked ~ .tbar label.v2 { color: var(--code-fg); border-bottom-color: var(--cyan); }
+.win input.v1:focus-visible ~ .tbar label.v1, .win input.v2:focus-visible ~ .tbar label.v2 { outline: 2px solid var(--cyan); outline-offset: -2px; }
 
 /* Footer */
 footer { border-top: 1px solid var(--border); padding: 30px 0 46px; color: var(--muted); font-size: 14px; }
@@ -701,53 +710,73 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
         <h2>Pick your launchpad.</h2>
         <p>Point <code>gate.example.com</code> and <code>*.gate.example.com</code> at the server, then:</p>
       </div>
-      <div class="term launch">
-        <input type="radio" name="tab" id="t-curl" checked>
-        <input type="radio" name="tab" id="t-wget">
+      <div class="tabs">
+        <input type="radio" name="tab" id="t-line" checked>
         <input type="radio" name="tab" id="t-docker">
         <input type="radio" name="tab" id="t-k8s">
-        <div class="tbar"><i></i><i></i><i></i>
-          <div class="win-tabs" role="tablist" aria-label="Where gate2sky runs">
-            <label for="t-curl">curl</label>
-            <label for="t-wget">wget</label>
-            <label for="t-docker">Docker</label>
-            <label for="t-k8s"><span class="wide">Kubernetes + Traefik</span><span class="narrow">k8s</span></label>
+        <div class="tab-labels" role="tablist">
+          <label for="t-line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 17l6-5-6-5M12 19h8"/></svg>One line</label>
+          <label for="t-docker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 12h16a3 3 0 0 0 2-1c-1 6-6 9-11 9-4 0-7-3-7-8Z"/><path d="M6 12V9h3v3M9 12V9h3v3M12 12V9h3v3M9 9V6h3v3"/></svg>Docker</label>
+          <label for="t-k8s"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6M5.6 5.6l4.3 4.3M14.1 14.1l4.3 4.3M18.4 5.6l-4.3 4.3M9.9 14.1l-4.3 4.3"/></svg>Kubernetes + Traefik</label>
+        </div>
+        <div class="panes">
+          <div class="pane p-line">
+            <div class="term win">
+              <input type="radio" name="w-line" id="w-curl" class="v1" checked>
+              <input type="radio" name="w-line" id="w-wget" class="v2">
+              <div class="tbar"><i></i><i></i><i></i>
+                <div class="win-tabs" role="tablist" aria-label="Download with">
+                  <label for="w-curl" class="v1 mono">curl</label>
+                  <label for="w-wget" class="v2 mono">wget</label>
+                </div>
+                <button class="copy v1" type="button" data-copy="curl -fsSL https://gate2sky.github.io/setup.sh | sh" aria-label="Copy the install command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+                <button class="copy v2" type="button" data-copy="wget -qO- https://gate2sky.github.io/setup.sh | sh" aria-label="Copy the install command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+              </div>
+<pre class="v1"><span class="p">$ </span>curl -fsSL https://gate2sky.github.io/setup.sh | sh</pre>
+<pre class="v2"><span class="p">$ </span>wget -qO- https://gate2sky.github.io/setup.sh | sh</pre>
+              <p class="tfoot v1">Linux and macOS. It installs the binary, opens the setup wizard and, with systemd, runs gate2sky as a service. Run it again to update, reconfigure or uninstall.</p>
+              <p class="tfoot v2">The same, for machines without curl, such as a minimal Debian: the installer then downloads with wget too.</p>
+            </div>
           </div>
-          <button class="copy i-curl" type="button" data-copy="curl -fsSL https://gate2sky.github.io/setup.sh | sh" aria-label="Copy the install command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
-          <button class="copy i-wget" type="button" data-copy="wget -qO- https://gate2sky.github.io/setup.sh | sh" aria-label="Copy the install command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
-          <button class="copy i-docker" type="button" data-copy="docker volume create gate2sky&#10;docker run -it --rm -v gate2sky:/data ghcr.io/gate2sky/gate2sky config&#10;docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2sky/gate2sky" aria-label="Copy the Docker commands"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
-          <button class="copy i-k8s" type="button" data-copy="helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky --set domain=gate.example.com --set traefik.tls.certResolver=letsencrypt-dns" aria-label="Copy the helm command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
-        </div>
-        <div class="pane i-curl">
-<pre><span class="p">$ </span>curl -fsSL https://gate2sky.github.io/setup.sh | sh</pre>
-          <p class="tfoot">Linux and macOS. It installs the binary, opens the setup wizard and, with systemd, runs gate2sky as a service. Run it again to update, reconfigure or uninstall.</p>
-        </div>
-        <div class="pane i-wget">
-<pre><span class="p">$ </span>wget -qO- https://gate2sky.github.io/setup.sh | sh</pre>
-          <p class="tfoot">For machines without curl, such as a minimal Debian: the installer then downloads with wget too. The rest is the same: it installs the binary, opens the setup wizard and, with systemd, runs gate2sky as a service.</p>
-        </div>
-        <div class="pane i-docker">
+          <div class="pane p-docker">
+            <div class="term win">
+              <div class="tbar"><i></i><i></i><i></i>
+                <button class="copy" type="button" data-copy="docker volume create gate2sky&#10;docker run -it --rm -v gate2sky:/data ghcr.io/gate2sky/gate2sky config&#10;docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2sky/gate2sky" aria-label="Copy the Docker commands"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+              </div>
 <pre><span class="c"># configuration and state live in the volume</span>
 <span class="p">$ </span>docker volume create gate2sky
 <span class="p">$ </span>docker run -it --rm -v gate2sky:/data ghcr.io/gate2sky/gate2sky config
 <span class="p">$ </span>docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data \
     -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/gate2sky/gate2sky</pre>
-          <p class="tfoot">Choose Let's Encrypt in the wizard: gate2sky gets a certificate for each subdomain on its own. Manage it later with <code>docker exec -it gate2sky gate2sky config</code>.</p>
-        </div>
-        <div class="pane i-k8s">
-<pre><span class="p">$ </span>helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky \
+              <p class="tfoot">Choose Let's Encrypt in the wizard: gate2sky gets a certificate for each subdomain on its own. Manage it later with <code>docker exec -it gate2sky gate2sky config</code>.</p>
+            </div>
+          </div>
+          <div class="pane p-k8s">
+            <div class="term win">
+              <input type="radio" name="w-k8s" id="w-helm" class="v1" checked>
+              <input type="radio" name="w-k8s" id="w-port" class="v2">
+              <div class="tbar"><i></i><i></i><i></i>
+                <div class="win-tabs" role="tablist" aria-label="Kubernetes">
+                  <label for="w-helm" class="v1"><span class="wide">Kubernetes + Traefik</span><span class="narrow">Kubernetes</span></label>
+                  <label for="w-port" class="v2">Traefik port</label>
+                </div>
+                <button class="copy v1" type="button" data-copy="helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky --set domain=gate.example.com --set traefik.tls.certResolver=letsencrypt-dns" aria-label="Copy the helm command"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+                <button class="copy v2" type="button" data-copy="ports:&#10;  ssh:&#10;    port: 2222&#10;    expose: {default: true}&#10;    exposedPort: 2222&#10;    protocol: TCP" aria-label="Copy the Traefik values"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+              </div>
+<pre class="v1"><span class="p">$ </span>helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky \
     --set domain=gate.example.com \
     --set traefik.tls.certResolver=letsencrypt-dns</pre>
-          <div class="sub">Traefik’s own chart, so it opens the SSH port: <code>values.yaml</code>
-            <button class="copy " type="button" data-copy="ports:&#10;  ssh:&#10;    port: 2222&#10;    expose: {default: true}&#10;    exposedPort: 2222&#10;    protocol: TCP" aria-label="Copy the Traefik values"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
-          </div>
-<pre>ports:
+<pre class="v2"><span class="c"># values.yaml of Traefik’s own chart</span>
+ports:
   ssh:
     port: 2222
     expose: {default: true}
     exposedPort: 2222
     protocol: TCP</pre>
-          <p class="tfoot">An IngressRoute for the dashboard and every subdomain, and SSH over that Traefik entry point with the PROXY protocol. Keep <code>exposedPort</code> and the chart’s <code>ssh.publicPort</code> the same; port 22 only works on an address no other <code>sshd</code> uses. See the <a href="https://github.com/gate2sky/gate2sky.github.io/tree/main/deploy/helm/gate2sky">chart</a>, also in a classic repository: <code>helm repo add gate2sky https://gate2sky.github.io/charts</code>.</p>
+              <p class="tfoot v1">An IngressRoute for the dashboard and every subdomain, and SSH over a Traefik TCP entry point with the PROXY protocol. See the <a href="https://github.com/gate2sky/gate2sky.github.io/tree/main/deploy/helm/gate2sky">chart</a>, also in a classic repository: <code>helm repo add gate2sky https://gate2sky.github.io/charts</code>.</p>
+              <p class="tfoot v2">Traefik opens the SSH port once its chart declares the entry point. Keep <code>exposedPort</code> and gate2sky’s <code>ssh.publicPort</code> the same; port 22 only works on an address no other <code>sshd</code> uses.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
