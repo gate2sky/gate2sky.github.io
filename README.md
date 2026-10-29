@@ -507,11 +507,12 @@ then run `python3 scripts/landing/gen.py scripts/landing/template.html
 pages/index.html`. Build checks that the two agree. The icon is
 [`pages/favicon.svg`](pages/favicon.svg), the same file as the dashboard's
 [`internal/web/ui/favicon.svg`](internal/web/ui/favicon.svg) (the landing's
-header inlines it, without its dark tile); after changing it, copy it to both
-and run `node scripts/landing/icons.js`, which renders `favicon.ico` and
-`apple-touch-icon.png` from it and writes
-[`logo-mark.svg`](internal/web/ui/logo-mark.svg), the logo without its tile,
-for the dashboard's header and sign-in page. Link previews show
+header inlines it); after changing it, copy it to both and run
+`node scripts/landing/icons.js`, which renders `favicon.ico` (also the
+desktop app's tray icon) and `apple-touch-icon.png`, on a dark tile because
+iOS fills transparency with black, from it and writes
+[`logo-mark.svg`](internal/web/ui/logo-mark.svg) for the dashboard's header
+and sign-in page. Link previews show
 [`pages/og.png`](pages/og.png), the hero at 1200×630: after changing the
 hero, regenerate the landing, then run `node scripts/landing/og.js`.
 

@@ -1,9 +1,9 @@
-// Writes internal/web/ui/logo-mark.svg, the logo without its dark tile, for
+// Writes internal/web/ui/logo-mark.svg, the logo without its comments, for
 // the dashboard's header and sign-in page (as the landing's header inlines
 // it), and renders pages/favicon.svg into the bitmaps for what does not take
 // an SVG icon: favicon.ico (16 and 32 px; older Safari, and the /favicon.ico every
-// browser asks for) and apple-touch-icon.png (180 px, the tile edge to edge,
-// without its rounded corners: iOS rounds them itself and fills
+// browser asks for) and apple-touch-icon.png (180 px, on a dark tile edge to
+// edge, without rounded corners: iOS rounds them itself and fills
 // transparency with black).
 //
 //     node scripts/landing/icons.js
@@ -15,15 +15,17 @@ const pages = path.join(__dirname, "../../pages")
 const source = fs.readFileSync(path.join(pages, "favicon.svg"), "utf8")
 const dataURL = svg => "data:image/svg+xml;base64," + Buffer.from(svg).toString("base64")
 const svg = dataURL(source)
-const square = dataURL(source.replace(/(<rect width="64" height="64") rx="[^"]*"/, "$1"))
+// The favicon has no tile: only the apple-touch-icon is drawn on one.
+const tile = dataURL(source.replace("</defs>", `  <radialGradient id="tile" cx=".6" cy=".3" r=".8"><stop offset="0" stop-color="#0a1a3d"/><stop offset="1" stop-color="#040815"/></radialGradient>
+  </defs>
+  <rect width="64" height="64" fill="url(#tile)"/>`))
 
 // The desktop app's tray icon is the favicon too.
 process.on("exit", () => fs.copyFileSync(path.join(pages, "favicon.ico"), path.join(__dirname, "../../cmd/intergate-gui/icon.ico")))
 
-// The same cut as hero.brand() in gen.py's hero.py: no comments, no tile.
+// The same cut as hero.brand() in gen.py's hero.py: no comments.
 fs.writeFileSync(path.join(__dirname, "../../internal/web/ui/logo-mark.svg"), source
-  .replace(/<!--[\s\S]*?-->\s*/g, "")
-  .replace(/<rect width="64" height="64"[^>]*\/>\s*/, ""))
+  .replace(/<!--[\s\S]*?-->\s*/g, ""))
 // The desktop app's window shows it too.
 fs.copyFileSync(path.join(__dirname, "../../internal/web/ui/logo-mark.svg"), path.join(__dirname, "../../internal/clientapp/ui/logo.svg"))
 
@@ -62,6 +64,6 @@ function ico(images) {
   const images = []
   for (const size of [16, 32]) images.push({ size, png: await render(browser, size) })
   fs.writeFileSync(path.join(pages, "favicon.ico"), ico(images))
-  fs.writeFileSync(path.join(pages, "apple-touch-icon.png"), await render(browser, 180, { src: square }))
+  fs.writeFileSync(path.join(pages, "apple-touch-icon.png"), await render(browser, 180, { src: tile }))
   await browser.close()
 })()
