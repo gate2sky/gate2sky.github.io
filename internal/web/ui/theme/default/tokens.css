@@ -43,6 +43,12 @@
      tone. */
   --ig-accent: #0071e3;
   --ig-on-accent: #fff;
+  /* The primary button: the secondary's glass, in a vivid blue that holds
+     white text at 4.5:1. */
+  --ig-button-1: #006cff;
+  --ig-button-1-hover: #1a78ff;
+  --ig-button-1-active: #005ad6;
+  --ig-button-1-shadow: inset 0 1px 0 rgb(255 255 255 / .3), inset 0 0 0 1px rgb(255 255 255 / .14), 0 1px 2px rgb(0 0 0 / .16);
   /* Buttons that lose something, and the quiet dark one (sign out). */
   --ig-danger: #d92d23;
   --ig-dark: #3a3f4a;
@@ -116,16 +122,16 @@
   --ig-code-purple: #7547c9;
   --ig-code-teal: #0f7a8e;
 
-  /* A command to copy: a terminal line, Monokai as it is on its dark ground,
-     on #555. */
+  /* A command to copy: a terminal line on #555, in Monokai's dark colours,
+     its pink, purple and grey lifted to read at 4.5:1. */
   --ig-term-bg: #555;
   --ig-term-line: rgb(0 0 0 / .2);
   --ig-term-fg: #f8f8f2;
-  --ig-term-comment: #75715e;
-  --ig-term-pink: #f92672;
+  --ig-term-comment: #cecab5;
+  --ig-term-pink: #ffb6c3;
   --ig-term-green: #a6e22e;
   --ig-term-yellow: #e6db74;
-  --ig-term-purple: #ae81ff;
+  --ig-term-purple: #d2bfff;
   --ig-term-button: rgb(255 255 255 / .12);
   --ig-term-button-hover: rgb(255 255 255 / .2);
 

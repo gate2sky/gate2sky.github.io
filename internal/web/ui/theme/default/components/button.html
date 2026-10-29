@@ -113,11 +113,16 @@
   .btn:focus-visible { outline: none; box-shadow: var(--ig-ring); }
   .btn:disabled { opacity: .45; cursor: default; filter: none; transform: none; }
 
-  /* The blue one, without the blur behind its glass. */
+  /* The secondary's glass in a vivid blue, with nothing blurred behind it.
+     Brightness hardly shows on it either: it lightens instead. */
   .variant-primary {
+    background: var(--ig-gloss-2), var(--ig-button-1);
+    box-shadow: var(--ig-button-1-shadow);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+  .variant-primary:hover { filter: none; background: var(--ig-gloss-2), var(--ig-button-1-hover); }
+  .variant-primary:active { filter: none; background: var(--ig-button-1-active); transform: scale(.97); }
   .variant-danger { --tone: var(--ig-danger); }
   .variant-dark { --tone: var(--ig-dark); }
 

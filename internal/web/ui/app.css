@@ -341,7 +341,7 @@ input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: no
 .tok-num { color: var(--ig-term-purple); }
 .tok-arg { color: var(--ig-term-yellow); }
 .copy {
-  flex: none; font: inherit; font-size: var(--ig-text-md); font-weight: var(--ig-weight-semibold); padding: 7px 14px; border-radius: var(--ig-radius-sm); cursor: pointer;
+  flex: none; display: grid; place-items: center; width: var(--ig-control-sm); height: var(--ig-control-sm); padding: 0; border-radius: var(--ig-radius-sm); cursor: pointer;
   border: 0; background: var(--ig-term-button); color: var(--ig-term-fg); box-shadow: 0 0 0 var(--ig-hairline) var(--ig-term-line);
   transition: background-color var(--ig-duration-fast), transform var(--ig-duration-fast) ease;
 }
