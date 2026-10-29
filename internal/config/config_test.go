@@ -101,11 +101,44 @@ func TestParseErrors(t *testing.T) {
 			"http:\n  tls:\n    cert_file: a\n    key_file: b\n",
 		"nobody allowed": strings.Replace(strings.Replace(base, "admins: [Root@Example.com]", "", 1),
 			`allowed_domains: ["@corp.example"]`, "", 1),
+		"tcp not a range":    base + "tcp:\n  ports: lots\n",
+		"tcp reversed range": base + "tcp:\n  ports: 30099-30000\n",
+		"tcp over http":      base + "tcp:\n  ports: 1-1000\n",
+		"tcp too wide":       base + "tcp:\n  ports: 20000-40000\n",
+		"tcp no ports":       base + "tcp:\n  ports: 30000-30099\n  max_ports: -1\n",
 	}
 	for name, doc := range cases {
 		if _, err := Parse([]byte(doc)); err == nil {
 			t.Errorf("%s: expected an error", name)
 		}
+	}
+}
+
+func TestTCPPorts(t *testing.T) {
+	t.Setenv("TEST_SECRET", "x")
+	cfg, err := Parse([]byte(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.TCP.Enabled() || cfg.TCP.InRange(30000) {
+		t.Error("TCP ports enabled without a range")
+	}
+	cfg, err = Parse([]byte(base + "tcp:\n  ports: 30000-30099\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first, last := cfg.TCP.Range(); first != 30000 || last != 30099 || cfg.TCP.MaxPorts != 5 {
+		t.Errorf("range %d-%d, max %d", first, last, cfg.TCP.MaxPorts)
+	}
+	if !cfg.TCP.InRange(30099) || cfg.TCP.InRange(30100) {
+		t.Error("InRange mismatch")
+	}
+	if got := cfg.TCPAddress(30042); got != "tcp://gate.example.com:30042" {
+		t.Errorf("address = %q", got)
+	}
+	cfg, _ = Parse([]byte(base + "tcp:\n  ports: \"5000\"\n  public_host: tcp.example.com\n"))
+	if first, last := cfg.TCP.Range(); first != 5000 || last != 5000 || cfg.TCPAddress(5000) != "tcp://tcp.example.com:5000" {
+		t.Errorf("single port: %d-%d %s", first, last, cfg.TCPAddress(5000))
 	}
 }
 

@@ -33,6 +33,7 @@ type Config struct {
 	Auth   AuthConfig  `yaml:"auth"`
 	Admin  AdminConfig `yaml:"admin"`
 	Limits Limits      `yaml:"limits"`
+	TCP    TCPConfig   `yaml:"tcp"`
 
 	// ReservedSubdomains are names nobody can register, on top of the
 	// built-in list (www, admin, api, ...).
@@ -82,6 +83,58 @@ type SSHConfig struct {
 	// ProxyProtocol expects a PROXY protocol header (v1 or v2) on every
 	// SSH connection, e.g. from Traefik or HAProxy, to learn client IPs.
 	ProxyProtocol bool `yaml:"proxy_protocol"`
+}
+
+// TCPConfig gives subdomains raw TCP ports, each forwarded with ssh -R to
+// a local service.
+type TCPConfig struct {
+	// Ports is the public range ports are allocated from, e.g.
+	// "30000-30099". Without it, subdomains get no TCP ports.
+	Ports string `yaml:"ports"`
+	// MaxPorts is how many ports a subdomain can have.
+	MaxPorts int `yaml:"max_ports"`
+	// ListenHost is the address the ports listen on; all interfaces by
+	// default.
+	ListenHost string `yaml:"listen_host"`
+	// PublicHost is the host in the ports' addresses
+	// (tcp://<public_host>:30042). Defaults to the SSH host.
+	PublicHost string `yaml:"public_host"`
+
+	first, last int
+}
+
+// Enabled reports whether subdomains can have TCP ports.
+func (t TCPConfig) Enabled() bool { return t.first != 0 }
+
+// Range returns the first and last public port, or zeros when disabled.
+func (t TCPConfig) Range() (first, last int) { return t.first, t.last }
+
+// InRange reports whether port belongs to the public range.
+func (t TCPConfig) InRange(port int) bool { return t.first != 0 && port >= t.first && port <= t.last }
+
+func (t *TCPConfig) parse() error {
+	if t.Ports == "" {
+		return nil
+	}
+	lo, hi, found := strings.Cut(strings.TrimSpace(t.Ports), "-")
+	if !found {
+		hi = lo
+	}
+	first, err1 := strconv.Atoi(strings.TrimSpace(lo))
+	last, err2 := strconv.Atoi(strings.TrimSpace(hi))
+	switch {
+	case err1 != nil || err2 != nil || first < 1 || last > 65535 || first > last:
+		return fmt.Errorf("tcp.ports must be a range of ports like 30000-30099, not %q", t.Ports)
+	case first <= 443 && last >= 80:
+		return errors.New("tcp.ports must not include ports 80 to 443, which tunnels use for HTTP")
+	case last-first >= 10000:
+		return errors.New("tcp.ports can span at most 10000 ports")
+	}
+	if t.MaxPorts < 1 {
+		return errors.New("tcp.max_ports must be at least 1")
+	}
+	t.first, t.last = first, last
+	return nil
 }
 
 type AdminConfig struct {
@@ -282,6 +335,9 @@ func (c *Config) setDefaults() {
 	if c.Limits.TunnelsPerConnection == 0 {
 		c.Limits.TunnelsPerConnection = 5
 	}
+	if c.TCP.MaxPorts == 0 {
+		c.TCP.MaxPorts = 5
+	}
 	for i := range c.Auth.Providers {
 		p := &c.Auth.Providers[i]
 		if p.Name == "" {
@@ -385,7 +441,7 @@ func (c *Config) validate() error {
 	if !c.Auth.AllowEveryone && len(c.Auth.AllowedEmails)+len(c.Auth.AllowedDomains)+len(c.Auth.Admins) == 0 {
 		return errors.New("auth: nobody can sign in; set admins, allowed_emails, allowed_domains or allow_everyone")
 	}
-	return nil
+	return c.TCP.parse()
 }
 
 // PasskeysEnabled reports whether users can sign in with passkeys.
@@ -442,6 +498,20 @@ func (c *Config) SSHPort() int {
 		return 22
 	}
 	return n
+}
+
+// TCPHost is the host in TCP ports' addresses.
+func (c *Config) TCPHost() string {
+	if c.TCP.PublicHost != "" {
+		return c.TCP.PublicHost
+	}
+	return c.SSHHost()
+}
+
+// TCPAddress is the public address of a TCP port, e.g.
+// tcp://gate.example.com:30042.
+func (c *Config) TCPAddress(port int) string {
+	return "tcp://" + net.JoinHostPort(c.TCPHost(), strconv.Itoa(port))
 }
 
 // IsAdmin reports whether email belongs to an administrator.

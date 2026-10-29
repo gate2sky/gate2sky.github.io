@@ -226,3 +226,71 @@ func TestSubdomainsAndGrants(t *testing.T) {
 		t.Fatalf("ListUsers = %+v, %v", users, err)
 	}
 }
+
+func TestPorts(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	u, _ := s.CreateUser(ctx, "a@x.com", "")
+	app, _ := s.CreateSubdomain(ctx, u.ID, "app", AccessPublic)
+	db, _ := s.CreateSubdomain(ctx, u.ID, "db", AccessPublic)
+
+	add := func(d *Subdomain, name string) (*Port, error) {
+		p := &Port{SubdomainID: d.ID, Name: name, Allow: []string{"10.0.0.0/8", "192.0.2.1/32"}, Preset: "postgresql", LocalPort: 5432}
+		return p, s.CreatePort(ctx, p, 30000, 30002)
+	}
+	p1, err := add(app, "pg")
+	if err != nil || p1.Port != 30000 || p1.Protocol != ProtocolTCP {
+		t.Fatalf("first port = %+v, %v", p1, err)
+	}
+	if _, err := add(app, "pg"); !errors.Is(err, ErrConflict) {
+		t.Errorf("duplicate name: %v", err)
+	}
+	p2, _ := add(db, "pg")
+	p3, _ := add(app, "ssh")
+	if p2.Port != 30001 || p3.Port != 30002 {
+		t.Errorf("ports %d, %d", p2.Port, p3.Port)
+	}
+	if _, err := add(db, "full"); !errors.Is(err, ErrFull) {
+		t.Errorf("full range: %v", err)
+	}
+
+	// A deleted port's number is reused; the others keep theirs.
+	if err := s.DeletePort(ctx, app.ID, p1.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeletePort(ctx, app.ID, p2.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("deleted another subdomain's port: %v", err)
+	}
+	p4, err := add(db, "redis")
+	if err != nil || p4.Port != 30000 {
+		t.Fatalf("reused port = %+v, %v", p4, err)
+	}
+
+	got, err := s.PortByNumber(ctx, 30000)
+	if err != nil || got.Subdomain != "db" || got.Name != "redis" || got.OwnerID != u.ID || len(got.Allow) != 2 || got.LocalPort != 5432 {
+		t.Fatalf("PortByNumber = %+v, %v", got, err)
+	}
+	got.Name, got.Allow, got.LocalPort = "cache", nil, 6379
+	if err := s.UpdatePort(ctx, got); err != nil {
+		t.Fatal(err)
+	}
+	got.Name = "pg"
+	if err := s.UpdatePort(ctx, got); !errors.Is(err, ErrConflict) {
+		t.Errorf("rename to a taken name: %v", err)
+	}
+	list, _ := s.PortsBySubdomain(ctx, db.ID)
+	if len(list) != 2 || list[0].Name != "cache" || len(list[0].Allow) != 0 || list[0].LocalPort != 6379 || list[1].Name != "pg" {
+		t.Errorf("PortsBySubdomain = %+v %+v", list[0], list[1])
+	}
+	if d, _ := s.SubdomainByName(ctx, "db"); d.Ports != 2 {
+		t.Errorf("port count = %d", d.Ports)
+	}
+
+	// Ports go with their subdomain.
+	if err := s.DeleteSubdomain(ctx, db.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.PortByNumber(ctx, 30001); !errors.Is(err, ErrNotFound) {
+		t.Errorf("port of a deleted subdomain: %v", err)
+	}
+}
