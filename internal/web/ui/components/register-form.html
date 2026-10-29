@@ -5,6 +5,8 @@
   const { app, go, toast } = await import("@ui/lib/store.js")
   const { api } = await import("@ui/lib/api.js")
   const AccessOptions = await import("@ui/components/access-options.html")
+  const Alert = await import("@theme/components/alert.html")
+  const Button = await import("@theme/components/button.html")
 
   let name = ""
   let access = "public"
@@ -30,8 +32,8 @@
   }
 </script>
 
-<div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
 <form class="form" @submit.prevent="register">
+  <Alert :if="error" tone="bad" flush>{{ error }}</Alert>
   <label>Name
     <span class="input-suffix">
       <input name="name" required maxlength="63" pattern="[A-Za-z0-9]([A-Za-z0-9\-]{0,61}[A-Za-z0-9])?" placeholder="myapp"
@@ -47,8 +49,8 @@
     <textarea name="keys" rows="3" spellcheck="false" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA… you@laptop"
               :value="keys" @input="keys = $event.target.value"></textarea>
   </label>
-  <div class="dialog-actions">
-    <button :if="cancel" type="button" class="button button-secondary" @click="$emit('cancel')">Cancel</button>
-    <button type="submit" class="button" :disabled="busy">Register</button>
+  <div class="form-actions">
+    <Button :if="cancel" variant="secondary" @click="$emit('cancel')">Cancel</Button>
+    <Button type="submit" :disabled="busy">Register</Button>
   </div>
 </form>

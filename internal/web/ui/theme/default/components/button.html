@@ -1,0 +1,169 @@
+<script :setup="{
+  variant = 'primary',
+  size = 'md',
+  type = 'button',
+  href = '',
+  target = '',
+  form = '',
+  disabled = false,
+  block = false,
+  square = false,
+  title = '',
+  label = '',
+  icon = ''
+}">
+  // A button: tinted glass. `variant` is what it does to the page —
+  // `primary` the one thing a view asks for, `secondary` the rest, `danger`
+  // one that loses something, `dark` a quiet one that is still a step
+  // (signing out), `plain` an action that should not compete with content,
+  // and `ghost` an icon in a row of them, red under the pointer when it is
+  // `ghost-danger`.
+  //
+  // **Part of the default theme**: imports only the theme's `Icon`, and
+  // draws only with `tokens.css`. See
+  // `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Button @click="save()">Save</Button>
+  //   <Button variant="secondary" icon="plus" size="sm">Add port</Button>
+  //   <Button variant="ghost-danger" square icon="trash" title="Remove" @click="remove(key)" />
+  //   <Button type="submit" form="add-port" :disabled="busy">Add port</Button>
+  //   <Button href="/auth/github/login" variant="secondary" block>GitHub</Button>
+  //
+  // **`click` is re-emitted**, with the native event in `$event.detail`:
+  // jq79 binds `@click` on a component to its `$emit` and nothing else. It is
+  // not emitted while disabled. A `submit` button submits its form, or the
+  // one `form` names (a dialog's foot is outside its form). With `href` it is
+  // a link that looks like a button. `square` is for an icon alone, and then
+  // `title` is its name; `label` names it for a screen reader alone.
+
+  const Icon = await import("@theme/components/icon.html")
+
+  // A bare attribute (`<X disabled>`) arrives as "", and means on.
+  const flag = v => v === "" || v === true || v === "true"
+  $: isDisabled = flag(disabled)
+  $: isBlock = flag(block)
+  $: isSquare = flag(square)
+
+  const click = event => {
+    if (isDisabled) return
+    $emit("click", event)
+  }
+</script>
+
+<a :if="href"
+   class="btn"
+   :class="'variant-' + variant + ' size-' + size"
+   :class.block="isBlock"
+   :class.square="isSquare"
+   :href="href"
+   :target="target || null"
+   :rel="target ? 'noopener noreferrer' : null"
+   :aria-label="label || null"
+   :title="title || null"
+   @click="click($event)">
+  <Icon :if="icon" :name="icon" :size="size === 'sm' ? 'sm' : 'md'" />
+  <slot></slot>
+</a>
+<button :else
+        class="btn"
+        :class="'variant-' + variant + ' size-' + size"
+        :class.block="isBlock"
+        :class.square="isSquare"
+        :type="type"
+        :form="form || null"
+        :disabled="isDisabled"
+        :aria-label="label || (isSquare ? title : '') || null"
+        :title="title || null"
+        @click="click($event)">
+  <Icon :if="icon" :name="icon" :size="size === 'sm' ? 'sm' : 'md'" />
+  <slot></slot>
+</button>
+
+<style scoped>
+  .btn {
+    --tone: var(--ig-accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--ig-space-2);
+    min-height: var(--ig-control-md);
+    padding: 0 var(--ig-space-7);
+    border: 0;
+    border-radius: var(--ig-radius-control);
+    color: var(--ig-on-accent);
+    font: inherit;
+    font-family: var(--ig-font-sans);
+    font-size: var(--ig-text-base);
+    font-weight: var(--ig-weight-semibold);
+    line-height: 20px;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    background: var(--ig-gloss), color-mix(in srgb, var(--tone) var(--ig-tint), transparent);
+    -webkit-backdrop-filter: var(--ig-glass-blur);
+    backdrop-filter: var(--ig-glass-blur);
+    box-shadow: var(--ig-rim),
+                0 8px 20px -10px color-mix(in srgb, var(--tone) 75%, transparent),
+                var(--ig-shadow-xs);
+    transition: filter var(--ig-duration) ease, background-color var(--ig-duration) ease,
+                transform var(--ig-duration-fast) ease;
+  }
+  .btn:hover { filter: brightness(1.08) saturate(1.06); text-decoration: none; }
+  .btn:active { filter: brightness(.96); transform: scale(.98); }
+  .btn:focus-visible { outline: none; box-shadow: var(--ig-ring); }
+  .btn:disabled { opacity: .45; cursor: default; filter: none; transform: none; }
+
+  .variant-danger { --tone: var(--ig-danger); }
+  .variant-dark { --tone: var(--ig-dark); }
+
+  /* Clear glass, with the ink of the ground it is on. On the wallpaper,
+     brightness hardly shows: it lightens instead. */
+  .variant-secondary {
+    color: var(--ig-fg);
+    background: var(--ig-gloss-2), var(--ig-button-2);
+    box-shadow: var(--ig-button-2-shadow);
+  }
+  .variant-secondary:hover { filter: none; background: var(--ig-gloss-2), var(--ig-button-2-hover); }
+  .variant-secondary:active { filter: none; background: var(--ig-button-2-active); transform: scale(.97); }
+
+  .variant-plain,
+  .variant-ghost,
+  .variant-ghost-danger {
+    color: var(--ig-fg-muted);
+    font-weight: var(--ig-weight-medium);
+    background: none;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .variant-plain { padding: 0 var(--ig-space-4); }
+  .variant-plain:hover,
+  .variant-ghost:hover,
+  .variant-ghost-danger:hover { filter: none; color: var(--ig-fg); background: var(--ig-fill-2); }
+  .variant-ghost:hover,
+  .variant-ghost-danger:hover { background: var(--ig-fill); }
+  .variant-ghost-danger:hover { color: var(--ig-bad); }
+  .variant-plain:active,
+  .variant-ghost:active,
+  .variant-ghost-danger:active { transform: none; background: var(--ig-fill); }
+
+  .size-sm {
+    min-height: var(--ig-control-sm);
+    padding: 0 var(--ig-space-5);
+    font-size: var(--ig-text-md);
+  }
+  .block { display: flex; width: 100%; }
+  .square { width: var(--ig-control-md); padding: 0; }
+  .square.size-sm { width: var(--ig-control-sm); }
+  /* An icon in a row of them: smaller than a control, and quiet. */
+  .square.variant-ghost,
+  .square.variant-ghost-danger {
+    width: var(--ig-control-xs);
+    min-height: var(--ig-control-xs);
+    border-radius: var(--ig-radius-control);
+    vertical-align: middle;
+  }
+  @media (min-width: 640px) {
+    .btn { font-size: var(--ig-text-md); }
+  }
+</style>

@@ -8,6 +8,9 @@
   const Subdomain = await import("@ui/views/subdomain.html")
   const Account = await import("@ui/views/account.html")
   const Admin = await import("@ui/views/admin.html")
+  const Card = await import("@theme/components/card.html")
+  const Button = await import("@theme/components/button.html")
+  const Icon = await import("@theme/components/icon.html")
   // What the pages import as they open, fetched now (and kept, by jq79's
   // cache) so that changing page never waits on code, only on data.
   import("@ui/lib/format.js")
@@ -17,6 +20,8 @@
   import("@ui/components/register-form.html")
   import("@ui/components/tcp-ports.html")
   import("@ui/components/status-badge.html")
+  for (const name of ["alert", "badge", "choice-cards", "facts", "modal", "segmented", "switch", "tabs"])
+    import(`@theme/components/${name}.html`)
 
   // Releases are numbers (0.0.6); builds between them say what they are.
   const version = /^\d/.test(app.version) ? "v" + app.version : app.version
@@ -36,9 +41,9 @@
     <nav class="nav" :if="app.user">
       <div class="tabs">
         <a href="/" :class.active="section === 'subdomains'">
-          <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></svg>Subdomains</a>
+          <span class="tab-icon"><Icon name="globe" weight="light" /></span>Subdomains</a>
         <a href="/admin" :if="app.user.admin" :class.active="section === 'admin'">
-          <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/></svg>Admin</a>
+          <span class="tab-icon"><Icon name="sliders" weight="light" /></span>Admin</a>
       </div>
       <a href="/account" class="who" :class.active="section === 'account'" title="Account">
         <img :if="app.user.avatar_url" class="avatar" :src="app.user.avatar_url" alt="">
@@ -50,25 +55,25 @@
 </header>
 
 <main class="wrap" :class.loading="app.loading" :aria-busy="app.loading ? 'true' : 'false'">
-  <div :if="app.toast" class="flash toast" :class="'flash-' + app.toast.kind" role="status">{{ app.toast.text }}</div>
+  <div :if="app.toast" class="toast" :class="'toast-' + app.toast.kind" data-tone="light" role="status">{{ app.toast.text }}</div>
 
-  <section :if="app.error" class="card error-page">
-    <h1>{{ app.error.status ? app.error.status + " · " : "" }}{{ app.error.title }}</h1>
+  <Card :if="app.error" width="lg" center>
+    <h1 class="error-title">{{ app.error.status ? app.error.status + " · " : "" }}{{ app.error.title }}</h1>
     <p>{{ app.error.message }}</p>
-    <p :if="app.error.retry"><button type="button" class="button" @click="retry">Try again</button></p>
-    <p><a class="icon-link" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Back to intergate</a></p>
-  </section>
+    <p :if="app.error.retry"><Button @click="retry">Try again</Button></p>
+    <p><a class="icon-link" href="/"><Icon name="arrow-left" size="sm" />Back to intergate</a></p>
+  </Card>
   <Setup :elseif="app.setup" />
   <Login :elseif="!app.user" />
   <Subdomains :elseif="current.page === 'subdomains' || current.page === 'login'" />
   <Subdomain :elseif="current.page === 'subdomain'" :name="current.name" />
   <Account :elseif="current.page === 'account'" />
   <Admin :elseif="current.page === 'admin' && app.user.admin" />
-  <section :else class="card error-page">
-    <h1>404 · Not Found</h1>
+  <Card :else width="lg" center>
+    <h1 class="error-title">404 · Not Found</h1>
     <p>There is no page here.</p>
-    <p><a class="icon-link" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>Back to intergate</a></p>
-  </section>
+    <p><a class="icon-link" href="/"><Icon name="arrow-left" size="sm" />Back to intergate</a></p>
+  </Card>
 </main>
 
 <footer class="wrap footer">

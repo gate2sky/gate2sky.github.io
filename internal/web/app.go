@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"html/template"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -115,24 +116,42 @@ func (s *Server) serveApp(w http.ResponseWriter, r *http.Request, status int, pe
 	}
 	b.Setup = setup
 
-	nonce := make([]byte, 18)
-	rand.Read(nonce)
 	page := struct {
 		Nonce string
 		Boot  boot
-	}{base64.RawURLEncoding.EncodeToString(nonce), b}
+	}{newNonce(), b}
+	s.servePage(w, s.shell, page.Nonce, page, status)
+}
+
+// newNonce is a page's script nonce, new on every response.
+func newNonce() string {
+	nonce := make([]byte, 18)
+	rand.Read(nonce)
+	return base64.RawURLEncoding.EncodeToString(nonce)
+}
+
+// servePage renders a page whose scripts carry nonce, with a CSP that
+// allows them.
+func (s *Server) servePage(w http.ResponseWriter, tmpl *template.Template, nonce string, data any, status int) {
 	var buf bytes.Buffer
-	if err := s.shell.Execute(&buf, page); err != nil {
+	if err := tmpl.Execute(&buf, data); err != nil {
 		s.log.Error("render page", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	h := w.Header()
-	h.Set("Content-Security-Policy", csp(page.Nonce))
+	h.Set("Content-Security-Policy", csp(nonce))
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	w.Write(buf.Bytes())
+}
+
+// handleTheme serves the design system's demo: the theme's tokens and
+// every component, with nothing of the app's. It needs no session.
+func (s *Server) handleTheme(w http.ResponseWriter, r *http.Request) {
+	nonce := newNonce()
+	s.servePage(w, s.theme, nonce, struct{ Nonce string }{nonce}, http.StatusOK)
 }
 
 func (s *Server) handleApp(w http.ResponseWriter, r *http.Request) {

@@ -476,6 +476,16 @@ component's functions as scripts carrying that nonce
 (`Component79.safeEval({ nonce: true })`). Edit a component and rebuild the
 binary to see it.
 
+It draws with a design system in
+[`internal/web/ui/theme/default`](internal/web/ui/theme/default):
+`tokens.css` holds every value (colours by role in two tones, type, space,
+radii, shadows, motion), `icons.js` the icons, and `components/` the
+building blocks — `Button`, `Modal`, `Tabs`, `Card`, `Badge`, `Alert`,
+`Facts`, `Switch`, `Segmented`, `ChoiceCards`, `Icon` — which draw with those
+tokens alone. `app.css` declares no colour of its own. Every component, in
+both tones and with how it is used, is on one page at `/ui/theme/default/`
+of any running dashboard.
+
 `internal/e2e` runs the whole system: SSH clients opening tunnels, browsers
 signing in with email codes, a software WebAuthn authenticator and a fake
 OpenID Connect provider, and the configuration wizard against a live admin

@@ -1,0 +1,26 @@
+/* The demo's page: the wallpaper the materials blur, held still, and its
+   own layout. Nothing here is the app's: the demo shows what the theme
+   draws on its own. */
+
+* { box-sizing: border-box; }
+[data-c79-box] { display: contents; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ig-fg);
+  font: var(--ig-text-base)/var(--ig-leading) var(--ig-font-sans);
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(40% 36% at 18% 12%, var(--ig-wall-1), transparent 70%),
+    radial-gradient(34% 32% at 82% 18%, var(--ig-wall-2), transparent 70%),
+    radial-gradient(42% 34% at 70% 70%, var(--ig-wall-3), transparent 70%),
+    radial-gradient(30% 28% at 20% 80%, var(--ig-wall-4), transparent 70%),
+    var(--ig-bg);
+  background-attachment: fixed;
+}
+
+a { color: var(--ig-link); }
+code, pre { font-family: var(--ig-font-mono); }
+code { font-size: .9em; }
+:focus-visible { outline: none; box-shadow: var(--ig-ring); }

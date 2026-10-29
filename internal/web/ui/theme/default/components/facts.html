@@ -1,0 +1,83 @@
+<script :setup="{ items = [], columns = 'auto' }">
+  // Facts about one thing, each in a tile tinted by its icon's hue: a
+  // tunnel's client and traffic, a relay's server. Read, not changed.
+  //
+  // **Part of the default theme**: imports only the theme's `Icon`, and
+  // draws only with `tokens.css`. See
+  // `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Facts columns="3" :items="[
+  //     { label: 'Client', value: tunnel.client_addr, icon: 'monitor', hue: 'blue' },
+  //     { label: 'Requests', value: tunnel.requests, icon: 'forward', hue: 'orange' },
+  //   ]" />
+  //
+  // An item is `{ label, value, icon, hue }`; one whose `value` is null or
+  // empty is left out. Two columns on a phone; on a wide screen `columns` is
+  // `3`, or `auto` for as many as fit.
+
+  const Icon = await import("@theme/components/icon.html")
+
+  $: shown = items.filter(item => item.value !== null && item.value !== undefined && item.value !== "")
+</script>
+
+<dl class="facts" :class="'columns-' + columns">
+  <div :each="item in shown" :key="item.label" class="fact" :class="'hue-' + (item.hue || 'gray')">
+    <dt><span class="icon"><Icon :name="item.icon" weight="bold" /></span>{{ item.label }}</dt>
+    <dd>{{ item.value }}</dd>
+  </div>
+</dl>
+
+<style scoped>
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ig-space-4);
+    margin: 0 0 var(--ig-space-7);
+    font-family: var(--ig-font-sans);
+  }
+  .fact {
+    --hue: var(--ig-hue-gray);
+    padding: var(--ig-space-5) var(--ig-space-6);
+    border-radius: var(--ig-radius-lg);
+    background: color-mix(in srgb, var(--hue) 9%, var(--ig-field));
+    box-shadow: 0 0 0 var(--ig-hairline) color-mix(in srgb, var(--hue) 28%, transparent);
+  }
+  .hue-blue { --hue: var(--ig-hue-blue); }
+  .hue-purple { --hue: var(--ig-hue-purple); }
+  .hue-green { --hue: var(--ig-hue-green); }
+  .hue-orange { --hue: var(--ig-hue-orange); }
+  .hue-teal { --hue: var(--ig-hue-teal); }
+  .hue-pink { --hue: var(--ig-hue-pink); }
+  dt {
+    display: flex;
+    align-items: center;
+    gap: var(--ig-space-3);
+    color: var(--ig-fg-muted);
+    font-size: var(--ig-text-sm);
+    font-weight: var(--ig-weight-medium);
+  }
+  .icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    color: var(--ig-on-accent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--hue) 65%, var(--ig-light)), var(--hue));
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--hue) 40%, transparent);
+  }
+  dd {
+    margin: var(--ig-space-3) 0 0;
+    font-size: var(--ig-text-base);
+    font-weight: var(--ig-weight-semibold);
+    letter-spacing: -.01em;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (min-width: 640px) {
+    .columns-auto { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+    .columns-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    dd { font-size: var(--ig-text-lg); }
+  }
+</style>

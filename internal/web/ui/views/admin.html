@@ -5,6 +5,16 @@
   const { api } = await import("@ui/lib/api.js")
   const { ago, plural } = await import("@ui/lib/format.js")
   const StatusBadge = await import("@ui/components/status-badge.html")
+  const AccessBadge = await import("@ui/components/access-badge.html")
+  const Alert = await import("@theme/components/alert.html")
+  const Badge = await import("@theme/components/badge.html")
+  const Button = await import("@theme/components/button.html")
+  const Card = await import("@theme/components/card.html")
+  const Facts = await import("@theme/components/facts.html")
+  const Icon = await import("@theme/components/icon.html")
+  const Modal = await import("@theme/components/modal.html")
+  const Switch = await import("@theme/components/switch.html")
+  const Tabs = await import("@theme/components/tabs.html")
 
   document.title = "Admin · intergate"
 
@@ -21,6 +31,11 @@
   }
   await load()
   $: online = subdomains.filter(sub => sub.tunnel).length
+  $: tabs = [
+    { value: "users", label: "Users", count: users.length },
+    { value: "subdomains", label: "Subdomains", count: subdomains.length, extra: online ? online + " online" : "" },
+    { value: "relay", label: "SMTP relay" },
+  ]
   // How much of tcp.ports the subdomains hold.
   $: portsUsed = subdomains.reduce((n, sub) => n + sub.ports, 0)
 
@@ -63,15 +78,16 @@
     load()
   }
 
-  // The user the delete dialog asks about.
+  // The user the delete dialog asks about; kept while it plays its way out.
+  let asking = false
   let deleting = null
   const askDelete = user => {
     deleting = user
-    document.querySelector("dialog.delete-user").showModal()
+    asking = true
   }
   const deleteUser = async () => {
     const user = deleting
-    document.querySelector("dialog.delete-user").close()
+    asking = false
     try {
       await api("DELETE", "/admin/users/" + user.id)
       toast(`Deleted ${user.email}.`)
@@ -100,6 +116,13 @@
       : from?.startsWith("env:") ? "Variable " + from.slice(4)
       : from?.startsWith("file:") ? "File " + from.slice(5)
       : "None"
+  $: relayFacts = [
+    { label: "Server", value: relay.host ? relay.host + ":" + relay.port : "", icon: "server", hue: "blue" },
+    { label: "Encryption", value: TLS[relay.tls], icon: "lock", hue: "green" },
+    { label: "User", value: relay.username || "None", icon: "user", hue: "purple" },
+    { label: "Sender", value: relay.from, icon: "mail", hue: "orange" },
+    { label: "Password", value: passwordFrom(relay.password), icon: "key", hue: "pink" },
+  ]
 
   let editingRelay = false
   let relayBusy = false
@@ -176,21 +199,10 @@
 
 <div class="page-head">
   <h1>Admin</h1>
-  <div class="panel-tabs" role="tablist">
-    <button type="button" role="tab" :aria-selected="tab === 'users' ? 'true' : 'false'" @click="tab = 'users'">
-      Users <span class="count">{{ users.length }}</span>
-    </button>
-    <button type="button" role="tab" :aria-selected="tab === 'subdomains' ? 'true' : 'false'" @click="tab = 'subdomains'">
-      Subdomains <span class="count">{{ subdomains.length }}</span>
-      <span :if="online" class="count count-online" :title="online + ' online'">{{ online }} online</span>
-    </button>
-    <button type="button" role="tab" :aria-selected="tab === 'relay' ? 'true' : 'false'" @click="tab = 'relay'">
-      SMTP relay
-    </button>
-  </div>
+  <Tabs label="Admin" :model="tab" :items="tabs" />
 </div>
 
-<section :if="tab === 'users'" class="card" role="tabpanel" aria-label="Users">
+<div :if="tab === 'users'" role="tabpanel" aria-label="Users"><Card>
   <div class="table-wrap">
     <table class="table">
       <thead><tr><th>User</th><th>Role</th><th class="hide-narrow">Sign-in</th><th class="hide-narrow">Subdomains</th><th class="hide-narrow">Last sign-in</th><th class="center">Enabled</th><th></th></tr></thead>
@@ -209,40 +221,36 @@
                 <option value="admin" :selected="user.role === 'admin'"><svg class="role-icon role-admin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6Z"/><path d="m9 12 2 2 4-4"/></svg><span>Admin</span></option>
                 <option value="user" :selected="user.role === 'user'"><svg class="role-icon role-user" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg><span>User</span></option>
             </select>
-            <span :elseif="user.role === 'owner'" class="value" :title="user.config_owner ? 'An owner in auth.admins' : null"><svg class="role-icon role-owner" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5Z"/></svg>Owner</span>
-            <span :elseif="user.role === 'admin'" class="value"><svg class="role-icon role-admin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6Z"/><path d="m9 12 2 2 4-4"/></svg>Admin</span>
-            <span :else class="value"><svg class="role-icon role-user" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg>User</span>
+            <span :elseif="user.role === 'owner'" class="value" :title="user.config_owner ? 'An owner in auth.admins' : null"><span class="role-owner"><Icon name="crown" /></span>Owner</span>
+            <span :elseif="user.role === 'admin'" class="value"><span class="role-admin"><Icon name="shield" /></span>Admin</span>
+            <span :else class="value"><span class="role-user"><Icon name="user" /></span>User</span>
           </td>
           <td class="small hide-narrow">{{ signIn(user) }}</td>
           <td class="hide-narrow">{{ user.subdomains }}</td>
           <td class="hide-narrow">{{ ago(user.last_login_at) }}</td>
           <td class="center keep">
-            <label :if="canToggle(user)" class="switch" :title="user.disabled ? 'Disabled' : 'Enabled'">
-              <input type="checkbox" role="switch" :checked="!user.disabled"
-                     :aria-label="(user.disabled ? 'Enable ' : 'Disable ') + user.email" @change="setDisabled(user, !$event.target.checked)">
-            </label>
+            <Switch :if="canToggle(user)" :on="!user.disabled" :title="user.disabled ? 'Disabled' : 'Enabled'"
+                    :label="(user.disabled ? 'Enable ' : 'Disable ') + user.email" @change="setDisabled(user, !$event.detail)" />
             <span :else class="state" :class.state-off="user.disabled" role="img" :aria-label="user.disabled ? 'Disabled' : 'Enabled'" :title="user.disabled ? 'Disabled' : 'Enabled'"></span>
           </td>
           <td class="right keep">
-            <button :if="canManage(user)" type="button" class="icon-button danger" :aria-label="'Delete ' + user.email" title="Delete"
-                    @click="askDelete(user)">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
-            </button>
+            <Button :if="canManage(user)" variant="ghost-danger" square icon="trash" title="Delete" :label="'Delete ' + user.email"
+                    @click="askDelete(user)" />
           </td>
         </tr>
       </tbody>
     </table>
   </div>
-  <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+  <Alert :if="error" tone="bad">{{ error }}</Alert>
   <form class="form form-row" @submit.prevent="addUser">
     <input type="email" name="email" required placeholder="new.user@example.com" aria-label="Email of the new user"
            autocomplete="off" :value="email" @input="email = $event.target.value">
-    <button type="submit" class="button button-secondary">Add user</button>
+    <Button type="submit" variant="secondary">Add user</Button>
   </form>
   <p class="hint">Added users sign in with that email address, whatever <code>auth.allowed_*</code> says. Admins manage every subdomain and account but owners’; owners manage everything, and those in <code>auth.admins</code> stay owners.</p>
-</section>
+</Card></div>
 
-<section :elseif="tab === 'subdomains'" class="card" role="tabpanel" aria-label="Subdomains">
+<div :elseif="tab === 'subdomains'" role="tabpanel" aria-label="Subdomains"><Card>
   <div :if="subdomains.length" class="table-wrap">
     <table class="table">
       <thead><tr><th>Subdomain</th><th class="hide-narrow">Owner</th><th>Access</th><th class="hide-narrow">Keys</th><th :if="app.tcp" class="hide-narrow">Ports</th><th>Status</th><th class="hide-narrow">Requests</th></tr></thead>
@@ -250,7 +258,7 @@
         <tr :each="sub in subdomains" :key="sub.name">
           <td><a class="name-cell" :href="'/subdomains/' + encodeURIComponent(sub.name)"><span class="tile" :class="'tile-' + sub.access" aria-hidden="true">{{ sub.name[0] }}</span><strong>{{ sub.name }}</strong></a></td>
           <td class="hide-narrow">{{ sub.owner }}</td>
-          <td><span class="badge" :class="'badge-' + sub.access">{{ sub.access }}</span></td>
+          <td><AccessBadge :access="sub.access" /></td>
           <td class="hide-narrow">{{ sub.keys }}</td>
           <td :if="app.tcp" class="hide-narrow">{{ sub.ports || "—" }}<span :if="sub.ports_online" class="muted small"> · {{ sub.ports_online }} online</span></td>
           <td>
@@ -264,45 +272,36 @@
   </div>
   <p :else class="empty-inline">No subdomains registered.</p>
   <p :if="app.tcp" class="hint">Ports {{ app.tcp.first }}–{{ app.tcp.last }}: {{ portsUsed }} of {{ app.tcp.last - app.tcp.first + 1 }} in use, at most {{ app.tcp.max_ports }} per subdomain.</p>
-</section>
+</Card></div>
 
-<section :elseif="tab === 'relay'" class="card" role="tabpanel" aria-label="SMTP relay">
-  <div class="card-head">
-    <h2>SMTP relay</h2>
-    <span class="count">{{ relay.source === "config" ? "configuration file" : relay.source ? "set up in the dashboard" : "not set up" }}</span>
-  </div>
-  <p class="muted">The server intergate sends its emails through: sign-in codes, and the codes that confirm changes like this one.</p>
-  <p :if="relay.log_only" class="flash flash-warn">Codes go to the server’s log, not by email (<code>auth.email.log_only</code>): only for development.</p>
-  <dl :elseif="relay.host" class="stats stats-3">
-    <div class="tone-blue"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>Server</dt><dd>{{ relay.host }}:{{ relay.port }}</dd></div>
-    <div class="tone-green"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Encryption</dt><dd>{{ TLS[relay.tls] }}</dd></div>
-    <div class="tone-purple"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6"/></svg>User</dt><dd>{{ relay.username || "None" }}</dd></div>
-    <div class="tone-orange"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Sender</dt><dd>{{ relay.from }}</dd></div>
-    <div class="tone-pink"><dt><svg class="stat-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M21 12v2"/></svg>Password</dt><dd>{{ passwordFrom(relay.password) }}</dd></div>
-  </dl>
+<div :elseif="tab === 'relay'" role="tabpanel" aria-label="SMTP relay"><Card title="SMTP relay">
+  <template :slot.aside><Badge>{{ relay.source === "config" ? "configuration file" : relay.source ? "set up in the dashboard" : "not set up" }}</Badge></template>
+  <p class="muted intro">The server intergate sends its emails through: sign-in codes, and the codes that confirm changes like this one.</p>
+  <Alert :if="relay.log_only" tone="warn">Codes go to the server’s log, not by email (<code>auth.email.log_only</code>): only for development.</Alert>
+  <Facts :elseif="relay.host" columns="3" :items="relayFacts" />
 
   <p :if="relay.source === 'config'" class="hint">It is set in the configuration file (<code>auth.email</code>): change it there and restart intergate.</p>
   <p :elseif="!relay.editable" class="hint">Only owners can change it.</p>
 
   <div :elseif="relay.pending">
-    <div :if="relayError" class="flash flash-error" role="alert">{{ relayError }}</div>
+    <Alert :if="relayError" tone="bad">{{ relayError }}</Alert>
     <p>We sent a code to <strong>{{ relay.pending }}</strong> through the new SMTP relay. Enter it to save the relay; until then, the one above stays.</p>
     <form class="form form-row" @submit.prevent="confirmRelay">
       <input class="code-input relay-code" name="code" required inputmode="numeric" autocomplete="one-time-code"
              pattern="[0-9 ]{6,7}" maxlength="7" placeholder="123456" aria-label="Code"
              :value="relayCode" @input="relayCode = $event.target.value">
-      <button type="submit" class="button" :disabled="relayBusy">Save the new relay</button>
+      <Button type="submit" :disabled="relayBusy">Save the new relay</Button>
     </form>
     <p class="small muted">Didn’t get it? Check your spam folder, or <button type="button" class="link" @click="cancelRelay">cancel the change</button>.</p>
   </div>
 
   <form :elseif="editingRelay" class="form" @submit.prevent="proposeRelay">
-    <div :if="relayError" class="flash flash-error" role="alert">{{ relayError }}</div>
+    <Alert :if="relayError" tone="bad" flush>{{ relayError }}</Alert>
     <label>SMTP server
       <input name="host" required autocapitalize="off" spellcheck="false" placeholder="smtp.example.com"
              :value="relayHost" @input="relayHost = $event.target.value">
     </label>
-    <div class="form-pair">
+    <div class="form-grid pair">
       <label>Encryption
         <select class="field" name="tls" @change="setRelayTLS($event.target.value)">
           <option value="starttls" :selected="relayTLS === 'starttls'">STARTTLS</option>
@@ -324,24 +323,21 @@
       <input name="from" required spellcheck="false" :value="relayFrom" @input="relayFrom = $event.target.value">
     </label>
     <div class="actions">
-      <button type="submit" class="button" :disabled="relayBusy">{{ relayBusy ? "Checking the relay…" : "Check and email me a code" }}</button>
+      <Button type="submit" :disabled="relayBusy">{{ relayBusy ? "Checking the relay…" : "Check and email me a code" }}</Button>
       <button type="button" class="link" @click="editingRelay = false">Cancel</button>
     </div>
     <p class="hint">intergate signs in to the new relay, then sends a code through it to {{ app.user.email }}. The relay changes once you enter the code.</p>
   </form>
 
   <div :else class="actions">
-    <button type="button" class="button" @click="editRelay">{{ relay.source ? "Change the SMTP relay" : "Set up an SMTP relay" }}</button>
+    <Button @click="editRelay">{{ relay.source ? "Change the SMTP relay" : "Set up an SMTP relay" }}</Button>
   </div>
-</section>
+</Card></div>
 
-<dialog class="card dialog delete-user" aria-labelledby="delete-user-title">
-  <form method="dialog">
-    <h2 id="delete-user-title">Delete {{ deleting ? deleting.email : "" }}?</h2>
-    <p class="muted">This removes the account{{ deleting && deleting.subdomains ? ", its " + plural(deleting.subdomains, "subdomain") + " with their SSH keys" : "" }} and its passkeys, and closes any tunnel. If the configuration allows the address, they can sign in again as a new account.</p>
-    <div class="dialog-actions">
-      <button value="cancel" class="button button-secondary" autofocus>Cancel</button>
-      <button type="button" class="button button-danger" @click="deleteUser">Delete</button>
-    </div>
-  </form>
-</dialog>
+<Modal :open="asking" :title="'Delete ' + (deleting ? deleting.email : '') + '?'" @close="asking = false">
+  <p class="muted">This removes the account{{ deleting && deleting.subdomains ? ", its " + plural(deleting.subdomains, "subdomain") + " with their SSH keys" : "" }} and its passkeys, and closes any tunnel. If the configuration allows the address, they can sign in again as a new account.</p>
+  <template :slot.foot>
+    <Button variant="secondary" @click="asking = false">Cancel</Button>
+    <Button variant="danger" @click="deleteUser">Delete</Button>
+  </template>
+</Modal>

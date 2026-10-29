@@ -1,0 +1,101 @@
+<script :setup="{ items = [], model = '', label = '' }">
+  // Views of one thing, one at a time: a page's lists, a subdomain's
+  // settings. Pills, the chosen one filled. Only the strip is drawn here; the
+  // owner shows the panel that `model` names.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Tabs label="Admin" :model="tab" :items="[
+  //     { value: 'users', label: 'Users', count: users.length },
+  //     { value: 'subdomains', label: 'Subdomains', count: 4, extra: '2 online' },
+  //     { value: 'danger', label: 'Danger zone', tone: 'bad' },
+  //   ]" />
+  //   <section :if="tab === 'users'" role="tabpanel">…</section>
+  //
+  // An item is a string or `{ value, label, count, extra, tone }`: `count`
+  // is a small number beside the label, `extra` a note in green after it
+  // (what is online), and `tone: 'bad'` a tab whose name turns red when it
+  // is chosen. The arrows, Home and End move between tabs and choose as they
+  // go. The choice goes up through `:model` and as `change`.
+
+  $: tabs = items.map(t => typeof t === "string" ? { value: t, label: t } : t)
+
+  const choose = tab => {
+    if (tab.value === model) return
+    $updateModel(tab.value)
+    $emit("change", tab.value)
+  }
+
+  const STEP = { ArrowRight: 1, ArrowLeft: -1 }
+  const key = (e, tab) => {
+    const i = tabs.indexOf(tab)
+    const next =
+      e.key === "Home" ? tabs[0] :
+      e.key === "End" ? tabs[tabs.length - 1] :
+      e.key in STEP ? tabs[(i + STEP[e.key] + tabs.length) % tabs.length] :
+      null
+    if (!next) return
+    e.preventDefault()
+    choose(next)
+    $self(".tabs").querySelectorAll("button")[tabs.indexOf(next)]?.focus()
+  }
+</script>
+
+<div class="tabs" role="tablist" :aria-label="label || null">
+  <button :each="tab in tabs"
+          :key="String(tab.value)"
+          type="button"
+          role="tab"
+          :aria-selected="tab.value === model ? 'true' : 'false'"
+          :tabindex="tab.value === model ? 0 : -1"
+          :class.bad="tab.tone === 'bad'"
+          @click="choose(tab)"
+          @keydown="key($event, tab)">
+    {{ tab.label }}
+    <span :if="tab.count !== undefined && tab.count !== null" class="count">{{ tab.count }}</span>
+    <span :if="tab.extra" class="count extra">{{ tab.extra }}</span>
+  </button>
+</div>
+
+<style scoped>
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ig-space-2);
+    font-family: var(--ig-font-sans);
+  }
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ig-space-3);
+    padding: var(--ig-space-2) var(--ig-space-3) var(--ig-space-2) var(--ig-space-6);
+    border: 0;
+    border-radius: var(--ig-radius-full);
+    background: none;
+    color: var(--ig-fg-muted);
+    font: inherit;
+    font-size: var(--ig-text-base);
+    font-weight: var(--ig-weight-semibold);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--ig-duration) ease, background-color var(--ig-duration) ease;
+  }
+  /* Without a count the pill is as wide on both sides. */
+  button:not(:has(.count)) { padding-right: var(--ig-space-6); }
+  button:hover { color: var(--ig-fg); background: var(--ig-fill-2); }
+  button[aria-selected="true"] { color: var(--ig-fg); background: var(--ig-fill); }
+  button.bad[aria-selected="true"] { color: var(--ig-bad); }
+  button:focus-visible { outline: none; box-shadow: var(--ig-ring); }
+
+  .count {
+    padding: 1px var(--ig-space-3);
+    border-radius: var(--ig-radius-full);
+    background: var(--ig-fill);
+    color: var(--ig-fg-muted);
+    font-size: var(--ig-text-sm);
+    font-weight: var(--ig-weight-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+  .extra { color: var(--ig-on-ok-solid); background: var(--ig-ok-solid); }
+</style>

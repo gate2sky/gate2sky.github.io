@@ -1,0 +1,9 @@
+<script :setup="{ access = 'public' }">
+  // Who can open a subdomain, as a badge in its colour.
+  //
+  //   <AccessBadge :access="sub.access" />
+  const Badge = await import("@theme/components/badge.html")
+  const TONES = { public: "accent", users: "warn", private: "bad" }
+</script>
+
+<Badge :tone="TONES[access] || 'neutral'">{{ access }}</Badge>

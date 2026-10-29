@@ -1,0 +1,66 @@
+<script :setup="{ model = false, on = null, disabled = false, label = '', title = '' }">
+  // On or off, and in force as soon as it moves: green with the knob right
+  // when on, red with it left when off.
+  //
+  // **Part of the default theme**: imports nothing, and draws only with
+  // `tokens.css`. See `RECORD/2026-10-29.a-design-system.completed.md`.
+  //
+  //   <Switch :model="autoRenew" label="Renew automatically" />
+  //   <Switch :on="!user.disabled" label="Enable alice" @change="setEnabled(user, $event.detail)" />
+  //
+  // A checkbox with `role="switch"`: Space flips it. The value goes up
+  // through `:model` and as `change`; `:on` instead shows a value the owner
+  // keeps and saves itself, from `change` (one that `:model` could not
+  // write back, like `!user.disabled`). `label` names it for a screen reader.
+
+  const flag = v => v === "" || v === true || v === "true"
+  $: isOn = flag(on === null ? model : on)
+  $: isDisabled = flag(disabled)
+
+  const flip = event => {
+    const next = event.target.checked
+    $updateModel(next)
+    $emit("change", next)
+  }
+</script>
+
+<label class="switch" :title="title || null">
+  <input type="checkbox" role="switch"
+         :checked="isOn"
+         :disabled="isDisabled"
+         :aria-label="label || null"
+         @change="flip($event)">
+</label>
+
+<style scoped>
+  .switch { display: inline-flex; vertical-align: middle; }
+  input {
+    appearance: none;
+    position: relative;
+    flex: none;
+    width: 38px;
+    height: 22px;
+    margin: 0;
+    border-radius: var(--ig-radius-full);
+    background: var(--ig-switch-off);
+    box-shadow: var(--ig-switch-well);
+    cursor: pointer;
+    transition: background var(--ig-duration-slow) ease;
+  }
+  input::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--ig-switch-knob);
+    box-shadow: var(--ig-switch-knob-shadow);
+    transition: transform var(--ig-duration-slow) var(--ig-ease-knob);
+  }
+  input:checked { background: var(--ig-switch-on); }
+  input:checked::before { transform: translateX(16px); }
+  input:focus-visible { outline: none; box-shadow: var(--ig-ring); }
+  input:disabled { opacity: .45; cursor: default; }
+</style>

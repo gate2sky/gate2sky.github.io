@@ -5,6 +5,9 @@
   const { app, query } = await import("@ui/lib/store.js")
   const { api } = await import("@ui/lib/api.js")
   const { supported, signIn, autofillAvailable, problem } = await import("@ui/lib/passkeys.js")
+  const Alert = await import("@theme/components/alert.html")
+  const Button = await import("@theme/components/button.html")
+  const Card = await import("@theme/components/card.html")
 
   document.title = "Sign in · intergate"
 
@@ -82,34 +85,31 @@
   }
 </script>
 
-<section class="card login">
+<Card width="sm" center>
   <img class="app-icon" src="/ui/logo-mark.svg" alt="">
   <div :if="sentTo">
-    <h1>Check your email</h1>
+    <h1 class="login-title">Check your email</h1>
     <p class="muted">If <strong>{{ sentTo }}</strong> can sign in here, we just sent it a 6-digit code.</p>
-    <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+    <div :if="error" class="login-alert"><Alert tone="bad" flush>{{ error }}</Alert></div>
     <form class="form form-login" @submit.prevent="verify">
       <label>Code
         <input class="code-input" name="code" required inputmode="numeric" autocomplete="one-time-code"
                pattern="[0-9 ]{6,7}" maxlength="7" placeholder="123456" autofocus
                :value="code" @input="code = $event.target.value">
       </label>
-      <button type="submit" class="button button-block" :disabled="busy">Sign in</button>
+      <Button type="submit" block :disabled="busy">Sign in</Button>
     </form>
     <p class="small muted">Didn’t get it? Check your spam folder or
       <button type="button" class="link" @click="otherAddress">try again</button>.</p>
   </div>
 
   <div :else>
-    <h1>Sign in</h1>
+    <h1 class="login-title">Sign in</h1>
     <p class="muted">Publish local services on <strong>*.{{ app.domain }}</strong> through SSH tunnels.</p>
-    <div :if="error" class="flash flash-error" role="alert">{{ error }}</div>
+    <div :if="error" class="login-alert"><Alert tone="bad" flush>{{ error }}</Alert></div>
 
     <div :if="withPasskeys" class="providers">
-      <button type="button" class="button button-block" :disabled="busy" @click="usePasskey">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2.5 20c.6-3.6 3.3-6 6.5-6 1.4 0 2.6.4 3.6 1.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="18" cy="13" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M18 15.6V21l1.6-1.4M18 18.4l1.4-1.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Sign in with a passkey
-      </button>
+      <Button block icon="passkey" :disabled="busy" @click="usePasskey">Sign in with a passkey</Button>
     </div>
 
     <div :if="app.email">
@@ -119,22 +119,19 @@
           <input type="email" name="email" required autocomplete="email webauthn" autocapitalize="off" spellcheck="false"
                  placeholder="you@example.com" :value="email" @input="email = $event.target.value">
         </label>
-        <button type="submit" class="button button-block" :class.button-secondary="withPasskeys" :disabled="busy">
-          Email me a sign-in code
-        </button>
+        <Button type="submit" block :variant="withPasskeys ? 'secondary' : 'primary'" :disabled="busy">Email me a sign-in code</Button>
       </form>
     </div>
 
     <div :if="providers.length">
       <div :if="withPasskeys || app.email" class="divider"><span>or continue with</span></div>
       <div class="providers">
-        <a :each="provider in providers" :key="provider.href" class="button button-block button-secondary"
-           :href="provider.href">{{ provider.name }}</a>
+        <Button :each="provider in providers" :key="provider.href" variant="secondary" block :href="provider.href">{{ provider.name }}</Button>
       </div>
     </div>
 
-    <p :if="!withPasskeys && !app.email && !providers.length" class="flash flash-error">
+    <div :if="!withPasskeys && !app.email && !providers.length" class="login-alert"><Alert tone="bad" flush>
       No sign-in method is configured. Set up email (SMTP) or an OAuth provider in the configuration.
-    </p>
+    </Alert></div>
   </div>
-</section>
+</Card>

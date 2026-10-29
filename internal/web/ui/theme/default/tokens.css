@@ -1,0 +1,278 @@
+/* The default theme's tokens: every value its components draw with, and the
+   only place each one is written. A component reads them with no fallback —
+   a missing token should look missing, not quietly draw this theme's value
+   under another name. `app.css` reads them too and declares no colour of its
+   own. See RECORD/2026-10-29.a-design-system.completed.md.
+
+   Close to current macOS: a slowly drifting wallpaper behind translucent,
+   blurred materials. **Two tones**, by what a thing sits on:
+
+   - `dark`, the default on `:root`: light text on the mid-gray wallpaper
+     and on the toolbar's dark glass.
+   - `light`: dark text on the light materials — a card, a dialog, the toast.
+
+   Any element is an island of the other tone with `data-tone="light"` (or
+   `"dark"`): the colours are re-declared on it, and everything inside draws
+   with them. `Card` and `Modal` are light islands of their own. Shape, type
+   and motion are the same in both. */
+
+:root {
+  /* ---- the page ----------------------------------------------------------- */
+
+  /* The wallpaper: a mid gray, and four glows that drift over it. */
+  --ig-bg: #4b5060;
+  --ig-wall-1: rgb(10 132 255 / .5);
+  --ig-wall-2: rgb(191 90 242 / .42);
+  --ig-wall-3: rgb(64 200 224 / .38);
+  --ig-wall-4: rgb(255 159 10 / .26);
+
+  /* Materials: translucent fills that blur what is behind them. A card, the
+     toolbar, and what floats over everything (a dialog, the toast, a
+     picker). */
+  --ig-material: rgb(246 247 250 / .84);
+  --ig-material-bar: rgb(40 43 53 / .62);
+  --ig-material-hud: rgb(250 250 252 / .9);
+  --ig-blur: blur(28px) saturate(170%);
+  /* What a dialog lays over the page behind it. */
+  --ig-overlay: rgb(10 14 30 / .35);
+  --ig-overlay-blur: blur(3px);
+
+  /* ---- colour, by role ---------------------------------------------------- */
+
+  /* The accent fills controls; `--ig-link` is the same blue as text, per
+     tone. */
+  --ig-accent: #0071e3;
+  --ig-on-accent: #fff;
+  /* Buttons that lose something, and the quiet dark one (sign out). */
+  --ig-danger: #d92d23;
+  --ig-dark: #3a3f4a;
+  /* The system colours, for dots, lights and switches. */
+  --ig-green: #30d158;
+  --ig-red: #ff453a;
+  --ig-orange: #ff9f0a;
+  /* A solid "ok" pill: dark green on light green, the same in both tones. */
+  --ig-ok-solid: color-mix(in srgb, #30d158 75%, #fff);
+  --ig-on-ok-solid: #0f3d1c;
+
+  /* Hues for icons and tinted tiles: a fact's tile, an option's icon. A
+     tile is a gradient from its hue lightened toward `--ig-light`. */
+  --ig-light: #fff;
+  --ig-hue-gray: #8e8e93;
+  --ig-hue-blue: #0a84ff;
+  --ig-hue-purple: #a35ce6;
+  --ig-hue-green: #28b24b;
+  --ig-hue-orange: #ff9500;
+  --ig-hue-teal: #20a8c4;
+  --ig-hue-pink: #ff2d55;
+
+  /* A subdomain's tile, by who can open it, and an avatar without a photo. */
+  --ig-tile-neutral: linear-gradient(160deg, #8e8e93, #636366);
+  --ig-tile-public: linear-gradient(160deg, #64d2ff, #0a84ff);
+  --ig-tile-users: linear-gradient(160deg, #ffd60a, #ff9f0a);
+  --ig-tile-private: linear-gradient(160deg, #ff8a80, #ff375f);
+  --ig-tile-edge: 0 .5px 0 rgb(255 255 255 / .35) inset, 0 1px 2px rgb(0 0 0 / .15);
+  --ig-avatar: linear-gradient(160deg, #a2a2ab, #6e6e76);
+
+  /* Roles, as their icons are drawn. */
+  --ig-role-owner: #e08a00;
+  --ig-role-admin: #8e4fd6;
+
+  /* A switch: green with the knob right when on, red with it left when off. */
+  --ig-switch-on: linear-gradient(180deg, #4cd97b, #28b850);
+  --ig-switch-off: linear-gradient(180deg, #ff6b62, #e8352b);
+  --ig-switch-knob: linear-gradient(180deg, #fff, #f1f1f3);
+  --ig-switch-well: inset 0 1px 2px rgb(0 0 0 / .18);
+  --ig-switch-knob-shadow: 0 1px 3px rgb(0 0 0 / .3);
+
+  /* The line under the toolbar's chosen tab. */
+  --ig-tab-line: #64b5ff;
+  /* The ring a focused control draws. */
+  --ig-ring: 0 0 0 3.5px rgb(64 156 255 / .7);
+
+  /* A button is tinted glass: light catches its rim, top and bottom, and its
+     colour glows softly beneath. */
+  --ig-gloss: linear-gradient(180deg, rgb(255 255 255 / .16), rgb(255 255 255 / 0) 55%, rgb(255 255 255 / .06));
+  --ig-gloss-2: linear-gradient(180deg, rgb(255 255 255 / .12), rgb(255 255 255 / 0) 55%);
+  --ig-rim: inset 0 1px 0 rgb(255 255 255 / .42), inset 0 -1px 0 rgb(255 255 255 / .1), inset 0 0 0 1px rgb(255 255 255 / .16);
+  --ig-glass-blur: blur(14px) saturate(190%);
+
+  /* Shadows. */
+  --ig-shadow-xs: 0 1px 2px rgb(0 0 0 / .05);
+  --ig-shadow-sm: 0 1px 2px rgb(0 0 0 / .12);
+  --ig-shadow-inset: 0 .5px 1px rgb(0 0 0 / .12) inset;
+  --ig-shadow: 0 1px 2px rgb(0 0 0 / .16), 0 14px 36px rgb(10 14 30 / .3);
+  --ig-shadow-pop: 0 2px 6px rgb(0 0 0 / .2), 0 22px 56px rgb(10 14 30 / .45);
+  --ig-shadow-lift: 0 3px 10px rgb(0 0 0 / .08);
+
+  /* Code: a light Monokai, its hues deep enough to read on paper. */
+  --ig-code-bg: #fbfaf4;
+  --ig-code-surface: #fff;
+  --ig-code-line: rgb(0 0 0 / .13);
+  --ig-code-fg: #272822;
+  --ig-code-comment: #9a967e;
+  --ig-code-pink: #d0105c;
+  --ig-code-green: #4d7c0f;
+  --ig-code-yellow: #a35b00;
+  --ig-code-purple: #7547c9;
+  --ig-code-button: #f3f2ea;
+  --ig-code-button-hover: #e9e8de;
+
+  /* ---- type --------------------------------------------------------------- */
+
+  --ig-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, "Helvetica Neue", sans-serif;
+  --ig-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --ig-text-2xs: 10px;
+  --ig-text-xs: 11px;
+  --ig-text-sm: 12px;
+  --ig-text-md: 13px;
+  --ig-text-base: 14px;
+  --ig-text-lg: 15px;
+  --ig-text-xl: 17px;
+  --ig-text-2xl: 22px;
+  --ig-text-3xl: 24px;
+  --ig-text-4xl: 28px;
+  --ig-weight-regular: 400;
+  --ig-weight-medium: 500;
+  --ig-weight-semibold: 600;
+  --ig-weight-bold: 650;
+  --ig-weight-heavy: 700;
+  --ig-leading: 1.5;
+  --ig-leading-tight: 1.2;
+
+  /* ---- space -------------------------------------------------------------- */
+
+  --ig-space-1: 4px;
+  --ig-space-2: 6px;
+  --ig-space-3: 8px;
+  --ig-space-4: 10px;
+  --ig-space-5: 12px;
+  --ig-space-6: 14px;
+  --ig-space-7: 16px;
+  --ig-space-8: 20px;
+  --ig-space-9: 24px;
+  --ig-space-10: 32px;
+
+  /* ---- shape -------------------------------------------------------------- */
+
+  --ig-radius-xs: 4px;
+  --ig-radius-sm: 6px;
+  --ig-radius-control: 8px;
+  --ig-radius-md: 10px;
+  --ig-radius-lg: 12px;
+  --ig-radius-xl: 14px;
+  --ig-radius-full: 999px;
+  --ig-hairline: .5px;
+
+  /* A control's height, so a button, a field and a select on one row line up
+     without anybody measuring. A phone's are taller, for a finger. */
+  --ig-control-xs: 28px;
+  --ig-control-sm: 30px;
+  --ig-control-md: 38px;
+  /* Between blocks on a page: one card and the next. */
+  --ig-block-gap: 16px;
+
+  /* ---- motion ------------------------------------------------------------- */
+
+  /* Something that arrives, with a little overshoot: a dialog, the toast. */
+  --ig-ease-spring: cubic-bezier(.2, .9, .3, 1.2);
+  /* A knob that slides. */
+  --ig-ease-knob: cubic-bezier(.3, .7, .4, 1.2);
+  /* Something that leaves: quick, no overshoot. */
+  --ig-ease-in: cubic-bezier(.4, 0, 1, 1);
+  --ig-duration-fast: 120ms;
+  --ig-duration: 150ms;
+  --ig-duration-slow: 200ms;
+  --ig-duration-arrive: 280ms;
+
+  /* ---- layers ------------------------------------------------------------- */
+
+  --ig-z-bar: 5;
+  --ig-z-toast: 10;
+}
+
+/* The dark tone: on the wallpaper and the toolbar. */
+:root, [data-tone="dark"] {
+  --ig-fg: #fff;
+  --ig-fg-muted: #e0e3ea;
+  --ig-link: #b8daff;
+  /* The tones as text, readable on this ground. */
+  --ig-ok: #8ff0a9;
+  --ig-bad: #ffc9c4;
+  --ig-warn: #ffd08a;
+
+  /* Hover and chosen: a veil of the ink over whatever is there. */
+  --ig-fill: rgb(255 255 255 / .13);
+  --ig-fill-2: rgb(255 255 255 / .07);
+  --ig-field: rgb(26 28 35 / .5);
+  --ig-field-line: rgb(255 255 255 / .24);
+  --ig-line: rgb(255 255 255 / .2);
+  --ig-separator: rgb(255 255 255 / .15);
+  --ig-material-edge: rgb(255 255 255 / .2);
+
+  /* A secondary button: clear glass, lighter on hover. */
+  --ig-button-2: rgb(255 255 255 / .13);
+  --ig-button-2-hover: rgb(255 255 255 / .2);
+  --ig-button-2-active: rgb(255 255 255 / .08);
+  --ig-button-2-shadow: inset 0 1px 0 rgb(255 255 255 / .3), inset 0 0 0 1px rgb(255 255 255 / .14), 0 1px 2px rgb(0 0 0 / .16);
+  /* How much of its colour a primary button's glass holds. */
+  --ig-tint: 58%;
+
+  color-scheme: dark;
+}
+
+/* The light tone: on a card, a dialog, the toast. */
+[data-tone="light"] {
+  --ig-fg: #333a3e;
+  --ig-fg-muted: #5f676c;
+  --ig-link: #0a5fc2;
+  --ig-ok: #1d7a35;
+  --ig-bad: #c0271d;
+  --ig-warn: #8a5300;
+
+  --ig-fill: rgb(0 0 0 / .06);
+  --ig-fill-2: rgb(0 0 0 / .035);
+  --ig-field: rgb(255 255 255 / .92);
+  --ig-field-line: rgb(0 0 0 / .16);
+  --ig-line: rgb(0 0 0 / .1);
+  --ig-separator: rgb(0 0 0 / .09);
+  --ig-material-edge: rgb(255 255 255 / .8);
+
+  --ig-button-2: rgb(255 255 255 / .55);
+  --ig-button-2-hover: rgb(255 255 255 / .8);
+  --ig-button-2-active: rgb(255 255 255 / .35);
+  --ig-button-2-shadow: inset 0 1px 0 rgb(255 255 255 / .95), inset 0 0 0 1px rgb(0 0 0 / .09), 0 1px 2px rgb(0 0 0 / .07);
+  /* On light material the glass holds more colour, for white text. */
+  --ig-tint: 84%;
+
+  color-scheme: light;
+}
+
+/* Wider than a phone: controls a step shorter, for a pointer. */
+@media (min-width: 640px) {
+  :root {
+    --ig-control-md: 32px;
+    --ig-block-gap: 18px;
+  }
+}
+
+/* Once, here, instead of a media query in every component: every transition
+   and animation the components write takes its time from these. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ig-duration-fast: 0ms;
+    --ig-duration: 0ms;
+    --ig-duration-slow: 0ms;
+    --ig-duration-arrive: 0ms;
+  }
+}
+
+/* One rule beyond the tokens. A component's slot for free content (a card's
+   body, a dialog's) trims the outer margins of what is put in it: its scoped
+   style cannot reach slotted elements, and a paragraph's margin would
+   otherwise add to the padding around it. A component's own box
+   (`data-c79-box`, jq79's) lays out as if it were not there, so what is in
+   it counts. */
+[data-flow] > :first-child,
+[data-flow] > [data-c79-box]:first-child > :first-child { margin-top: 0; }
+[data-flow] > :last-child,
+[data-flow] > [data-c79-box]:last-child > :last-child { margin-bottom: 0; }
