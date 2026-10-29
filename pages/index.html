@@ -1114,7 +1114,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
               </div>
 <pre class="v1"><span class="p">$ </span>curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh</pre>
 <pre class="v2"><span class="p">$ </span>wget -qO- https://jgermade.github.io/intergate/setup.sh | sh</pre>
-              <p class="tfoot v1">Linux and macOS. It installs the binary, opens the setup wizard and, with systemd, runs intergate as a service. Run it again to update, reconfigure or uninstall.</p>
+              <p class="tfoot v1">Linux and macOS. It installs the binary, opens the setup wizard and, with systemd, runs intergate as a service, then gives you a one-time link to the dashboard’s setup: email delivery and your account. Run it again to update, reconfigure or uninstall.</p>
               <p class="tfoot v2">The same, for machines without curl, such as a minimal Debian: the installer then downloads with wget too.</p>
             </div>
           </div>
@@ -1128,7 +1128,7 @@ footer a.gh svg { width: 16px; height: 16px; fill: currentColor; }
 <span class="p">$ </span>docker run -it --rm -v intergate:/data ghcr.io/jgermade/intergate config
 <span class="p">$ </span>docker run -d --name intergate --restart unless-stopped -v intergate:/data \
     -p 80:80 -p 443:443 -p 2222:2222 ghcr.io/jgermade/intergate</pre>
-              <p class="tfoot">Choose Let's Encrypt in the wizard: intergate gets a certificate for each subdomain on its own. Manage it later with <code>docker exec -it intergate intergate config</code>.</p>
+              <p class="tfoot">Choose Let's Encrypt in the wizard: intergate gets a certificate for each subdomain on its own. Then <code>docker exec intergate intergate setup-url</code> gives the link to the dashboard’s setup, and <code>docker exec -it intergate intergate config</code> manages it from the terminal.</p>
             </div>
           </div>
           <div class="pane p-k8s">
@@ -1153,7 +1153,7 @@ ports:
     expose: {default: true}
     exposedPort: 2222
     protocol: TCP</pre>
-              <p class="tfoot v1">An IngressRoute for the dashboard and every subdomain, and SSH over a Traefik TCP entry point with the PROXY protocol. See the <a href="https://github.com/jgermade/intergate/tree/main/deploy/helm/intergate">chart</a>, also in a classic repository: <code>helm repo add intergate https://jgermade.github.io/intergate/charts</code>.</p>
+              <p class="tfoot v1">An IngressRoute for the dashboard and every subdomain, and SSH over a Traefik TCP entry point with the PROXY protocol. Then <code>kubectl exec deploy/intergate -- intergate setup-url</code> gives the link to the dashboard’s setup. See the <a href="https://github.com/jgermade/intergate/tree/main/deploy/helm/intergate">chart</a>, also in a classic repository: <code>helm repo add intergate https://jgermade.github.io/intergate/charts</code>.</p>
               <p class="tfoot v2">Traefik opens the SSH port once its chart declares the entry point. Keep <code>exposedPort</code> and intergate’s <code>ssh.publicPort</code> the same; port 22 only works on an address no other <code>sshd</code> uses.</p>
             </div>
           </div>

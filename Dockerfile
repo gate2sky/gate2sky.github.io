@@ -14,6 +14,7 @@ COPY --from=build --chown=65532:65532 /out/data /data
 # The configuration and all state live in /data:
 #   docker run -it --rm -v intergate:/data IMAGE config   (create the configuration)
 #   docker run -d -v intergate:/data -p ... IMAGE         (run it)
+#   docker exec CONTAINER intergate setup-url             (link to the dashboard's setup)
 ENV INTERGATE_CONFIG=/data/intergate.yaml \
     INTERGATE_DATA_DIR=/data
 VOLUME /data

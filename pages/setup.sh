@@ -4,15 +4,18 @@
 #   curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh
 #   curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh -s -- reinstall
 #   curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh -s -- uninstall
+#   curl -fsSL https://jgermade.github.io/intergate/setup.sh | sh -s -- setup-url
 #   wget -qO- https://jgermade.github.io/intergate/setup.sh | sh     # without curl
 #
 # With no command and a terminal to ask on, it asks what to do: install, and —
-# when it finds intergate already there — update, reinstall, configure or
-# uninstall. With nobody to ask it installs.
+# when it finds intergate already there — update, reinstall, configure, a new
+# link to the dashboard's setup or uninstall. With nobody to ask it installs.
 #
 # One binary, from a GitHub release, into /usr/local/bin (or --dir). After a
 # first install it offers `intergate config`, the setup wizard, and on Linux
-# with systemd `intergate service --install`. An update restarts the service.
+# with systemd `intergate service --install`, which prints the one-time link
+# to the dashboard's setup (email delivery and the owner) when the
+# configuration leaves them to it. An update restarts the service.
 # `uninstall` keeps the configuration and data unless `--purge` says otherwise.
 #
 # Everything is a function and the last line calls `main`, so a download that
@@ -38,6 +41,9 @@ Commands:
                that version is already there.
   reinstall    Download and replace the binary, even if it is the same version.
   configure    Run the setup wizard (intergate config).
+  setup-url    Print a new one-time link to the dashboard's setup, where the
+               owner sets up email delivery and their account. It replaces
+               the link given before.
   uninstall    Stop and remove the service and the binary. The configuration
                and data are kept unless --purge.
   help         Show this text.
@@ -378,6 +384,13 @@ data_dir() {
 	esac
 }
 
+# A new link to the dashboard's setup, from the running server. Only root
+# and the service user may ask it.
+setup_url() {
+	[ -x "$BIN" ] || die "intergate is not installed in $DIR: install it first"
+	maybe_root "$(dirname "$CONFIG")" "$BIN" setup-url --config "$CONFIG" || exit 1
+}
+
 uninstall_intergate() {
 	if service_installed; then
 		if [ -x "$BIN" ]; then
@@ -450,51 +463,55 @@ choose_command() {
 	fi
 	current=""
 	if [ -x "$BIN" ]; then current=$(version_of "$BIN"); fi
+	# The options, numbered as they are shown: OPTION_<n> is the command.
+	n=0
+	option() {
+		n=$((n + 1))
+		eval "OPTION_$n=\$1"
+		say "  $n) $2"
+	}
 	if [ -n "$current" ]; then
 		state=""
-		if service_active; then state=" — running as a service"; fi
+		running=0
+		if service_active; then
+			state=" — running as a service"
+			running=1
+		elif "$BIN" status --config "$CONFIG" >/dev/null 2>&1; then
+			running=1
+		fi
 		say "intergate $current is installed at $BIN$state."
 		say ""
-		say "  1) Update to the latest release"
-		say "  2) Reinstall $current"
-		say "  3) Configure: subdomains, SSH keys, users and settings"
-		say "  4) Uninstall — keeps the configuration and data"
-		say "  5) Quit"
+		option install "Update to the latest release"
+		option reinstall "Reinstall $current"
+		option configure "Configure: subdomains, SSH keys, users and settings"
+		if [ "$running" = 1 ]; then
+			option setup-url "New link to the dashboard's setup: email delivery and the owner"
+		fi
+		option uninstall "Uninstall — keeps the configuration and data"
 	else
 		say "intergate opens a gate from your machine to the web: an encrypted"
 		say "SSH tunnel per subdomain, managed from a web dashboard."
 		say ""
-		say "  1) Install the latest release"
-		say "  2) Quit"
+		option install "Install the latest release"
 	fi
+	option quit "Quit"
 	while :; do
 		printf 'What should this do? [1] ' >/dev/tty
 		read -r answer </dev/tty || answer=1
 		[ -n "$answer" ] || answer=1
 		case "$answer" in
-		q | Q) answer=quit ;;
+		q | Q) COMMAND=quit ;;
+		*[!0-9]*) COMMAND="" ;;
+		*) eval "COMMAND=\${OPTION_$answer:-}" ;;
 		esac
-		if [ -n "$current" ]; then
-			case "$answer" in
-			1) COMMAND=install; return ;;
-			2) COMMAND=reinstall; return ;;
-			3) COMMAND=configure; return ;;
-			4) COMMAND=uninstall; return ;;
-			5 | quit)
-				say "Nothing to do."
-				exit 0
-				;;
-			esac
-		else
-			case "$answer" in
-			1) COMMAND=install; return ;;
-			2 | quit)
-				say "Nothing to do."
-				exit 0
-				;;
-			esac
-		fi
-		warn "not an option"
+		case "$COMMAND" in
+		quit)
+			say "Nothing to do."
+			exit 0
+			;;
+		"") warn "not an option" ;;
+		*) return ;;
+		esac
 	done
 }
 
@@ -509,7 +526,7 @@ main() {
 	YES=0
 	while [ $# -gt 0 ]; do
 		case "$1" in
-		install | reinstall | configure | uninstall)
+		install | reinstall | configure | uninstall | setup-url)
 			COMMAND=$1
 			EXPLICIT=1
 			;;
@@ -576,6 +593,7 @@ main() {
 	install) install_intergate 0 ;;
 	reinstall) install_intergate 1 ;;
 	configure) configure_intergate ;;
+	setup-url) setup_url ;;
 	uninstall) uninstall_intergate ;;
 	esac
 }

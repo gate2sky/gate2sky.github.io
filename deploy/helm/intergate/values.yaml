@@ -18,24 +18,31 @@ imagePullSecrets: []
 # ports, data_dir, trust_proxy_headers, ssh.public_*). Any option of
 # intergate.example.yaml can go here. Reference secrets as ${VAR} and put
 # them in secretEnv or existingSecret.
-config:
-  auth:
-    admins: [you@example.com]
-    allowed_domains: []
-    email:
-      from: "intergate <no-reply@gate.example.com>"
-      smtp:
-        host: smtp.example.com
-        port: 587
-        username: intergate
-        password: ${SMTP_PASSWORD}
+#
+# Without email delivery or admins, the dashboard's setup asks for them on
+# a one-time link (`kubectl exec deploy/intergate -- intergate setup-url`):
+# the SMTP server, stored on the volume with its password encrypted, and
+# the owner. To manage them with Helm instead, set them here:
+config: {}
+#  auth:
+#    admins: [you@example.com]
+#    email:
+#      from: "intergate <no-reply@gate.example.com>"
+#      smtp:
+#        host: smtp.example.com
+#        port: 587
+#        username: intergate
+#        password: ${SMTP_PASSWORD}
 
-# Environment variables stored in a Secret created by the chart.
+# Environment variables stored in a Secret created by the chart: the
+# secrets config references as ${VAR}, or the SMTP password of the
+# dashboard's setup, once `intergate config` reads it from one (env:NAME).
 secretEnv: {}
 #  SMTP_PASSWORD: change-me
 #  GITHUB_CLIENT_SECRET: change-me
 
-# Or use a Secret you manage; each key becomes an environment variable.
+# Or use a Secret you manage, e.g. filled from Vault by the External
+# Secrets Operator; each key becomes an environment variable.
 existingSecret: ""
 
 # SSH host and port users type in `ssh -p <port> <host>`. The port must be
@@ -100,8 +107,9 @@ certManager:
     kind: ClusterIssuer
 
 persistence:
-  # The SQLite database, SSH host key and signing key live here. Without
-  # persistence, every restart changes the SSH host key and signs users out.
+  # The SQLite database, SSH host key and signing key live here, and what
+  # the dashboard's setup saves. Without persistence, every restart changes
+  # the SSH host key, signs users out and undoes the setup.
   enabled: true
   size: 1Gi
   storageClass: ""

@@ -39,6 +39,10 @@ ssh:
   # Traefik or HAProxy, to see real client addresses.
   proxy_protocol: false
 
+# Without email (or an OAuth provider) and anyone who may sign in, the
+# dashboard asks for email delivery and the owner in a setup, opened with
+# the one-time link `intergate setup-url` prints. What it saves lives in
+# the database; what this file sets wins.
 auth:
   session_ttl: 168h
   # Who may sign in. Admins can always sign in and see the admin page, and
