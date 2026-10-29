@@ -186,13 +186,16 @@ func (s *Server) handleEmailLogin(w http.ResponseWriter, r *http.Request) {
 	if s.mayUseEmail(r.Context(), email) {
 		code := sixDigits()
 		s.codes.add(flow.ID, code, ttl)
-		msg := g2smail.Message{
+		msg := g2smail.Code{
 			To:      email,
-			Subject: "Your intergate sign-in code: " + code,
-			Body: fmt.Sprintf("Your sign-in code for %s is:\n\n    %s\n\nIt expires in %d minutes and works once.\n\n"+
-				"If you did not try to sign in, you can ignore this email: nobody can sign in without the code.\n",
-				s.cfg.DashboardURL("/"), code, int(ttl.Minutes())),
-		}
+			Code:    code,
+			Subject: "is your intergate sign-in code",
+			Heading: "Your sign-in code",
+			Intro:   "Enter this code to sign in to intergate at " + s.cfg.Domain() + ".",
+			TTL:     ttl,
+			Note:    "If you did not try to sign in, you can ignore this email: nobody can sign in without the code.",
+			Site:    s.cfg.DashboardURL("/"),
+		}.Message()
 		// Send in the background so the response time doesn't tell
 		// whether an email was sent.
 		go func() {

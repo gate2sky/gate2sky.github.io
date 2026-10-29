@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -209,14 +208,16 @@ func (s *Server) handleSetupOwner(w http.ResponseWriter, r *http.Request) {
 	ttl := s.cfg.Auth.Email.CodeTTL
 	flow := emailFlow{ID: randomString(16), Email: email}
 	code := sixDigits()
-	msg := g2smail.Message{
+	msg := g2smail.Code{
 		To:      email,
-		Subject: "Your intergate setup code: " + code,
-		Body: fmt.Sprintf("Your code to finish setting up intergate at %s is:\n\n    %s\n\n"+
-			"It expires in %d minutes and works once. With it, %s becomes intergate's owner.\n\n"+
-			"If you are not setting up intergate, you can ignore this email.\n",
-			s.cfg.DashboardURL("/"), code, int(ttl.Minutes()), email),
-	}
+		Code:    code,
+		Subject: "is your intergate setup code",
+		Heading: "Finish setting up intergate",
+		Intro:   "Enter this code in the setup of intergate at " + s.cfg.Domain() + ": " + email + " becomes its owner.",
+		TTL:     ttl,
+		Note:    "If you are not setting up intergate, you can ignore this email.",
+		Site:    s.cfg.DashboardURL("/"),
+	}.Message()
 	ctx, cancel := context.WithTimeout(r.Context(), emailSendDeadline)
 	defer cancel()
 	if err := s.mailer.Send(ctx, msg); err != nil {

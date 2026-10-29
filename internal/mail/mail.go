@@ -8,12 +8,15 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
 	"mime"
+	"mime/multipart"
 	"mime/quotedprintable"
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"time"
@@ -21,11 +24,13 @@ import (
 	"github.com/jgermade/intergate/internal/config"
 )
 
-// Message is a plain-text email.
+// Message is an email: plain text, and an HTML version of it when HTML is
+// set.
 type Message struct {
 	To      string
 	Subject string
 	Body    string
+	HTML    string
 }
 
 // Sender delivers messages.
@@ -80,7 +85,7 @@ func (s *SMTPSender) Send(ctx context.Context, m Message) error {
 	if err != nil {
 		return fmt.Errorf("smtp: DATA: %w", err)
 	}
-	if _, err := w.Write(Compose(from, to, m.Subject, m.Body)); err != nil {
+	if _, err := w.Write(Compose(from, to, m)); err != nil {
 		return fmt.Errorf("smtp: write message: %w", err)
 	}
 	if err := w.Close(); err != nil {
@@ -143,8 +148,9 @@ func dial(ctx context.Context, smtpCfg config.SMTPConfig) (*smtp.Client, error) 
 	return c, nil
 }
 
-// Compose renders an RFC 5322 message with a quoted-printable UTF-8 body.
-func Compose(from, to *mail.Address, subject, body string) []byte {
+// Compose renders an RFC 5322 message with a quoted-printable UTF-8 body:
+// plain text, or multipart/alternative with an HTML version too.
+func Compose(from, to *mail.Address, m Message) []byte {
 	id := make([]byte, 12)
 	rand.Read(id)
 	domain := from.Address[strings.LastIndexByte(from.Address, '@')+1:]
@@ -153,16 +159,35 @@ func Compose(from, to *mail.Address, subject, body string) []byte {
 	header := func(k, v string) { fmt.Fprintf(&b, "%s: %s\r\n", k, v) }
 	header("From", from.String())
 	header("To", to.String())
-	header("Subject", mime.QEncoding.Encode("utf-8", subject))
+	header("Subject", mime.QEncoding.Encode("utf-8", m.Subject))
 	header("Date", time.Now().Format(time.RFC1123Z))
 	header("Message-ID", "<"+hex.EncodeToString(id)+"@"+domain+">")
 	header("MIME-Version", "1.0")
-	header("Content-Type", "text/plain; charset=utf-8")
-	header("Content-Transfer-Encoding", "quoted-printable")
 	header("Auto-Submitted", "auto-generated")
+	if m.HTML == "" {
+		header("Content-Type", "text/plain; charset=utf-8")
+		header("Content-Transfer-Encoding", "quoted-printable")
+		b.WriteString("\r\n")
+		writeQP(&b, m.Body)
+		return b.Bytes()
+	}
+	parts := multipart.NewWriter(&b)
+	header("Content-Type", "multipart/alternative; boundary="+parts.Boundary())
 	b.WriteString("\r\n")
-	qp := quotedprintable.NewWriter(&b)
-	qp.Write([]byte(strings.ReplaceAll(body, "\n", "\r\n")))
-	qp.Close()
+	// The last part is the one mail apps prefer to show.
+	for _, p := range [][2]string{{"text/plain", m.Body}, {"text/html", m.HTML}} {
+		w, _ := parts.CreatePart(textproto.MIMEHeader{
+			"Content-Type":              {p[0] + "; charset=utf-8"},
+			"Content-Transfer-Encoding": {"quoted-printable"},
+		})
+		writeQP(w, p[1])
+	}
+	parts.Close()
 	return b.Bytes()
+}
+
+func writeQP(w io.Writer, text string) {
+	qp := quotedprintable.NewWriter(w)
+	qp.Write([]byte(strings.ReplaceAll(text, "\n", "\r\n")))
+	qp.Close()
 }
