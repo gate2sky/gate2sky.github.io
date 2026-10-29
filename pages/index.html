@@ -943,7 +943,7 @@ docker run -d --name gate2sky --restart unless-stopped -v gate2sky:/data -p 80:8
 <pre><span class="p">$ </span>helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky \
     --set domain=gate.example.com \
     --set traefik.tls.certResolver=letsencrypt-dns</pre></div>
-            <p class="hint">An IngressRoute for the dashboard and every subdomain, SSH over a Traefik TCP entry point with the PROXY protocol. See the <a href="https://github.com/gate2sky/gate2sky.github.io/tree/main/deploy/helm/gate2sky">chart</a>.</p>
+            <p class="hint">An IngressRoute for the dashboard and every subdomain, SSH over a Traefik TCP entry point with the PROXY protocol. See the <a href="https://github.com/gate2sky/gate2sky.github.io/tree/main/deploy/helm/gate2sky">chart</a>, also in a classic repository: <code>helm repo add gate2sky https://gate2sky.github.io/charts</code>.</p>
           </div>
         </div>
       </div>

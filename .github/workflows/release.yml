@@ -3,7 +3,9 @@ name: Release
 # Started by hand from the Actions tab, on the default branch: raises the
 # version, builds that commit with build.yml, publishes the GitHub release
 # with the binaries pages/setup.sh installs, the Docker image and the Helm
-# chart, and deploys the landing to GitHub Pages.
+# chart, and deploys the landing and the Helm repository to GitHub Pages.
+# Every binary, the image and the chart carry a build provenance attestation:
+# `gh attestation verify <file> --repo gate2sky/gate2sky.github.io`.
 on:
   workflow_dispatch:
     inputs:
@@ -22,6 +24,7 @@ permissions:
   packages: write
   pages: write
   id-token: write
+  attestations: write
 
 concurrency:
   group: release
@@ -92,7 +95,6 @@ jobs:
       # The bump is a new commit: build it, not the commit the release started from.
       ref: ${{ needs.version.outputs.sha }}
       version: ${{ needs.version.outputs.version }}
-      pages: true
 
   publish:
     needs: [version, build]
@@ -104,6 +106,11 @@ jobs:
           pattern: gate2sky-*
           path: dist
           merge-multiple: true
+      # Signed by GitHub with this workflow's identity: proves each archive
+      # was built here, from this commit.
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tar.gz
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -133,6 +140,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        id: push
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -144,10 +152,17 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/gate2sky:${{ needs.version.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/gate2sky:latest
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/gate2sky
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
-  # The chart as an OCI artifact, so `helm install gate2sky
-  # oci://ghcr.io/<owner>/charts/gate2sky` needs no clone. Under charts/ so it
-  # does not land on the image's ghcr.io/<owner>/gate2sky.
+  # The chart, two ways, so there is nothing to clone: as an OCI artifact
+  # (`helm install gate2sky oci://ghcr.io/<owner>/charts/gate2sky`; under
+  # charts/ so it does not land on the image's ghcr.io/<owner>/gate2sky) and
+  # attached to the release, where the classic repository the pages job
+  # publishes points (`helm repo add gate2sky https://gate2sky.github.io/charts`).
   chart:
     needs: [version, publish]
     runs-on: ubuntu-latest
@@ -157,21 +172,71 @@ jobs:
           ref: ${{ needs.version.outputs.sha }}
       - uses: azure/setup-helm@v4
       - name: Push the chart
+        id: push
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          chart="dist/gate2sky-${{ needs.version.outputs.version }}.tgz"
           echo "$TOKEN" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           helm package deploy/helm/gate2sky -d dist
-          helm push "dist/gate2sky-${{ needs.version.outputs.version }}.tgz" oci://ghcr.io/${{ github.repository_owner }}/charts
+          helm push "$chart" oci://ghcr.io/${{ github.repository_owner }}/charts 2>&1 | tee push.log
+          digest=$(sed -n 's/^Digest: //p' push.log)
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          gh release upload "${{ needs.version.outputs.tag }}" "$chart" --repo "$GITHUB_REPOSITORY"
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/gate2sky-${{ needs.version.outputs.version }}.tgz
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/charts/gate2sky
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chart
+          path: dist/gate2sky-${{ needs.version.outputs.version }}.tgz
 
-  # The landing tells people to install the chart, so it waits for it.
+  # The landing tells people to install the chart, so it waits for it. Pages
+  # replaces the whole site on each deploy, so the Helm repository's index
+  # starts from the one being served: every release adds its chart, which
+  # stays a download of its own release.
   pages:
-    needs: [build, publish, chart]
+    needs: [version, build, chart]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: chart
+          path: chart
+      - uses: azure/setup-helm@v4
+      - name: The site, with the Helm repository
+        run: |
+          set -euo pipefail
+          cp -r pages site
+          mkdir -p site/charts
+          # Only a site with no repository yet may start a new index: any
+          # other failure would drop the earlier releases from it.
+          code=$(curl -sS -o served.yaml -w '%{http_code}' https://${{ github.repository_owner }}.github.io/charts/index.yaml)
+          case "$code" in
+            200) merge=(--merge served.yaml) ;;
+            404) merge=() ;;
+            *) echo "::error::https://${{ github.repository_owner }}.github.io/charts/index.yaml answered $code"; exit 1 ;;
+          esac
+          helm repo index chart "${merge[@]}" \
+            --url "https://github.com/$GITHUB_REPOSITORY/releases/download/${{ needs.version.outputs.tag }}"
+          mv chart/index.yaml site/charts/index.yaml
+          cat site/charts/index.yaml
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
       - id: deploy
         uses: actions/deploy-pages@v4

@@ -78,6 +78,16 @@ curl -fsSL https://gate2sky.github.io/setup.sh | sh -s -- configure
 curl -fsSL https://gate2sky.github.io/setup.sh | sh -s -- uninstall --purge
 ```
 
+Every release archive, the Docker image and the Helm chart also carry a
+build provenance attestation signed by GitHub: it proves they were built by
+this repository's release workflow, from the tagged commit. With the
+[GitHub CLI](https://cli.github.com/):
+
+```sh
+gh attestation verify gate2sky-linux-amd64.tar.gz --repo gate2sky/gate2sky.github.io
+gh attestation verify oci://ghcr.io/gate2sky/gate2sky:latest --repo gate2sky/gate2sky.github.io
+```
+
 | Option | |
 | --- | --- |
 | `--dir DIR` | Where the binary goes. Default `/usr/local/bin`, or `GATE2SKY_INSTALL_DIR`. |
@@ -147,9 +157,10 @@ needed.
 ### Kubernetes with Traefik
 
 [`deploy/helm/gate2sky`](deploy/helm/gate2sky) installs gate2sky behind
-Traefik v3. Every release publishes it to `oci://ghcr.io/gate2sky/charts`,
-so there is nothing to clone (from a clone, `deploy/helm/gate2sky` works the
-same):
+Traefik v3. Every release publishes it to `oci://ghcr.io/gate2sky/charts`
+and to the classic repository `https://gate2sky.github.io/charts` (for tools
+without OCI support, such as helm-dashboard), so there is nothing to clone
+(from a clone, `deploy/helm/gate2sky` works the same):
 
 - an `IngressRoute` for `gate.example.com` and its subdomains (TLS from a
   Traefik resolver with a DNS-01 challenge, an existing wildcard secret, or
@@ -165,6 +176,13 @@ helm install gate2sky oci://ghcr.io/gate2sky/charts/gate2sky \
   --set secretEnv.SMTP_PASSWORD=... \
   -f my-values.yaml      # config.auth.admins, SMTP settings...
 kubectl exec -it deploy/gate2sky -- gate2sky config
+```
+
+Or from the classic repository:
+
+```bash
+helm repo add gate2sky https://gate2sky.github.io/charts
+helm install gate2sky gate2sky/gate2sky --set domain=gate.example.com ...
 ```
 
 Traefik needs a TCP entry point for SSH, e.g. in the Traefik chart's values:
@@ -269,10 +287,12 @@ Two workflows:
   Actions tab on the default branch, choosing `patch`, `minor` or `major`. It
   raises [`VERSION`](VERSION) and the Helm chart's version, commits and tags
   `vX.Y.Z`, runs Build on that commit, creates the GitHub release with the
-  binaries and `SHA256SUMS` (what `setup.sh` installs), pushes the Docker image
-  and the Helm chart to GHCR and deploys [`pages/`](pages/) — the landing and
-  `setup.sh` — to GitHub Pages. `dry-run` builds everything and publishes
-  nothing.
+  binaries, `SHA256SUMS` (what `setup.sh` installs) and the Helm chart, pushes
+  the Docker image and the chart to GHCR, attests the provenance of all of
+  them, and deploys [`pages/`](pages/) — the landing and `setup.sh` — to
+  GitHub Pages, with the Helm repository's `charts/index.yaml`, which adds
+  each release's chart to the one already served. `dry-run` builds everything
+  and publishes nothing.
 
 The landing is built from [`scripts/landing`](scripts/landing): edit
 `template.html` (or the drawings in `hero.py`, whose geometry is computed),
