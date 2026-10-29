@@ -30,7 +30,7 @@
   <div class="wrap topbar-inner">
     <a class="brand" href="/">
       <img class="logo" src="/ui/logo-mark.svg" alt="">
-      <span class="brand-name">gate2net</span>
+      <span class="brand-name">intergate</span>
     </a>
     <nav class="nav" :if="app.user">
       <div class="tabs">
@@ -55,7 +55,7 @@
     <h1>{{ app.error.status ? app.error.status + " · " : "" }}{{ app.error.title }}</h1>
     <p>{{ app.error.message }}</p>
     <p :if="app.error.retry"><button type="button" class="button" @click="retry">Try again</button></p>
-    <p><a href="/">← Back to gate2net</a></p>
+    <p><a href="/">← Back to intergate</a></p>
   </section>
   <Login :elseif="!app.user" />
   <Subdomains :elseif="current.page === 'subdomains' || current.page === 'login'" />
@@ -65,12 +65,12 @@
   <section :else class="card error-page">
     <h1>404 · Not Found</h1>
     <p>There is no page here.</p>
-    <p><a href="/">← Back to gate2net</a></p>
+    <p><a href="/">← Back to intergate</a></p>
   </section>
 </main>
 
 <footer class="wrap footer">
-  <a href="https://gate2net.github.io/" target="_blank" rel="noopener">gate2net</a>
+  <a href="https://jgermade.github.io/intergate/" target="_blank" rel="noopener">intergate</a>
   <span :if="version">{{ version }}</span>
   · SSH tunnels on *.{{ app.domain }}
 </footer>

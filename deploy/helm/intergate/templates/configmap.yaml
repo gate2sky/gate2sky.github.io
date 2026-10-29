@@ -3,7 +3,7 @@
   "public_url" (printf "https://%s" .Values.domain)
   "data_dir" "/data"
   "http" (dict "listen" ":8080" "trust_proxy_headers" true)
-  "ssh" (dict "listen" ":2222" "public_host" $sshPublicHost "public_port" (int .Values.ssh.publicPort) "proxy_protocol" (eq (include "gate2net.proxyProtocol" .) "true"))
+  "ssh" (dict "listen" ":2222" "public_host" $sshPublicHost "public_port" (int .Values.ssh.publicPort) "proxy_protocol" (eq (include "intergate.proxyProtocol" .) "true"))
 -}}
 {{- if .Values.tcp.enabled }}
 {{- $_ := set $defaults "tcp" (dict "ports" (printf "%d-%d" (int .Values.tcp.first) (int .Values.tcp.last)) "max_ports" (int .Values.tcp.maxPorts) "public_host" (.Values.tcp.publicHost | default $sshPublicHost)) }}
@@ -12,9 +12,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "gate2net.fullname" . }}
+  name: {{ include "intergate.fullname" . }}
   labels:
-    {{- include "gate2net.labels" . | nindent 4 }}
+    {{- include "intergate.labels" . | nindent 4 }}
 data:
-  gate2net.yaml: |
+  intergate.yaml: |
     {{- toYaml $config | nindent 4 }}

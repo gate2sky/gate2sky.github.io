@@ -1,4 +1,4 @@
-// Package service installs gate2net as a systemd service.
+// Package service installs intergate as a systemd service.
 package service
 
 import (
@@ -15,14 +15,14 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/gate2net/gate2net.github.io/internal/config"
+	"github.com/jgermade/intergate/internal/config"
 )
 
 const (
-	name       = "gate2net"
-	unitPath   = "/etc/systemd/system/gate2net.service"
-	binaryPath = "/usr/local/bin/gate2net"
-	userName   = "gate2net"
+	name       = "intergate"
+	unitPath   = "/etc/systemd/system/intergate.service"
+	binaryPath = "/usr/local/bin/intergate"
+	userName   = "intergate"
 )
 
 // Options configure Install and Uninstall.
@@ -36,8 +36,8 @@ type Options struct {
 }
 
 var unitTemplate = template.Must(template.New("unit").Parse(`[Unit]
-Description=gate2net SSH tunnel server
-Documentation=https://github.com/gate2net/gate2net.github.io
+Description=intergate SSH tunnel server
+Documentation=https://github.com/jgermade/intergate
 After=network-online.target
 Wants=network-online.target
 
@@ -107,10 +107,10 @@ func dataDir(opts Options) string {
 
 func supported() error {
 	if runtime.GOOS != "linux" {
-		return fmt.Errorf("service installation supports systemd on Linux only; on %s run `gate2net start --detached`", runtime.GOOS)
+		return fmt.Errorf("service installation supports systemd on Linux only; on %s run `intergate start --detached`", runtime.GOOS)
 	}
 	if _, err := os.Stat("/run/systemd/system"); err != nil {
-		return errors.New("systemd is not running on this machine; run `gate2net start --detached` instead")
+		return errors.New("systemd is not running on this machine; run `intergate start --detached` instead")
 	}
 	return nil
 }
@@ -198,10 +198,10 @@ func Install(opts Options) error {
 		return err
 	}
 	if !opts.DryRun {
-		fmt.Fprintf(opts.Out, "\ngate2net is running as a service.\n"+
-			"  status:  systemctl status gate2net\n"+
-			"  logs:    journalctl -u gate2net -f\n"+
-			"  manage:  sudo gate2net config\n")
+		fmt.Fprintf(opts.Out, "\nintergate is running as a service.\n"+
+			"  status:  systemctl status intergate\n"+
+			"  logs:    journalctl -u intergate -f\n"+
+			"  manage:  sudo intergate config\n")
 	}
 	return nil
 }
@@ -216,7 +216,7 @@ func Uninstall(opts Options) error {
 			return errors.New("removing the service needs root: run it with sudo")
 		}
 		if _, err := os.Stat(unitPath); err != nil {
-			return errors.New("the gate2net service is not installed")
+			return errors.New("the intergate service is not installed")
 		}
 	}
 	err := execute(opts, []step{
@@ -230,7 +230,7 @@ func Uninstall(opts Options) error {
 	return err
 }
 
-// Status shows `systemctl status gate2net`.
+// Status shows `systemctl status intergate`.
 func Status(out io.Writer) error {
 	if err := supported(); err != nil {
 		return err
@@ -274,7 +274,7 @@ func createUser(home string) func() error {
 	return func() error {
 		if path, err := exec.LookPath("useradd"); err == nil {
 			return command(path, "--system", "--user-group", "--home-dir", home, "--no-create-home",
-				"--shell", "/usr/sbin/nologin", "--comment", "gate2net", userName)()
+				"--shell", "/usr/sbin/nologin", "--comment", "intergate", userName)()
 		}
 		if path, err := exec.LookPath("adduser"); err == nil { // BusyBox (Alpine)
 			if err := command("addgroup", "-S", userName)(); err != nil {

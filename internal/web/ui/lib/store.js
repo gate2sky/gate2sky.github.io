@@ -73,7 +73,7 @@ const arrive = async (pathname, commit) => {
   commit()
   sync(failure && (failure.status
     ? { status: failure.status, title: "This page could not be loaded", message: failure.message, retry: true }
-    : { title: "gate2net can't be reached", message: "Check your connection and try again.", retry: true }))
+    : { title: "intergate can't be reached", message: "Check your connection and try again.", retry: true }))
 }
 
 export const go = (url, { replace = false } = {}) => {

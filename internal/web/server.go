@@ -22,11 +22,11 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 
-	"github.com/gate2net/gate2net.github.io/internal/config"
-	"github.com/gate2net/gate2net.github.io/internal/mail"
-	"github.com/gate2net/gate2net.github.io/internal/manage"
-	"github.com/gate2net/gate2net.github.io/internal/store"
-	"github.com/gate2net/gate2net.github.io/internal/tunnel"
+	"github.com/jgermade/intergate/internal/config"
+	"github.com/jgermade/intergate/internal/mail"
+	"github.com/jgermade/intergate/internal/manage"
+	"github.com/jgermade/intergate/internal/store"
+	"github.com/jgermade/intergate/internal/tunnel"
 )
 
 //go:embed templates ui
@@ -114,16 +114,16 @@ func New(o Options) (*Server, error) {
 		prefix = "__Host-"
 	}
 	s.cookies = cookieNames{
-		session:    prefix + "gate2net",
-		oauth:      prefix + "gate2net-oauth",
-		access:     prefix + "gate2net-access",
-		emailLogin: prefix + "gate2net-email",
-		passkey:    prefix + "gate2net-passkey",
+		session:    prefix + "intergate",
+		oauth:      prefix + "intergate-oauth",
+		access:     prefix + "intergate-access",
+		emailLogin: prefix + "intergate-email",
+		passkey:    prefix + "intergate-passkey",
 	}
 	if s.cfg.PasskeysEnabled() {
 		wa, err := webauthn.New(&webauthn.Config{
 			RPID:          s.cfg.Domain(),
-			RPDisplayName: "gate2net",
+			RPDisplayName: "intergate",
 			// Tunnel subdomains may claim this RP ID too, so assertions
 			// are only accepted from the dashboard's exact origin.
 			RPOrigins: []string{s.cfg.DashboardURL("")},
@@ -445,7 +445,7 @@ func (s *Server) portsCommand(name string, list []*store.Port) string {
 	return cmd + " " + s.cfg.SSHHost()
 }
 
-// tunnelCommand runs the gate2net client for every port of a subdomain,
+// tunnelCommand runs the intergate client for every port of a subdomain,
 // on Linux and macOS or, with windows, in PowerShell; it is "" without any.
 func (s *Server) tunnelCommand(name string, list []*store.Port, windows bool) string {
 	if len(list) == 0 {
@@ -461,7 +461,7 @@ func (s *Server) tunnelCommand(name string, list []*store.Port, windows bool) st
 	return cmd
 }
 
-// sshServer is HOST:PORT of the SSH endpoint, for the gate2net client.
+// sshServer is HOST:PORT of the SSH endpoint, for the intergate client.
 func (s *Server) sshServer() string {
 	return net.JoinHostPort(s.cfg.SSHHost(), fmt.Sprint(s.cfg.SSHPort()))
 }
@@ -472,7 +472,7 @@ var (
 	shellSafe      = regexp.MustCompile(`^[A-Za-z0-9.:+/=\[\]_-]*$`)
 )
 
-// handleClientInfo tells the gate2net app, given only the dashboard's
+// handleClientInfo tells the intergate app, given only the dashboard's
 // address, where to connect and which host key to expect.
 func (s *Server) handleClientInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -485,7 +485,7 @@ func (s *Server) handleClientInfo(w http.ResponseWriter, r *http.Request) {
 	}{s.sshServer(), s.hostKey, s.cfg.Domain(), s.cfg.DashboardURL("/"), s.version})
 }
 
-// handleTunnelScript serves the script that runs the gate2net client
+// handleTunnelScript serves the script that runs the intergate client
 // without installing it, set up for this server: tunnel.sh for Linux and
 // macOS, tunnel.ps1 for Windows.
 func (s *Server) handleTunnelScript(w http.ResponseWriter, r *http.Request) {

@@ -1,4 +1,4 @@
-// Package wizard implements `gate2net config`: an interactive terminal
+// Package wizard implements `intergate config`: an interactive terminal
 // wizard that creates the configuration file and manages subdomains, SSH
 // keys and users on the running server through its admin socket.
 package wizard
@@ -17,10 +17,10 @@ import (
 
 	"github.com/charmbracelet/huh"
 
-	"github.com/gate2net/gate2net.github.io/internal/admin"
-	"github.com/gate2net/gate2net.github.io/internal/config"
-	"github.com/gate2net/gate2net.github.io/internal/names"
-	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/jgermade/intergate/internal/admin"
+	"github.com/jgermade/intergate/internal/config"
+	"github.com/jgermade/intergate/internal/names"
+	"github.com/jgermade/intergate/internal/store"
 )
 
 // Wizard runs the interactive configuration.
@@ -189,7 +189,7 @@ func (w *Wizard) setup(d *doc) error {
 			}
 			continue
 		} else if err != nil {
-			w.printf("\nNote: %v.\nSet them in the environment (or %s) before starting gate2net.\n", err, envFileFor(w.Path))
+			w.printf("\nNote: %v.\nSet them in the environment (or %s) before starting intergate.\n", err, envFileFor(w.Path))
 		}
 		if err := writeFile(w.Path, raw); err != nil {
 			return err
@@ -215,9 +215,9 @@ func (w *Wizard) setupForms(s *settings) error {
 		huh.NewSelect[string]().
 			Title("Who handles HTTPS?").
 			Options(
-				huh.NewOption("gate2net, with free Let's Encrypt certificates", tlsACME),
-				huh.NewOption("gate2net, with my own wildcard certificate", tlsFiles),
-				huh.NewOption("A reverse proxy in front of gate2net (Traefik, Caddy, nginx…)", tlsProxy),
+				huh.NewOption("intergate, with free Let's Encrypt certificates", tlsACME),
+				huh.NewOption("intergate, with my own wildcard certificate", tlsFiles),
+				huh.NewOption("A reverse proxy in front of intergate (Traefik, Caddy, nginx…)", tlsProxy),
 				huh.NewOption("Nobody: plain HTTP, for local development", tlsNone),
 			).
 			Value(&s.TLSMode),
@@ -358,7 +358,7 @@ func validatePort(s string) error {
 
 func validateFrom(s string) error {
 	if _, err := mail.ParseAddress(strings.TrimSpace(s)); err != nil {
-		return fmt.Errorf("enter an address like gate2net <no-reply@example.com>")
+		return fmt.Errorf("enter an address like intergate <no-reply@example.com>")
 	}
 	return nil
 }
@@ -382,7 +382,7 @@ func (w *Wizard) saved(s *settings, isNew bool) {
 	w.printf("\n✔ Saved %s\n", w.Path)
 	if !isNew {
 		if _, err := w.client().Status(w.ctx); err == nil {
-			w.printf("Restart gate2net to apply the changes (sudo systemctl restart gate2net, or gate2net stop && gate2net start --detached).\n")
+			w.printf("Restart intergate to apply the changes (sudo systemctl restart intergate, or intergate stop && intergate start --detached).\n")
 		}
 		return
 	}
@@ -396,12 +396,12 @@ func (w *Wizard) saved(s *settings, isNew bool) {
 	} else {
 		w.printf("  1. Browsers resolve *.localhost on their own; for other names, point %s and *.%s to this machine.\n", host, host)
 	}
-	w.printf("  2. Start gate2net:\n" +
-		"       gate2net start                     in the foreground\n" +
-		"       gate2net start --detached          in the background\n" +
-		"       sudo gate2net service --install    as a system service (Linux)\n")
+	w.printf("  2. Start intergate:\n" +
+		"       intergate start                     in the foreground\n" +
+		"       intergate start --detached          in the background\n" +
+		"       sudo intergate service --install    as a system service (Linux)\n")
 	w.printf("  3. Sign in at %s as %s.\n", s.PublicURL, splitList(s.Admins)[0])
-	w.printf("Run `gate2net config` again to manage subdomains, SSH keys and users.\n")
+	w.printf("Run `intergate config` again to manage subdomains, SSH keys and users.\n")
 }
 
 func (w *Wizard) client() *admin.Client {
@@ -439,7 +439,7 @@ func (w *Wizard) menu() error {
 			return err
 		}
 		c := admin.NewClient(socketPath(w.Path, d))
-		status := "gate2net is not running: start it to manage subdomains and users."
+		status := "intergate is not running: start it to manage subdomains and users."
 		if st, err := c.Status(w.ctx); err == nil {
 			status = fmt.Sprintf("Running %s · %d subdomains, %d online · %d users", st.DashboardURL, st.Subdomains, st.TunnelsOnline, st.Users)
 		} else if !errors.Is(err, admin.ErrNotRunning) {
@@ -448,7 +448,7 @@ func (w *Wizard) menu() error {
 		w.note(status)
 		var choice string
 		err = w.form(huh.NewGroup(huh.NewSelect[string]().
-			Title("gate2net — "+w.Path).
+			Title("intergate — "+w.Path).
 			Description(status).
 			Options(
 				huh.NewOption("Subdomains and SSH keys", "subdomains"),
@@ -547,7 +547,7 @@ func (w *Wizard) subdomains(c *admin.Client, d *doc) error {
 func accessOptions() []huh.Option[store.Access] {
 	return []huh.Option[store.Access]{
 		huh.NewOption("Public: anyone with the URL", store.AccessPublic),
-		huh.NewOption("Signed-in users: anyone who can sign in to this gate2net", store.AccessUsers),
+		huh.NewOption("Signed-in users: anyone who can sign in to this intergate", store.AccessUsers),
 		huh.NewOption("Private: only the owner, after signing in", store.AccessPrivate),
 	}
 }

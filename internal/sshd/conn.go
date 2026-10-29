@@ -13,10 +13,10 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2net/gate2net.github.io/internal/ports"
-	"github.com/gate2net/gate2net.github.io/internal/store"
-	"github.com/gate2net/gate2net.github.io/internal/tunnel"
-	"github.com/gate2net/gate2net.github.io/internal/udpframe"
+	"github.com/jgermade/intergate/internal/ports"
+	"github.com/jgermade/intergate/internal/store"
+	"github.com/jgermade/intergate/internal/tunnel"
+	"github.com/jgermade/intergate/internal/udpframe"
 )
 
 // clientConn is one authenticated SSH connection.
@@ -114,7 +114,7 @@ func (c *clientConn) handleForward(req *ssh.Request) {
 	c.console.Printf("  access: %s — manage it at %s", t.Access(), cfg.DashboardURL("/subdomains/"+t.Subdomain))
 }
 
-// handleUDPForward forwards a UDP port, for the gate2net client.
+// handleUDPForward forwards a UDP port, for the intergate client.
 func (c *clientConn) handleUDPForward(req *ssh.Request) {
 	var fr forwardRequest
 	if err := ssh.Unmarshal(req.Payload, &fr); err != nil {
@@ -296,7 +296,7 @@ func (c *clientConn) openPort(fr forwardRequest, name, requested string, proto s
 	}
 	switch {
 	case p.Protocol == store.ProtocolUDP && proto != store.ProtocolUDP:
-		return nil, fmt.Errorf("%s.%s is a UDP port, which plain ssh can't forward: use the gate2net client (%s)", p.Name, p.Subdomain, cfg.DashboardURL("/tunnel.sh"))
+		return nil, fmt.Errorf("%s.%s is a UDP port, which plain ssh can't forward: use the intergate client (%s)", p.Name, p.Subdomain, cfg.DashboardURL("/tunnel.sh"))
 	case p.Protocol != proto:
 		return nil, fmt.Errorf("%s.%s is a %s port", p.Name, p.Subdomain, strings.ToUpper(string(p.Protocol)))
 	case !cfg.TCP.InRange(p.Port):
@@ -513,7 +513,7 @@ func (c *clientConn) handleChannels(chans <-chan ssh.NewChannel) {
 		if nch.ChannelType() != "session" {
 			// Notably direct-tcpip (ssh -L): clients must never reach the
 			// server's own network.
-			nch.Reject(ssh.Prohibited, "gate2net only supports remote forwarding (ssh -R)")
+			nch.Reject(ssh.Prohibited, "intergate only supports remote forwarding (ssh -R)")
 			continue
 		}
 		ch, reqs, err := nch.Accept()
@@ -534,12 +534,12 @@ func (c *clientConn) handleSession(ch ssh.Channel, reqs <-chan *ssh.Request) {
 			req.Reply(true, nil)
 		case "shell", "exec":
 			req.Reply(true, nil)
-			welcome := fmt.Sprintf("gate2net: connected with key %s\r\n", c.fingerprint)
+			welcome := fmt.Sprintf("intergate: connected with key %s\r\n", c.fingerprint)
 			if req.Type == "exec" {
-				welcome += "gate2net: commands are not supported; manage your subdomains at " + c.srv.cfg.DashboardURL("/") + "\r\n"
+				welcome += "intergate: commands are not supported; manage your subdomains at " + c.srv.cfg.DashboardURL("/") + "\r\n"
 			}
 			if pty {
-				welcome += "gate2net: press Ctrl-C to close the connection\r\n"
+				welcome += "intergate: press Ctrl-C to close the connection\r\n"
 			}
 			c.console.Attach(ch, welcome)
 			go c.readInput(ch, pty)

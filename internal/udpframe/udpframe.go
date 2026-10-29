@@ -1,8 +1,9 @@
-// Package udpframe is how UDP travels over SSH between the gate2net server
-// and the gate2net client, which plain OpenSSH can't do: the client asks
+// Package udpframe is how UDP travels over SSH between the intergate server
+// and the intergate client, which plain OpenSSH can't do: the client asks
 // for a port with a global request like tcpip-forward, and the server
 // opens a channel per remote address, carrying its datagrams each after
-// its length.
+// its length. The names keep gate2net, intergate's former name, so clients
+// and servers released under it still understand each other.
 package udpframe
 
 import (

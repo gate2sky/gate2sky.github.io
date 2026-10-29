@@ -10,7 +10,9 @@ import (
 // tray.
 const (
 	runKey   = `Software\Microsoft\Windows\CurrentVersion\Run`
-	runValue = "gate2net"
+	runValue = "intergate"
+	// legacyRunValue is the entry of gate2net, the app's former name.
+	legacyRunValue = "gate2net"
 )
 
 // AutostartSupported reports whether SetAutostart can work here.
@@ -27,13 +29,15 @@ func AutostartEnabled() bool {
 	return err == nil
 }
 
-// SetAutostart makes this executable start with the system, or not.
+// SetAutostart makes this executable start with the system, or not. Either
+// way it removes the entry of gate2net, the app's former name.
 func SetAutostart(on bool) error {
 	k, _, err := registry.CreateKey(registry.CURRENT_USER, runKey, registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
 	defer k.Close()
+	k.DeleteValue(legacyRunValue)
 	if !on {
 		if err := k.DeleteValue(runValue); err != nil && err != registry.ErrNotExist {
 			return err

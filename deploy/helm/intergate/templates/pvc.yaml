@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "gate2net.fullname" . }}
+  name: {{ include "intergate.fullname" . }}
   labels:
-    {{- include "gate2net.labels" . | nindent 4 }}
+    {{- include "intergate.labels" . | nindent 4 }}
 spec:
   accessModes:
     {{- toYaml .Values.persistence.accessModes | nindent 4 }}

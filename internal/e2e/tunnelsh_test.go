@@ -14,17 +14,17 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// fakeRelease writes a release directory whose gate2net only prints its
+// fakeRelease writes a release directory whose intergate only prints its
 // arguments, and returns it.
 func fakeRelease(t *testing.T, corrupt bool) string {
 	t.Helper()
 	dir := t.TempDir()
 	target := runtime.GOOS + "-" + runtime.GOARCH
-	bin := filepath.Join(dir, "gate2net-"+target)
+	bin := filepath.Join(dir, "intergate-"+target)
 	os.MkdirAll(bin, 0o755)
-	os.WriteFile(filepath.Join(bin, "gate2net"), []byte("#!/bin/sh\necho \"client $*\"\n"), 0o755)
-	asset := "gate2net-" + target + ".tar.gz"
-	if out, err := exec.Command("tar", "-czf", filepath.Join(dir, asset), "-C", dir, "gate2net-"+target).CombinedOutput(); err != nil {
+	os.WriteFile(filepath.Join(bin, "intergate"), []byte("#!/bin/sh\necho \"client $*\"\n"), 0o755)
+	asset := "intergate-" + target + ".tar.gz"
+	if out, err := exec.Command("tar", "-czf", filepath.Join(dir, asset), "-C", dir, "intergate-"+target).CombinedOutput(); err != nil {
 		t.Fatalf("tar: %v %s", err, out)
 	}
 	os.RemoveAll(bin)
@@ -51,7 +51,7 @@ func TestTunnelScript(t *testing.T) {
 	}
 	resp, ps := get(t, h.browser(false), "http://"+domain+"/tunnel.ps1")
 	if resp.StatusCode != http.StatusOK || !strings.Contains(ps, "$HostKey = '"+fp+"'") || !strings.Contains(ps, "$Server = '"+domain+":2222'") ||
-		!strings.Contains(ps, "irm http://"+domain+"/tunnel.ps1") || !strings.Contains(ps, "gate2net-$target.zip") {
+		!strings.Contains(ps, "irm http://"+domain+"/tunnel.ps1") || !strings.Contains(ps, "intergate-$target.zip") {
 		t.Errorf("tunnel.ps1: %d\n%s", resp.StatusCode, ps)
 	}
 
@@ -61,8 +61,8 @@ func TestTunnelScript(t *testing.T) {
 	run := func(release, home string, args ...string) (string, error) {
 		cmd := exec.Command("sh", append([]string{path}, args...)...)
 		tmp := t.TempDir()
-		cmd.Env = append(os.Environ(), "GATE2NET_DOWNLOAD_URL=file://"+release, "HOME="+home, "TMPDIR="+tmp,
-			"XDG_CACHE_HOME=", "GATE2NET_VERSION=1.2.3")
+		cmd.Env = append(os.Environ(), "INTERGATE_DOWNLOAD_URL=file://"+release, "HOME="+home, "TMPDIR="+tmp,
+			"XDG_CACHE_HOME=", "INTERGATE_VERSION=1.2.3")
 		out, err := cmd.CombinedOutput()
 		if left, _ := os.ReadDir(tmp); len(left) != 0 {
 			t.Errorf("left %d files in TMPDIR", len(left))

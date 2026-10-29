@@ -1,10 +1,10 @@
 apiVersion: v2
-name: gate2net
+name: intergate
 description: Expose local services on your domain through SSH tunnels, with a web dashboard (email codes, passkeys, OAuth).
 type: application
 version: 0.0.11
 appVersion: "0.0.11"
 keywords: [ssh, tunnel, reverse-proxy, ngrok, sish, traefik]
-home: https://github.com/gate2net/gate2net.github.io
+home: https://github.com/jgermade/intergate
 sources:
-  - https://github.com/gate2net/gate2net.github.io
+  - https://github.com/jgermade/intergate

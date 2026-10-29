@@ -1,4 +1,4 @@
-gate2net is starting.
+intergate is starting.
 
   Dashboard: https://{{ .Values.domain }}
   Tunnels:   https://<name>.{{ .Values.domain }}
@@ -19,10 +19,10 @@ exposed by its Service, e.g. with the Traefik Helm chart:
 {{- end }}
 
 {{- if .Values.tcp.enabled }}
-TCP ports {{ .Values.tcp.first }}-{{ .Values.tcp.last }} are served by the Service {{ include "gate2net.fullname" . }}-tcp
+TCP ports {{ .Values.tcp.first }}-{{ .Values.tcp.last }} are served by the Service {{ include "intergate.fullname" . }}-tcp
 ({{ .Values.tcp.service.type }}). Point {{ .Values.tcp.publicHost | default (.Values.ssh.publicHost | default .Values.domain) }} at its address.
 
 {{ end -}}
 Manage subdomains, SSH keys and users from the dashboard, or from a shell:
 
-  kubectl -n {{ .Release.Namespace }} exec -it deploy/{{ include "gate2net.fullname" . }} -- gate2net config
+  kubectl -n {{ .Release.Namespace }} exec -it deploy/{{ include "intergate.fullname" . }} -- intergate config

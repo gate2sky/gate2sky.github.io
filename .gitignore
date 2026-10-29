@@ -1,6 +1,6 @@
-/gate2net
+/intergate
 /data/
-/gate2net.yaml
+/intergate.yaml
 *.db
 *.db-shm
 *.db-wal

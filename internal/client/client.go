@@ -1,4 +1,4 @@
-// Package client is the gate2net client: it connects to a gate2net server
+// Package client is the intergate client: it connects to a intergate server
 // with SSH, like `ssh -R`, and forwards a subdomain's HTTP tunnel, TCP
 // ports and UDP ports — UDP being what plain OpenSSH can't carry. It
 // reconnects when the connection drops.
@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2net/gate2net.github.io/internal/udpframe"
+	"github.com/jgermade/intergate/internal/udpframe"
 )
 
 // Kinds of forward.
@@ -68,7 +68,7 @@ func ParseForward(kind, s string) (Forward, error) {
 
 // Options configure a client.
 type Options struct {
-	// Server is host:port of the gate2net SSH endpoint.
+	// Server is host:port of the intergate SSH endpoint.
 	Server    string
 	Subdomain string
 	Forwards  []Forward
@@ -140,7 +140,7 @@ func Run(ctx context.Context, o Options) error {
 		if time.Since(started) > time.Minute {
 			backoff = time.Second
 		}
-		fmt.Fprintf(o.Out, "gate2net: %v; reconnecting in %s\n", err, backoff)
+		fmt.Fprintf(o.Out, "intergate: %v; reconnecting in %s\n", err, backoff)
 		o.emit(Event{Kind: Retrying, Err: err, Delay: backoff})
 		select {
 		case <-time.After(backoff):
@@ -297,7 +297,7 @@ func serveStream(nch ssh.NewChannel, r route, o Options) {
 	cancel()
 	if err != nil {
 		nch.Reject(ssh.ConnectionFailed, err.Error())
-		fmt.Fprintf(o.Out, "gate2net: %s is not answering: %v\n", r.local, err)
+		fmt.Fprintf(o.Out, "intergate: %s is not answering: %v\n", r.local, err)
 		return
 	}
 	ch, reqs, err := nch.Accept()

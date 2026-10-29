@@ -14,9 +14,9 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/gate2net/gate2net.github.io/internal/api"
-	"github.com/gate2net/gate2net.github.io/internal/client"
-	"github.com/gate2net/gate2net.github.io/internal/store"
+	"github.com/jgermade/intergate/internal/api"
+	"github.com/jgermade/intergate/internal/client"
+	"github.com/jgermade/intergate/internal/store"
 )
 
 // udpEcho answers every datagram with "echo:" and the datagram.

@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	g2smail "github.com/gate2net/gate2net.github.io/internal/mail"
-	"github.com/gate2net/gate2net.github.io/internal/store"
+	g2smail "github.com/jgermade/intergate/internal/mail"
+	"github.com/jgermade/intergate/internal/store"
 )
 
 const (
@@ -176,7 +176,7 @@ func (s *Server) handleEmailLogin(w http.ResponseWriter, r *http.Request) {
 		s.codes.add(flow.ID, code, ttl)
 		msg := g2smail.Message{
 			To:      email,
-			Subject: "Your gate2net sign-in code: " + code,
+			Subject: "Your intergate sign-in code: " + code,
 			Body: fmt.Sprintf("Your sign-in code for %s is:\n\n    %s\n\nIt expires in %d minutes and works once.\n\n"+
 				"If you did not try to sign in, you can ignore this email: nobody can sign in without the code.\n",
 				s.cfg.DashboardURL("/"), code, int(ttl.Minutes())),

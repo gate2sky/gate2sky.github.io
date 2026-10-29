@@ -1,4 +1,4 @@
-module github.com/gate2net/gate2net.github.io
+module github.com/jgermade/intergate
 
 go 1.26.0
 

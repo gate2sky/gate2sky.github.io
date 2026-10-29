@@ -14,7 +14,7 @@ type Access string
 const (
 	// AccessPublic lets anyone with the URL in.
 	AccessPublic Access = "public"
-	// AccessUsers requires signing in to gate2net.
+	// AccessUsers requires signing in to intergate.
 	AccessUsers Access = "users"
 	// AccessPrivate only lets the subdomain owner in.
 	AccessPrivate Access = "private"

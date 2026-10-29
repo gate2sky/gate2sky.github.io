@@ -11,16 +11,16 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gate2net/gate2net.github.io/internal/client"
+	"github.com/jgermade/intergate/internal/client"
 )
 
-const tunnelUsage = `Usage: gate2net tunnel [flags] SUBDOMAIN
+const tunnelUsage = `Usage: intergate tunnel [flags] SUBDOMAIN
 
 Forwards a subdomain's HTTP tunnel and ports from this machine, UDP
 included, which plain ssh -R can't carry. It reconnects when the
 connection drops.
 
-  gate2net tunnel --server gate.example.com:2222 myapp \
+  intergate tunnel --server gate.example.com:2222 myapp \
     --http 3000 --tcp db=5432 --udp mc=19132
 
 Flags:
@@ -33,13 +33,13 @@ func (m *multi) String() string     { return strings.Join(*m, ",") }
 func (m *multi) Set(v string) error { *m = append(*m, v); return nil }
 
 func cmdTunnel(args []string) error {
-	fs := flag.NewFlagSet("gate2net tunnel", flag.ContinueOnError)
+	fs := flag.NewFlagSet("intergate tunnel", flag.ContinueOnError)
 	fs.Usage = func() {
 		fmt.Fprint(fs.Output(), tunnelUsage)
 		fs.PrintDefaults()
 	}
-	server := fs.String("server", os.Getenv("GATE2NET_SERVER"), "the gate2net SSH endpoint, HOST[:PORT] (or $GATE2NET_SERVER)")
-	hostKey := fs.String("host-key", os.Getenv("GATE2NET_HOST_KEY"), "the server's host key fingerprint, SHA256:... (or $GATE2NET_HOST_KEY); otherwise ~/.ssh/known_hosts")
+	server := fs.String("server", os.Getenv("INTERGATE_SERVER"), "the intergate SSH endpoint, HOST[:PORT] (or $INTERGATE_SERVER)")
+	hostKey := fs.String("host-key", os.Getenv("INTERGATE_HOST_KEY"), "the server's host key fingerprint, SHA256:... (or $INTERGATE_HOST_KEY); otherwise ~/.ssh/known_hosts")
 	var httpPort string
 	var tcp, udp, identities multi
 	fs.StringVar(&httpPort, "http", "", "forward the HTTP tunnel to this local `PORT` (or HOST:PORT)")
@@ -108,7 +108,7 @@ func cmdTunnel(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	for _, f := range forwards {
-		fmt.Printf("gate2net: %s: %s\n", subdomain, f)
+		fmt.Printf("intergate: %s: %s\n", subdomain, f)
 	}
 	return client.Run(ctx, client.Options{
 		Server:    addr,

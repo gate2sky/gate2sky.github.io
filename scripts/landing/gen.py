@@ -44,7 +44,7 @@ root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
 tpl = tpl.replace("@@VERSION@@", open(os.path.join(root, "VERSION")).read().strip())
 tpl = tpl.replace("@@HERO@@", hero.hero())
 tpl = tpl.replace("@@BRAND@@", hero.brand())
-# How it works: the gate at your machine, the tube, gate2net's gate.
+# How it works: the gate at your machine, the tube, intergate's gate.
 tpl = tpl.replace("@@FLOW_STRANDS_W@@", hero.flow_strands(360, 150, 184))
 tpl = tpl.replace("@@FLOW_GATES_W@@", hero.gate("home", (262, 150), 0, 0.58) + "\n          " + hero.gate("web", (490, 150), 0, 1.05))
 tpl = tpl.replace("@@FLOW_STRANDS_T@@", hero.flow_strands(160, 258, 144, 90))
