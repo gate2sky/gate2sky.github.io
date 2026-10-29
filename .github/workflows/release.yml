@@ -65,6 +65,8 @@ jobs:
           # default image is the one this release publishes.
           echo "$next" > VERSION
           sed -i -E "s/^version: .*/version: $next/; s/^appVersion: .*/appVersion: \"$next\"/" deploy/helm/gate2sky/Chart.yaml
+          # The landing's footer shows the version too.
+          python3 scripts/landing/gen.py scripts/landing/template.html pages/index.html
           git diff
 
           echo "version=$next" >> "$GITHUB_OUTPUT"
@@ -77,7 +79,7 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add VERSION deploy/helm/gate2sky/Chart.yaml
+          git add VERSION deploy/helm/gate2sky/Chart.yaml pages/index.html
           git commit -m "Release v$next"
           git tag -a "v$next" -m "v$next"
           git push origin HEAD --follow-tags

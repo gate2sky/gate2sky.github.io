@@ -1,16 +1,28 @@
 <script :setup>
   // The page: the top bar, and the view the path names. Signed out, every
   // path shows the sign-in form, which comes back to that path.
-  const { app, route } = await import("@ui/lib/store.js")
+  const { app, route, go } = await import("@ui/lib/store.js")
   const { api } = await import("@ui/lib/api.js")
   const Login = await import("@ui/views/login.html")
   const Subdomains = await import("@ui/views/subdomains.html")
   const Subdomain = await import("@ui/views/subdomain.html")
   const Account = await import("@ui/views/account.html")
   const Admin = await import("@ui/views/admin.html")
+  // What the pages import as they open, fetched now (and kept, by jq79's
+  // cache) so that changing page never waits on code, only on data.
+  import("@ui/lib/format.js")
+  import("@ui/lib/passkeys.js")
+  import("@ui/components/access-options.html")
+  import("@ui/components/copy-text.html")
+  import("@ui/components/status-badge.html")
+
+  // Releases are numbers (0.0.6); builds between them say what they are.
+  const version = /^\d/.test(app.version) ? "v" + app.version : app.version
 
   $: current = route(app.path) || { page: "missing" }
   $: section = current.page === "subdomain" ? "subdomains" : current.page
+
+  const retry = () => go(location.href, { replace: true })
 
   const signOut = async () => {
     await api("POST", "/logout").catch(() => {})
@@ -41,12 +53,13 @@
   </div>
 </header>
 
-<main class="wrap">
+<main class="wrap" :class.loading="app.loading" :aria-busy="app.loading ? 'true' : 'false'">
   <div :if="app.toast" class="flash toast" :class="'flash-' + app.toast.kind" role="status">{{ app.toast.text }}</div>
 
   <section :if="app.error" class="card error-page">
-    <h1>{{ app.error.status }} · {{ app.error.title }}</h1>
+    <h1>{{ app.error.status ? app.error.status + " · " : "" }}{{ app.error.title }}</h1>
     <p>{{ app.error.message }}</p>
+    <p :if="app.error.retry"><button type="button" class="button" @click="retry">Try again</button></p>
     <p><a href="/">← Back to gate2sky</a></p>
   </section>
   <Login :elseif="!app.user" />
@@ -61,4 +74,8 @@
   </section>
 </main>
 
-<footer class="wrap footer">gate2sky · SSH tunnels on *.{{ app.domain }}</footer>
+<footer class="wrap footer">
+  <a href="https://gate2sky.github.io/" target="_blank" rel="noopener">gate2sky</a>
+  <span :if="version">{{ version }}</span>
+  · SSH tunnels on *.{{ app.domain }}
+</footer>

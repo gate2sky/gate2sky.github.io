@@ -44,6 +44,8 @@ type Options struct {
 	// HTTPClient talks to OAuth providers. Defaults to a client with a
 	// 15 second timeout.
 	HTTPClient *http.Client
+	// Version is shown in the dashboard's footer.
+	Version string
 }
 
 // Server is the HTTP handler for the dashboard and all tunnels.
@@ -65,6 +67,7 @@ type Server struct {
 	ui        map[string]uiFile
 	dashboard http.Handler
 	proxy     *httputil.ReverseProxy
+	version   string
 }
 
 type cookieNames struct {
@@ -90,6 +93,7 @@ func New(o Options) (*Server, error) {
 		signer:   signer{key: o.Secret},
 		nonces:   newNonceSet(),
 		codes:    newCodeStore(),
+		version:  o.Version,
 	}
 	if s.mailer == nil {
 		s.mailer = mail.New(s.cfg.Auth.Email, s.log)

@@ -93,6 +93,7 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 		Secret:     secret,
 		Logger:     log.With("component", "web"),
 		HTTPClient: opts.HTTPClient,
+		Version:    opts.Version,
 	})
 	if err != nil {
 		s.store.Close()
