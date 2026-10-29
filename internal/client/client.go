@@ -78,6 +78,40 @@ type Options struct {
 	Out io.Writer
 	// Dial connects to local services; net.Dialer by default (tests).
 	Dial func(ctx context.Context, network, addr string) (net.Conn, error)
+	// OnEvent, if set, is told how the connection and each forward fare,
+	// for an app that shows it.
+	OnEvent func(Event)
+}
+
+// EventKind says what happened.
+type EventKind string
+
+const (
+	Connecting   EventKind = "connecting"
+	Connected    EventKind = "connected"
+	Forwarded    EventKind = "forwarded" // Forward, Port
+	Refused      EventKind = "refused"   // Forward
+	Disconnected EventKind = "disconnected"
+	// Retrying comes after Disconnected when the client will try again,
+	// with Err saying why it stopped.
+	Retrying EventKind = "retrying"
+)
+
+// Event is a change in the client's state.
+type Event struct {
+	Kind    EventKind
+	Forward Forward
+	// Port is the public port a TCP or UDP forward got.
+	Port uint32
+	Err  error
+	// Delay is how long until the next attempt, for Retrying.
+	Delay time.Duration
+}
+
+func (o Options) emit(e Event) {
+	if o.OnEvent != nil {
+		o.OnEvent(e)
+	}
 }
 
 // ErrRejected is returned when the server refused every forward: retrying
@@ -95,6 +129,7 @@ func Run(ctx context.Context, o Options) error {
 	for attempt := 0; ; attempt++ {
 		started := time.Now()
 		err := runOnce(ctx, o)
+		o.emit(Event{Kind: Disconnected, Err: err})
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -106,6 +141,7 @@ func Run(ctx context.Context, o Options) error {
 			backoff = time.Second
 		}
 		fmt.Fprintf(o.Out, "gate2sky: %v; reconnecting in %s\n", err, backoff)
+		o.emit(Event{Kind: Retrying, Err: err, Delay: backoff})
 		select {
 		case <-time.After(backoff):
 		case <-ctx.Done():
@@ -126,6 +162,7 @@ type route struct {
 }
 
 func runOnce(ctx context.Context, o Options) error {
+	o.emit(Event{Kind: Connecting})
 	d := net.Dialer{Timeout: 15 * time.Second}
 	nc, err := d.DialContext(ctx, "tcp", o.Server)
 	if err != nil {
@@ -146,6 +183,7 @@ func runOnce(ctx context.Context, o Options) error {
 	}
 	conn := ssh.NewClient(cc, nil, reqs)
 	defer conn.Close()
+	o.emit(Event{Kind: Connected})
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
 	defer stop()
 
@@ -185,6 +223,7 @@ func runOnce(ctx context.Context, o Options) error {
 			return err
 		}
 		if !ok {
+			o.emit(Event{Kind: Refused, Forward: f})
 			continue // the server says why on the session
 		}
 		if port == 0 {
@@ -198,6 +237,11 @@ func runOnce(ctx context.Context, o Options) error {
 		routes[net.JoinHostPort(bind, strconv.Itoa(int(port)))] = route{f.Kind, f.Local}
 		mu.Unlock()
 		accepted++
+		ev := Event{Kind: Forwarded, Forward: f}
+		if f.Kind != HTTP {
+			ev.Port = port
+		}
+		o.emit(ev)
 	}
 	if accepted == 0 {
 		// Let the server's reasons reach the terminal.

@@ -191,6 +191,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
 	mux.HandleFunc("GET /tunnel.sh", s.handleTunnelScript)
 	mux.HandleFunc("GET /tunnel.ps1", s.handleTunnelScript)
+	mux.HandleFunc("GET /client.json", s.handleClientInfo)
 
 	// Pages: the same shell for each, and the app draws the one its path
 	// names. Signed out, every page is the sign-in form.
@@ -470,6 +471,19 @@ var (
 	releaseVersion = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 	shellSafe      = regexp.MustCompile(`^[A-Za-z0-9.:+/=\[\]_-]*$`)
 )
+
+// handleClientInfo tells the gate2sky app, given only the dashboard's
+// address, where to connect and which host key to expect.
+func (s *Server) handleClientInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	writeJSON(w, http.StatusOK, struct {
+		Server    string `json:"server"`
+		HostKey   string `json:"host_key"`
+		Domain    string `json:"domain"`
+		Dashboard string `json:"dashboard"`
+		Version   string `json:"version"`
+	}{s.sshServer(), s.hostKey, s.cfg.Domain(), s.cfg.DashboardURL("/"), s.version})
+}
 
 // handleTunnelScript serves the script that runs the gate2sky client
 // without installing it, set up for this server: tunnel.sh for Linux and

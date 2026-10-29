@@ -116,6 +116,19 @@ OpenSSH Authentication Agent (`ssh-add`) or `%USERPROFILE%\.ssh`, and
 
 The dashboard shows both commands, ready to copy, for a subdomain's ports.
 
+### The desktop app
+
+The Windows release zips also hold `gate2sky-gui.exe`, the client with a
+window and a tray icon. Give it your dashboard's address and it looks up the
+SSH endpoint and host key (`/client.json`); then the subdomain, an optional
+key file, and what to forward (the HTTP tunnel and ports, by name). It shows
+each forward's state and public address and a log, connects and disconnects
+from the tray, can start with Windows (minimized to the tray, from the
+user's `Run` key) and connect on start. Its settings live in
+`%APPDATA%\gate2sky\app.json`. The window is WebView2, which Windows 10 and
+11 have; without it the app opens in the browser. On Linux the same program
+runs with its window in the browser and no tray (`go build ./cmd/gate2sky-gui`).
+
 Each remote address gets a stream of its own to your service, closed after
 two minutes of silence. UDP over a TCP connection suffers head-of-line
 blocking: fine for DNS, MQTT-SN or a quiet game server, jittery for

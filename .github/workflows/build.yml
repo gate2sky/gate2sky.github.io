@@ -44,8 +44,11 @@ jobs:
       - run: go test -race ./...
       - name: Compiles for every platform
         run: |
-          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
             GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/gate2sky
+          done
+          for target in windows/amd64 windows/arm64 linux/amd64; do
+            CGO_ENABLED=0 GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/gate2sky-gui
           done
       - name: Version
         id: version
@@ -83,6 +86,14 @@ jobs:
           CGO_ENABLED=0 GOOS=${target%-*} GOARCH=${target#*-} go build -trimpath \
             -ldflags "-s -w -X main.version=${{ needs.test.outputs.version }}" \
             -o "dist/gate2sky-$target/$exe" ./cmd/gate2sky
+          case "$target" in
+          windows-*)
+            # The desktop app: a window and a tray icon, no console.
+            CGO_ENABLED=0 GOOS=windows GOARCH=${target#*-} go build -trimpath \
+              -ldflags "-s -w -H windowsgui -X main.version=${{ needs.test.outputs.version }}" \
+              -o "dist/gate2sky-$target/gate2sky-gui.exe" ./cmd/gate2sky-gui
+            ;;
+          esac
           cp README.md "dist/gate2sky-$target/"
           # The layout pages/setup.sh, tunnel.sh and tunnel.ps1 unpack:
           # gate2sky-<target>/gate2sky(.exe), a zip for Windows.

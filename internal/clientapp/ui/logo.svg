@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6fe6ff"/>
+      <stop offset="1" stop-color="#0a5fe0"/>
+    </linearGradient>
+    <radialGradient id="core" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#f2fdff"/>
+      <stop offset=".55" stop-color="#9bf0ff"/>
+      <stop offset=".9" stop-color="#2fd0ff"/>
+      <stop offset="1" stop-color="#1a8cff"/>
+    </radialGradient>
+    <linearGradient id="beam" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="80" y2="0">
+      <stop offset="0" stop-color="#fff8d6"/>
+      <stop offset=".45" stop-color="#ffd84d"/>
+      <stop offset="1" stop-color="#ff8a1f"/>
+    </linearGradient>
+    <radialGradient id="globe" cx=".3" cy=".65" r=".95">
+      <stop offset="0" stop-color="#5cc8ff"/>
+      <stop offset=".5" stop-color="#2a8cf0"/>
+      <stop offset="1" stop-color="#1448c8"/>
+    </radialGradient>
+    <radialGradient id="hit" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#fff8d6" stop-opacity=".95"/>
+      <stop offset=".45" stop-color="#ffd84d" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#ff8a1f" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="earth"><circle cx="410" cy="175" r="95"/></clipPath>
+  </defs>
+  <g transform="translate(-34.8 -8) scale(.18)">
+    <polygon points="0,-19 80,-40 80,40 0,19" fill="url(#beam)" transform="translate(287 278) rotate(-40)"/>
+
+    <circle cx="410" cy="175" r="95" fill="url(#globe)"/>
+    <g clip-path="url(#earth)">
+      <circle cx="337" cy="236" r="42" fill="url(#hit)"/>
+      <g fill="none" stroke="#e6faff" stroke-width="5" stroke-linecap="round" opacity=".92">
+        <ellipse cx="410" cy="175" rx="42" ry="95"/>
+        <path d="M410 80V270M315 175H505M322 127H498M322 223H498"/>
+        <circle cx="410" cy="175" r="93"/>
+      </g>
+    </g>
+
+    <g transform="translate(287 278) rotate(-20)">
+      <ellipse rx="42" ry="90" fill="url(#ring)"/>
+      <ellipse rx="36.5" ry="84.5" fill="url(#core)"/>
+      <path d="M-24 -58C-14 -70 2 -72 11 -66C-1 -66 -12 -56 -18 -42C-23 -46 -26 -52 -24 -58Z" fill="#fff" opacity=".85"/>
+    </g>
+
+    <g transform="translate(287 278)" fill="#0b4fd0">
+      <path d="M-13 0V-14a13 13 0 0 1 26 0V0H5V-14a5 5 0 0 0-10 0V0Z"/>
+      <rect x="-19" y="-2" width="38" height="32" rx="6"/>
+      <circle cy="10" r="4.5" fill="#dff8ff"/>
+      <rect x="-2" y="12" width="4" height="10" rx="2" fill="#dff8ff"/>
+    </g>
+  </g>
+</svg>
