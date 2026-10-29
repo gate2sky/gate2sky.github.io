@@ -30,6 +30,7 @@ import (
 	"github.com/gate2sky/gate2sky.github.io/internal/mail"
 	"github.com/gate2sky/gate2sky.github.io/internal/manage"
 	"github.com/gate2sky/gate2sky.github.io/internal/names"
+	"github.com/gate2sky/gate2sky.github.io/internal/ports"
 	"github.com/gate2sky/gate2sky.github.io/internal/sshd"
 	"github.com/gate2sky/gate2sky.github.io/internal/store"
 	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
@@ -52,6 +53,7 @@ type Server struct {
 	version  string
 	store    *store.Store
 	registry *tunnel.Registry
+	ports    *ports.Registry
 	manage   *manage.Service
 	hostKey  ssh.Signer
 	ssh      *sshd.Server
@@ -64,7 +66,7 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
 		return nil, err
 	}
-	s := &Server{cfg: cfg, log: log, version: opts.Version, registry: tunnel.NewRegistry()}
+	s := &Server{cfg: cfg, log: log, version: opts.Version, registry: tunnel.NewRegistry(), ports: ports.NewRegistry(cfg.TCP.ListenHost)}
 	var err error
 	if s.store, err = store.Open(filepath.Join(cfg.DataDir, "gate2sky.db")); err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
@@ -82,8 +84,8 @@ func New(cfg *config.Config, log *slog.Logger, opts Options) (*Server, error) {
 		s.store.Close()
 		return nil, fmt.Errorf("load SSH host key: %w", err)
 	}
-	s.manage = manage.New(cfg, s.store, s.registry, names.NewChecker(cfg.ReservedSubdomains), log.With("component", "manage"))
-	s.ssh = sshd.New(cfg, s.store, s.registry, s.hostKey, log.With("component", "ssh"))
+	s.manage = manage.New(cfg, s.store, s.registry, s.ports, names.NewChecker(cfg.ReservedSubdomains), log.With("component", "manage"))
+	s.ssh = sshd.New(cfg, s.store, s.registry, s.ports, s.hostKey, log.With("component", "ssh"))
 	s.web, err = web.New(web.Options{
 		Config:     cfg,
 		Store:      s.store,
@@ -111,6 +113,9 @@ func (s *Server) Store() *store.Store { return s.store }
 
 // Registry returns the live tunnels.
 func (s *Server) Registry() *tunnel.Registry { return s.registry }
+
+// Ports returns the forwarded TCP ports.
+func (s *Server) Ports() *ports.Registry { return s.ports }
 
 // SSH returns the SSH server.
 func (s *Server) SSH() *sshd.Server { return s.ssh }
@@ -233,6 +238,9 @@ func (s *Server) Run(ctx context.Context) error {
 		"ssh_host_key", ssh.FingerprintSHA256(s.hostKey.PublicKey()),
 		"sign_in", strings.Join(methods, ","),
 		"admin_socket", cfg.Admin.Socket)
+	if cfg.TCP.Enabled() {
+		log.Info("tcp ports enabled", "range", cfg.TCP.Ports, "per_subdomain", cfg.TCP.MaxPorts, "address", cfg.TCPAddress(0))
+	}
 	if cfg.Auth.Email.LogOnly {
 		log.Warn("auth.email.log_only is set: sign-in codes are written to this log instead of being emailed")
 	}
@@ -251,6 +259,7 @@ func (s *Server) Run(ctx context.Context) error {
 	cancel()
 	<-adminDone
 	s.ssh.Close()
+	s.ports.Close()
 	shutdownCtx, done := context.WithTimeout(context.Background(), 5*time.Second)
 	defer done()
 	for _, srv := range servers {

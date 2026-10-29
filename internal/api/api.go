@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gate2sky/gate2sky.github.io/internal/config"
+	"github.com/gate2sky/gate2sky.github.io/internal/ports"
 	"github.com/gate2sky/gate2sky.github.io/internal/store"
 	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
 )
@@ -20,6 +21,9 @@ type Subdomain struct {
 	Keys      int           `json:"keys"`
 	CreatedAt time.Time     `json:"created_at"`
 	Tunnel    *tunnel.Stats `json:"tunnel,omitempty"`
+	// Ports counts its TCP ports, and PortsOnline those forwarded now.
+	Ports       int `json:"ports"`
+	PortsOnline int `json:"ports_online"`
 }
 
 // NewSubdomain describes d; t is its tunnel, or nil when offline.
@@ -32,6 +36,34 @@ func NewSubdomain(cfg *config.Config, d *store.Subdomain, t *tunnel.Stats) Subdo
 		Keys:      d.Keys,
 		CreatedAt: d.CreatedAt,
 		Tunnel:    t,
+		Ports:     d.Ports,
+	}
+}
+
+// Port is a TCP port of a subdomain, and its forward when a client has it
+// open.
+type Port struct {
+	ID        int64          `json:"id"`
+	Name      string         `json:"name"`
+	Protocol  store.Protocol `json:"protocol"`
+	Port      int            `json:"port"`
+	Address   string         `json:"address"`
+	Allow     []string       `json:"allow"`
+	Preset    string         `json:"preset"`
+	LocalPort int            `json:"local_port"`
+	CreatedAt time.Time      `json:"created_at"`
+	Forward   *ports.Stats   `json:"forward,omitempty"`
+}
+
+// NewPort describes p; f is its forward, or nil.
+func NewPort(cfg *config.Config, p *store.Port, f *ports.Stats) Port {
+	allow := p.Allow
+	if allow == nil {
+		allow = []string{}
+	}
+	return Port{
+		ID: p.ID, Name: p.Name, Protocol: p.Protocol, Port: p.Port, Address: cfg.TCPAddress(p.Port),
+		Allow: allow, Preset: p.Preset, LocalPort: p.LocalPort, CreatedAt: p.CreatedAt, Forward: f,
 	}
 }
 
@@ -59,10 +91,11 @@ func NewKeys(keys []*store.Key) []Key {
 	return out
 }
 
-// SubdomainDetail is a subdomain with its keys.
+// SubdomainDetail is a subdomain with its keys and ports.
 type SubdomainDetail struct {
 	Subdomain
-	KeyList []Key `json:"key_list"`
+	KeyList  []Key  `json:"key_list"`
+	PortList []Port `json:"port_list"`
 }
 
 // User is an account.

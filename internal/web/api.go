@@ -63,7 +63,9 @@ func capitalize(s string) string {
 }
 
 func (s *Server) view(d *store.Subdomain) api.Subdomain {
-	return api.NewSubdomain(s.cfg, d, s.manage.Tunnel(d.Name))
+	v := api.NewSubdomain(s.cfg, d, s.manage.Tunnel(d.Name))
+	v.PortsOnline = s.manage.OnlinePorts(d)
+	return v
 }
 
 func (s *Server) views(subs []*store.Subdomain) []api.Subdomain {
@@ -142,13 +144,28 @@ func (s *Server) handleSubdomain(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, "list keys", err)
 		return
 	}
+	list, err := s.manage.Ports(r.Context(), d)
+	if err != nil {
+		s.internalError(w, "list ports", err)
+		return
+	}
+	portList := make([]api.Port, len(list))
+	for i, p := range list {
+		portList[i] = api.NewPort(s.cfg, p, s.manage.PortStats(p.Port))
+	}
 	writeJSON(w, http.StatusOK, struct {
 		api.SubdomainDetail
 		SSHCommand string `json:"ssh_command"`
-		Mine       bool   `json:"mine"`
+		// PortsCommand forwards every TCP port to its local port.
+		PortsCommand string `json:"ports_command"`
+		// ClientIP is the address the dashboard sees, to fill in allow lists.
+		ClientIP string `json:"client_ip"`
+		Mine     bool   `json:"mine"`
 	}{
-		SubdomainDetail: api.SubdomainDetail{Subdomain: s.view(d), KeyList: api.NewKeys(keys)},
+		SubdomainDetail: api.SubdomainDetail{Subdomain: s.view(d), KeyList: api.NewKeys(keys), PortList: portList},
 		SSHCommand:      s.sshCommand(d.Name),
+		PortsCommand:    s.portsCommand(d.Name, list),
+		ClientIP:        s.clientIP(r),
 		Mine:            d.UserID == currentAuth(r).User.ID,
 	})
 }
@@ -220,6 +237,67 @@ func (s *Server) handleDeleteKey(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if _, err := s.manage.RemoveKey(r.Context(), d, id, currentAuth(r).User.Email); err != nil {
 		s.fail(w, "delete key", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// portRequest is the body that adds a port or changes one.
+type portRequest struct {
+	Name      string         `json:"name"`
+	Protocol  store.Protocol `json:"protocol"`
+	Preset    string         `json:"preset"`
+	LocalPort int            `json:"local_port"`
+	Allow     []string       `json:"allow"`
+}
+
+func (p portRequest) input() manage.PortInput {
+	return manage.PortInput{Name: p.Name, Protocol: p.Protocol, Preset: p.Preset, LocalPort: p.LocalPort, Allow: p.Allow}
+}
+
+func (s *Server) handleAddPort(w http.ResponseWriter, r *http.Request) {
+	d := s.loadSubdomain(w, r)
+	if d == nil {
+		return
+	}
+	var req portRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	p, err := s.manage.CreatePort(r.Context(), d, req.input(), currentAuth(r).User.Email)
+	if err != nil {
+		s.fail(w, "add port", err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, api.NewPort(s.cfg, p, nil))
+}
+
+func (s *Server) handleUpdatePort(w http.ResponseWriter, r *http.Request) {
+	d := s.loadSubdomain(w, r)
+	if d == nil {
+		return
+	}
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	var req portRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	p, err := s.manage.UpdatePort(r.Context(), d, id, req.input(), currentAuth(r).User.Email)
+	if err != nil {
+		s.fail(w, "update port", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, api.NewPort(s.cfg, p, s.manage.PortStats(p.Port)))
+}
+
+func (s *Server) handleDeletePort(w http.ResponseWriter, r *http.Request) {
+	d := s.loadSubdomain(w, r)
+	if d == nil {
+		return
+	}
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err := s.manage.DeletePort(r.Context(), d, id, currentAuth(r).User.Email); err != nil {
+		s.fail(w, "delete port", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

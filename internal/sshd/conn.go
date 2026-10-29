@@ -7,11 +7,14 @@ import (
 	"log/slog"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/gate2sky/gate2sky.github.io/internal/ports"
+	"github.com/gate2sky/gate2sky.github.io/internal/store"
 	"github.com/gate2sky/gate2sky.github.io/internal/tunnel"
 )
 
@@ -26,7 +29,8 @@ type clientConn struct {
 	done        chan struct{}
 
 	mu       sync.Mutex
-	forwards map[string]*tunnel.Tunnel // by bind address and port
+	forwards map[string]*tunnel.Tunnel // HTTP, by bind address and port
+	ports    map[string]*ports.Forward // TCP, by bind address and public port
 	closing  bool
 }
 
@@ -76,11 +80,37 @@ func (c *clientConn) handleForward(req *ssh.Request) {
 		req.Reply(false, nil)
 		return
 	}
-	t, err := c.openTunnel(fr)
-	if err != nil {
+	reject := func(err error) {
 		c.log.Info("forward rejected", "bind", forwardKey(fr.BindAddr, fr.BindPort), "err", err)
 		c.console.Printf("✖ cannot forward %s: %v", forwardKey(fr.BindAddr, fr.BindPort), err)
 		req.Reply(false, nil)
+	}
+	portName, requested, err := c.srv.parseBind(fr.BindAddr)
+	if err != nil {
+		reject(err)
+		return
+	}
+	if portName != "" || !isHTTPPort(fr.BindPort) {
+		f, err := c.openPort(fr, portName, requested)
+		if err != nil {
+			reject(err)
+			return
+		}
+		var reply []byte
+		if fr.BindPort == 0 {
+			// OpenSSH prints "Allocated port N for remote forward".
+			reply = ssh.Marshal(struct{ Port uint32 }{uint32(f.Port.Port)})
+		}
+		req.Reply(true, reply)
+		cfg := c.srv.cfg
+		c.log.Info("port opened", "subdomain", f.Port.Subdomain, "port", f.Port.Port, "name", f.Port.Name, "key", f.KeyName)
+		c.console.Printf("✔ %s (%s.%s) is now forwarding to this connection", f.Address, f.Port.Name, f.Port.Subdomain)
+		c.console.Printf("  access: %s — manage it at %s", describeAllow(f.Port.Allow), cfg.DashboardURL("/subdomains/"+f.Port.Subdomain))
+		return
+	}
+	t, err := c.openTunnel(fr, requested)
+	if err != nil {
+		reject(err)
 		return
 	}
 	var reply []byte
@@ -95,22 +125,47 @@ func (c *clientConn) handleForward(req *ssh.Request) {
 	c.console.Printf("  access: %s — manage it at %s", t.Access(), cfg.DashboardURL("/subdomains/"+t.Subdomain))
 }
 
-func (c *clientConn) openTunnel(fr forwardRequest) (*tunnel.Tunnel, error) {
-	switch fr.BindPort {
-	case 0, 80, 443:
-	default:
-		return nil, fmt.Errorf("only HTTP tunnels are supported; use port 80, e.g. -R myapp:80:localhost:%d", fr.BindPort)
+// isHTTPPort reports whether a forward to port is an HTTP tunnel, unless
+// its bind address names a TCP port.
+func isHTTPPort(p uint32) bool { return p == 0 || p == 80 || p == 443 }
+
+func describeAllow(allow []string) string {
+	if len(allow) == 0 {
+		return "anyone"
 	}
-	requested, err := c.srv.subdomainFromBind(fr.BindAddr)
-	if err != nil {
-		return nil, err
+	return "only " + strings.Join(allow, ", ")
+}
+
+// reserve checks that the connection can take one more forward under key.
+func (c *clientConn) reserve(key string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	switch {
+	case c.closing:
+		return errors.New("connection is closing")
+	case c.forwards[key] != nil || c.ports[key] != nil:
+		return errors.New("already forwarding this address")
+	case len(c.forwards)+len(c.ports) >= c.srv.cfg.Limits.TunnelsPerConnection:
+		return fmt.Errorf("at most %d tunnels per connection", c.srv.cfg.Limits.TunnelsPerConnection)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	return nil
+}
+
+func (c *clientConn) loadGrants(ctx context.Context) ([]store.Grant, error) {
 	grants, err := c.srv.grants(ctx, c.fingerprint, c.publicKey)
 	if err != nil {
 		c.log.Error("load grants", "err", err)
 		return nil, errors.New("internal error, please retry")
+	}
+	return grants, nil
+}
+
+func (c *clientConn) openTunnel(fr forwardRequest, requested string) (*tunnel.Tunnel, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	grants, err := c.loadGrants(ctx)
+	if err != nil {
+		return nil, err
 	}
 	g, err := pickGrant(grants, requested, c.conn.User())
 	if err != nil {
@@ -119,17 +174,7 @@ func (c *clientConn) openTunnel(fr forwardRequest) (*tunnel.Tunnel, error) {
 
 	port := effectivePort(fr.BindPort)
 	key := forwardKey(fr.BindAddr, port)
-	c.mu.Lock()
-	switch {
-	case c.closing:
-		err = errors.New("connection is closing")
-	case c.forwards[key] != nil:
-		err = errors.New("already forwarding this address")
-	case len(c.forwards) >= c.srv.cfg.Limits.TunnelsPerConnection:
-		err = fmt.Errorf("at most %d tunnels per connection", c.srv.cfg.Limits.TunnelsPerConnection)
-	}
-	c.mu.Unlock()
-	if err != nil {
+	if err := c.reserve(key); err != nil {
 		return nil, err
 	}
 
@@ -158,6 +203,118 @@ func (c *clientConn) openTunnel(fr forwardRequest) (*tunnel.Tunnel, error) {
 	return t, nil
 }
 
+// openPort starts forwarding one of a subdomain's TCP ports, named in the
+// bind address (db.myapp, port 0 or its public number) or given by its
+// public number (myapp:30042, or without the subdomain).
+func (c *clientConn) openPort(fr forwardRequest, name, requested string) (*ports.Forward, error) {
+	cfg := c.srv.cfg
+	if !cfg.TCP.Enabled() {
+		return nil, fmt.Errorf("this server only has HTTP tunnels; use port 80, e.g. -R %s:80:localhost:3000", orName(requested, "myapp"))
+	}
+	if name != "" && (fr.BindPort == 80 || fr.BindPort == 443) {
+		return nil, fmt.Errorf("%s names a TCP port; use port 0, e.g. -R %s:0:localhost:<port>", fr.BindAddr, fr.BindAddr)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	grants, err := c.loadGrants(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var p *store.Port
+	var g store.Grant
+	if requested == "" {
+		// -R 30042:localhost:5432: the port says which subdomain.
+		p, err = c.srv.store.PortByNumber(ctx, int(fr.BindPort))
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, fmt.Errorf("port %d is not a TCP port of your subdomains", fr.BindPort)
+		}
+		if err != nil {
+			c.log.Error("load port", "err", err)
+			return nil, errors.New("internal error, please retry")
+		}
+		found := false
+		for _, gr := range grants {
+			if gr.SubdomainID == p.SubdomainID {
+				g, found = gr, true
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("port %d is not a TCP port of your subdomains", fr.BindPort)
+		}
+	} else {
+		if g, err = pickGrant(grants, requested, c.conn.User()); err != nil {
+			return nil, err
+		}
+		list, err := c.srv.store.PortsBySubdomain(ctx, g.SubdomainID)
+		if err != nil {
+			c.log.Error("load ports", "err", err)
+			return nil, errors.New("internal error, please retry")
+		}
+		for _, q := range list {
+			if (name != "" && q.Name == name) || (name == "" && q.Port == int(fr.BindPort)) {
+				p = q
+			}
+		}
+		switch {
+		case p == nil && name != "":
+			return nil, fmt.Errorf("%s has no TCP port named %q; add it at %s", g.Subdomain, name, cfg.DashboardURL("/subdomains/"+g.Subdomain))
+		case p == nil:
+			return nil, fmt.Errorf("port %d is not a TCP port of %s; add one at %s", fr.BindPort, g.Subdomain, cfg.DashboardURL("/subdomains/"+g.Subdomain))
+		case fr.BindPort != 0 && p.Port != int(fr.BindPort):
+			return nil, fmt.Errorf("%s.%s is port %d, not %d; use -R %s.%s:0:localhost:<port>", p.Name, g.Subdomain, p.Port, fr.BindPort, p.Name, g.Subdomain)
+		}
+	}
+	switch {
+	case p.Protocol != store.ProtocolTCP:
+		return nil, fmt.Errorf("%s.%s is a %s port, which plain ssh can't forward", p.Name, p.Subdomain, strings.ToUpper(string(p.Protocol)))
+	case !cfg.TCP.InRange(p.Port):
+		return nil, fmt.Errorf("port %d is outside the server's TCP range (%s)", p.Port, cfg.TCP.Ports)
+	}
+
+	// The client matches incoming streams by what it asked for, so they
+	// echo its bind address and the port it was told.
+	key := forwardKey(fr.BindAddr, uint32(p.Port))
+	if err := c.reserve(key); err != nil {
+		return nil, err
+	}
+	var f *ports.Forward
+	f, err = c.srv.ports.Open(ports.Options{
+		Port:          *p,
+		Address:       cfg.TCPAddress(p.Port),
+		KeyID:         g.KeyID,
+		KeyName:       g.KeyName,
+		ClientAddr:    c.conn.RemoteAddr().String(),
+		ClientVersion: string(c.conn.ClientVersion()),
+		Dial:          c.dialer(fr.BindAddr, uint32(p.Port)),
+		Logf:          c.console.Printf,
+		OnClose:       func(reason string) { c.portClosed(key, f, reason) },
+	})
+	if err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	if c.closing {
+		c.mu.Unlock()
+		f.Close("client disconnected")
+		return nil, errors.New("connection is closing")
+	}
+	c.ports[key] = f
+	c.mu.Unlock()
+
+	if err := c.srv.store.TouchKey(ctx, g.KeyID); err != nil {
+		c.log.Warn("record key use", "err", err)
+	}
+	return f, nil
+}
+
+func orName(name, fallback string) string {
+	if name == "" {
+		return fallback
+	}
+	return name
+}
+
 // tunnelClosed runs when a tunnel is closed from outside this connection:
 // replaced by another client, disconnected from the dashboard, or its key
 // was revoked. Without tunnels left, the connection has no purpose.
@@ -167,13 +324,35 @@ func (c *clientConn) tunnelClosed(key string, t *tunnel.Tunnel, reason string) {
 	if owned {
 		delete(c.forwards, key)
 	}
-	remaining, closing := len(c.forwards), c.closing
 	c.mu.Unlock()
-	if !owned || closing {
+	if owned {
+		c.log.Info("tunnel closed", "subdomain", t.Subdomain, "reason", reason)
+		c.closed(c.srv.cfg.TunnelURL(t.Subdomain), reason)
+	}
+}
+
+// portClosed is tunnelClosed for TCP ports.
+func (c *clientConn) portClosed(key string, f *ports.Forward, reason string) {
+	c.mu.Lock()
+	owned := f != nil && c.ports[key] == f
+	if owned {
+		delete(c.ports, key)
+	}
+	c.mu.Unlock()
+	if owned {
+		c.log.Info("port closed", "subdomain", f.Port.Subdomain, "port", f.Port.Port, "reason", reason)
+		c.closed(f.Address+" ("+f.Name()+")", reason)
+	}
+}
+
+func (c *clientConn) closed(what, reason string) {
+	c.mu.Lock()
+	remaining, closing := len(c.forwards)+len(c.ports), c.closing
+	c.mu.Unlock()
+	if closing {
 		return
 	}
-	c.log.Info("tunnel closed", "subdomain", t.Subdomain, "reason", reason)
-	c.console.Printf("✖ %s closed: %s", c.srv.cfg.TunnelURL(t.Subdomain), reason)
+	c.console.Printf("✖ %s closed: %s", what, reason)
 	if remaining == 0 {
 		// Give the console a moment to deliver the message.
 		time.AfterFunc(time.Second, func() { c.conn.Close() })
@@ -186,21 +365,42 @@ func (c *clientConn) handleCancel(req *ssh.Request) {
 		req.Reply(false, nil)
 		return
 	}
-	key := forwardKey(fr.BindAddr, effectivePort(fr.BindPort))
 	c.mu.Lock()
-	t := c.forwards[key]
-	delete(c.forwards, key)
+	key := forwardKey(fr.BindAddr, fr.BindPort)
+	f := c.ports[key]
+	if f == nil && fr.BindPort == 0 {
+		// A port asked for with port 0, cancelled the same way.
+		for k, pf := range c.ports {
+			if h, _, _ := net.SplitHostPort(k); h == fr.BindAddr {
+				key, f = k, pf
+			}
+		}
+	}
+	var t *tunnel.Tunnel
+	if f != nil {
+		delete(c.ports, key)
+	} else {
+		key = forwardKey(fr.BindAddr, effectivePort(fr.BindPort))
+		t = c.forwards[key]
+		delete(c.forwards, key)
+	}
 	c.mu.Unlock()
-	if t == nil {
+	switch {
+	case f != nil:
+		f.Close("cancelled by client")
+		c.log.Info("port cancelled", "subdomain", f.Port.Subdomain, "port", f.Port.Port)
+	case t != nil:
+		t.Close("cancelled by client")
+		c.log.Info("tunnel cancelled", "subdomain", t.Subdomain)
+	default:
 		req.Reply(false, nil)
 		return
 	}
-	t.Close("cancelled by client")
-	c.log.Info("tunnel cancelled", "subdomain", t.Subdomain)
 	req.Reply(true, nil)
 }
 
-// closeAll closes every tunnel of this connection once it has ended.
+// closeAll closes every tunnel and port of this connection once it has
+// ended.
 func (c *clientConn) closeAll() {
 	c.mu.Lock()
 	c.closing = true
@@ -208,11 +408,20 @@ func (c *clientConn) closeAll() {
 	for _, t := range c.forwards {
 		ts = append(ts, t)
 	}
+	fs := make([]*ports.Forward, 0, len(c.ports))
+	for _, f := range c.ports {
+		fs = append(fs, f)
+	}
 	c.forwards = map[string]*tunnel.Tunnel{}
+	c.ports = map[string]*ports.Forward{}
 	c.mu.Unlock()
 	for _, t := range ts {
 		t.Close("client disconnected")
 		c.log.Info("tunnel closed", "subdomain", t.Subdomain)
+	}
+	for _, f := range fs {
+		f.Close("client disconnected")
+		c.log.Info("port closed", "subdomain", f.Port.Subdomain, "port", f.Port.Port)
 	}
 }
 

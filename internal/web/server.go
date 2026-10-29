@@ -221,6 +221,9 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("PATCH /api/subdomains/{name}/keys/{id}", user(s.handleRenameKey))
 	mux.Handle("DELETE /api/subdomains/{name}/keys/{id}", user(s.handleDeleteKey))
 	mux.Handle("POST /api/subdomains/{name}/disconnect", user(s.handleDisconnect))
+	mux.Handle("POST /api/subdomains/{name}/ports", user(s.handleAddPort))
+	mux.Handle("PATCH /api/subdomains/{name}/ports/{id}", user(s.handleUpdatePort))
+	mux.Handle("DELETE /api/subdomains/{name}/ports/{id}", user(s.handleDeletePort))
 
 	admin := func(h http.HandlerFunc) http.Handler { return s.requireUser(s.requireAdmin(h)) }
 	mux.Handle("GET /api/admin/subdomains", admin(s.handleAdminSubdomains))
@@ -395,13 +398,33 @@ func (s *Server) clearCookie(w http.ResponseWriter, name string) {
 	})
 }
 
+func (s *Server) ssh() string {
+	if p := s.cfg.SSHPort(); p != 22 {
+		return fmt.Sprintf("ssh -p %d", p)
+	}
+	return "ssh"
+}
+
 // sshCommand is the command a user runs to expose localhost:3000.
 func (s *Server) sshCommand(name string) string {
-	cmd := "ssh"
-	if p := s.cfg.SSHPort(); p != 22 {
-		cmd += fmt.Sprintf(" -p %d", p)
+	return fmt.Sprintf("%s -R %s:80:localhost:3000 %s", s.ssh(), name, s.cfg.SSHHost())
+}
+
+// portsCommand is the command that forwards every TCP port of a
+// subdomain to its local port, or "" without any.
+func (s *Server) portsCommand(name string, list []*store.Port) string {
+	cmd := s.ssh()
+	n := 0
+	for _, p := range list {
+		if p.Protocol == store.ProtocolTCP {
+			cmd += fmt.Sprintf(" -R %s.%s:0:localhost:%d", p.Name, name, p.LocalPort)
+			n++
+		}
 	}
-	return fmt.Sprintf("%s -R %s:80:localhost:3000 %s", cmd, name, s.cfg.SSHHost())
+	if n == 0 {
+		return ""
+	}
+	return cmd + " " + s.cfg.SSHHost()
 }
 
 // localPath returns rd if it is a path on this host, else "/". It stops
