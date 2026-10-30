@@ -145,8 +145,14 @@ a.who.active { background: var(--ig-fill); }
   color: var(--ig-on-accent); text-transform: uppercase; background: var(--ig-avatar);
 }
 
-main.wrap { padding-top: var(--ig-space-9); padding-bottom: 40px; }
-.footer { color: var(--ig-fg-muted); font-size: var(--ig-text-sm); padding-bottom: calc(56px + env(safe-area-inset-bottom)); text-align: center; }
+/* The page fills the window at least, so a short one still has its footer
+   at the foot of it; a long one pushes it down. */
+#app { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+main.wrap { flex: 1 0 auto; width: 100%; padding-top: var(--ig-space-9); padding-bottom: 40px; }
+footer.footer {
+  color: var(--ig-fg-muted); font-size: var(--ig-text-sm); text-align: center;
+  padding-top: var(--ig-space-9); padding-bottom: calc(var(--ig-space-9) + env(safe-area-inset-bottom));
+}
 .footer a { color: inherit; font-weight: var(--ig-weight-semibold); }
 .footer a:hover { color: var(--ig-fg); }
 
