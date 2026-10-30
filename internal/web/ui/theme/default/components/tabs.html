@@ -13,10 +13,11 @@
   //   ]" />
   //   <section :if="tab === 'users'" role="tabpanel">…</section>
   //
-  // An item is a string or `{ value, label, count, extra, tone }`: `count`
-  // is a small number beside the label, `extra` a note in green after it
-  // (what is online), and `tone: 'bad'` a tab whose name turns red when it
-  // is chosen. The arrows, Home and End move between tabs and choose as they
+  // An item is a string or `{ value, label, short, count, extra, tone }`:
+  // `short` is the label on a phone, narrower than 640px, `count` a small
+  // number beside the label, `extra` a note in green after it (what is
+  // online), and `tone: 'bad'` a tab whose name turns red when it is
+  // chosen. The arrows, Home and End move between tabs and choose as they
   // go. The choice goes up through `:model` and as `change`.
 
   $: tabs = items.map(t => typeof t === "string" ? { value: t, label: t } : t)
@@ -52,7 +53,8 @@
           :class.bad="tab.tone === 'bad'"
           @click="choose(tab)"
           @keydown="key($event, tab)">
-    {{ tab.label }}
+    <span :if="tab.short" class="short">{{ tab.short }}</span>
+    <span :class.long="!!tab.short">{{ tab.label }}</span>
     <span :if="tab.count !== undefined && tab.count !== null" class="count">{{ tab.count }}</span>
     <span :if="tab.extra" class="count extra">{{ tab.extra }}</span>
   </button>
@@ -99,4 +101,12 @@
     font-variant-numeric: tabular-nums;
   }
   .extra { color: var(--ig-on-ok-solid); background: var(--ig-ok-solid); }
+
+  /* A label with a short form: the short one on a phone, the whole one
+     wider. Only one is drawn, so it is the tab's name. */
+  .long { display: none; }
+  @media (min-width: 640px) {
+    .short { display: none; }
+    .long { display: inline; }
+  }
 </style>

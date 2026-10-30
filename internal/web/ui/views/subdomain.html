@@ -68,7 +68,7 @@
   $: name !== loaded && load()
   $: document.title = `${name} · intergate`
   $: tabs = sub ? [
-    { value: "connection", label: "Connection and access" },
+    { value: "connection", label: "Connection and access", short: "Connection" },
     { value: "keys", label: "SSH keys", count: sub.key_list.length },
     { value: "danger", label: "Danger zone", tone: "bad" },
   ] : []

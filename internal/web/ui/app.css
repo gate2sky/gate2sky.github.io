@@ -163,6 +163,9 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 .page-head h1 a { color: inherit; }
 .page-head h1 a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .page-title { display: flex; align-items: center; gap: var(--ig-space-5); flex-wrap: wrap; }
+/* On a phone the toolbar and the crumbs say where you are: a page title
+   keeps only what is beside its heading. */
+.page-title h1 { display: none; }
 .crumbs { margin: 0 0 var(--ig-space-4); font-size: var(--ig-text-md); }
 .crumbs a { font-weight: var(--ig-weight-medium); }
 
@@ -422,6 +425,7 @@ input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: no
   .who span:last-child { display: inline; }
   main.wrap { padding-top: 36px; }
   h1 { font-size: var(--ig-text-4xl); }
+  .page-title h1 { display: block; }
   .empty { padding: var(--ig-space-7) 0; }
   .table-wrap { margin: 0 -10px; }
   .table th, .table td { padding-left: 12px; padding-right: 12px; }
