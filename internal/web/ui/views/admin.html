@@ -261,7 +261,7 @@
     </table>
   </div>
 </Card>
-  <Button variant="secondary" icon="plus" @click="startAddUser">Add user</Button>
+  <div class="card-actions"><Button variant="secondary" icon="plus" @click="startAddUser">Add user</Button></div>
   <Modal :open="addingUser" size="md" title="Add a user" @close="addingUser = false">
     <form id="add-user" class="form" @submit.prevent="addUser">
       <Alert :if="error" tone="bad" flush>{{ error }}</Alert>

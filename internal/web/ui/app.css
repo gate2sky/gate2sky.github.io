@@ -336,6 +336,8 @@ legend .hint { display: block; margin-top: 0; }
 .actions { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: var(--ig-space-6); }
 .form .actions { margin-top: 0; }
 .form-actions { display: flex; justify-content: flex-end; gap: var(--ig-space-4); }
+/* What adds to the list in the card above it, centred under it. */
+.card-actions { display: flex; justify-content: center; gap: var(--ig-space-4); }
 
 input:not([type=radio]):not([type=checkbox]), textarea {
   font: inherit; font-size: 16px; color: var(--ig-fg); background: var(--ig-field);

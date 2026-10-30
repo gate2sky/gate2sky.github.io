@@ -164,7 +164,7 @@
   <p :else class="empty-inline">No passkeys yet.</p>
   <p :if="!supported" class="muted small">This browser does not support passkeys.</p>
 </Card>
-<Button :if="app.passkeys" variant="secondary" icon="plus" :disabled="!supported" @click="startAddPasskey">Add a passkey</Button>
+<div :if="app.passkeys" class="card-actions"><Button variant="secondary" icon="plus" :disabled="!supported" @click="startAddPasskey">Add a passkey</Button></div>
 
 <Modal :open="addingPasskey" size="md" title="Add a passkey" @close="stopAddPasskey">
   <form id="add-passkey" class="form" @submit.prevent="addPasskey">
