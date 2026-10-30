@@ -172,8 +172,6 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 /* A subdomain's host, on a phone with its status at the far end of the line. */
 .subdomain-title { flex: 1 1 100%; flex-wrap: nowrap; justify-content: space-between; }
 .subdomain-title h1 { min-width: 0; }
-.crumbs { margin: 0 0 var(--ig-space-4); font-size: var(--ig-text-md); }
-.crumbs a { font-weight: var(--ig-weight-medium); }
 
 .muted { color: var(--ig-fg-muted); font-weight: normal; }
 .small { font-size: var(--ig-text-sm); }
@@ -444,7 +442,7 @@ input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: no
   thead.hide-narrow { display: table-header-group; }
   .hide-wide { display: none; }
   span.hide-narrow { display: inline; }
-  div.hide-narrow, h1.hide-narrow, p.hide-narrow { display: block; }
+  div.hide-narrow, h1.hide-narrow { display: block; }
   .subdomain-title { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-start; }
   .form-row > [data-c79-box] > * { flex: none; }
   input:not([type=radio]), textarea { font-size: var(--ig-text-base); padding: 7px 11px; }
