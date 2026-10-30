@@ -186,7 +186,7 @@
   }
 </script>
 
-<p class="crumbs"><a class="icon-link" href="/"><Icon name="arrow-left" size="sm" />Subdomains</a></p>
+<p class="crumbs hide-narrow"><a class="icon-link" href="/"><Icon name="arrow-left" size="sm" />Subdomains</a></p>
 
 <Card :if="missing" width="lg" center>
   <h1 class="error-title">Subdomain not found</h1>
@@ -195,7 +195,7 @@
 
 <div :elseif="sub">
   <div class="page-head">
-    <div class="page-title">
+    <div class="page-title subdomain-title">
       <h1><a :href="sub.url" target="_blank" rel="noopener noreferrer">{{ sub.name }}<span class="muted">.{{ app.domain }}</span></a></h1>
       <StatusBadge :tunnel="sub.tunnel" />
     </div>

@@ -394,12 +394,14 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Email string `json:"email"`
+		Email string     `json:"email"`
+		Role  store.Role `json:"role"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	u, err := s.manage.CreateUser(r.Context(), req.Email, currentAuth(r).User.Email)
+	a := currentAuth(r)
+	u, err := s.manage.AddUser(r.Context(), req.Email, req.Role, a.User, a.Role)
 	if err != nil {
 		s.fail(w, "create user", err)
 		return

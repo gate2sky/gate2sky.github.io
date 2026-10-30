@@ -931,6 +931,25 @@ func TestAddedUsersAndRoles(t *testing.T) {
 		t.Errorf("unknown role: %d", code)
 	}
 
+	// Added with a role: admins add admins but not owners, and a role that
+	// may not be given adds nobody.
+	resp, body = call(t, carol, "POST", "/api/admin/users", map[string]string{"email": "erin@other.test", "role": "admin"})
+	if u := decode[api.User](t, body); resp.StatusCode != http.StatusCreated || u.Role != "admin" || byEmail("erin@other.test").Role != "admin" {
+		t.Errorf("admin adds an admin: %d %+v", resp.StatusCode, u)
+	}
+	for _, role := range []string{"owner", "nobody"} {
+		if resp, _ := call(t, carol, "POST", "/api/admin/users", map[string]string{"email": "frank@other.test", "role": role}); resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("admin adds an %s: %d", role, resp.StatusCode)
+		}
+	}
+	if _, err := h.store.UserByEmail(t.Context(), "frank@other.test"); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("a refused role added the account: %v", err)
+	}
+	resp, body = call(t, owner, "POST", "/api/admin/users", map[string]string{"email": "frank@other.test", "role": "owner"})
+	if u := decode[api.User](t, body); resp.StatusCode != http.StatusCreated || u.Role != "owner" {
+		t.Errorf("owner adds an owner: %d %+v", resp.StatusCode, u)
+	}
+
 	if code := patch(owner, "carol@other.test", map[string]string{"role": "user"}); code != http.StatusNoContent {
 		t.Fatalf("back to user: %d", code)
 	}

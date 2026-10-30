@@ -48,8 +48,9 @@
 </script>
 
 <div class="page-head">
-  <div class="page-title"><h1>Subdomains</h1><Badge size="lg">{{ subdomains.length }} of {{ app.limits.subdomains }}</Badge></div>
-  <Button :if="subdomains.length" icon="plus" label="Register a subdomain" @click="openRegister"><span class="hide-wide">Subdomain</span><span class="hide-narrow">Register a subdomain</span></Button>
+  <div class="page-title"><h1 class="hide-narrow">Subdomains</h1><Badge size="lg">{{ subdomains.length }} of {{ app.limits.subdomains }}</Badge></div>
+  <span :if="subdomains.length" class="hide-wide"><Button icon="plus" size="sm" label="Register a subdomain" @click="openRegister">Subdomain</Button></span>
+  <span :if="subdomains.length" class="hide-narrow"><Button icon="plus" @click="openRegister">Register a subdomain</Button></span>
 </div>
 
 <Alert :if="loadError" tone="bad">{{ loadError }}</Alert>
