@@ -348,8 +348,10 @@ input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--ig-f
 textarea { font-size: var(--ig-text-base); line-height: 1.55; resize: vertical; }
 input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: none; border-color: var(--ig-accent); box-shadow: var(--ig-ring); background: var(--ig-field-focus); }
 
-.input-suffix { display: flex; align-items: stretch; max-width: 520px; border-radius: var(--ig-radius-control); }
-.input-suffix input:not([type=radio]):not([type=checkbox]) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+/* A field and what follows it, as one: the full width, the value written up
+   to the suffix so the two read as one name. */
+.input-suffix { display: flex; align-items: stretch; border-radius: var(--ig-radius-control); }
+.input-suffix input:not([type=radio]):not([type=checkbox]) { border-top-right-radius: 0; border-bottom-right-radius: 0; text-align: right; }
 .input-suffix span {
   display: flex; align-items: center; padding: 0 12px; font-weight: normal; white-space: nowrap; color: var(--ig-fg-muted);
   border: var(--ig-hairline) solid var(--ig-field-line); border-left: 0; border-radius: 0 var(--ig-radius-control) var(--ig-radius-control) 0; background: var(--ig-fill-2);
