@@ -234,8 +234,12 @@ main.loading { opacity: .45; pointer-events: none; transition: opacity .25s .12s
 
 .name-cell { display: flex; align-items: center; gap: var(--ig-space-5); min-width: 0; }
 a.name-cell:hover { text-decoration: none; }
-.name-cell > span:last-child { display: grid; min-width: 0; }
-.name-cell .url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A subdomain's host on one line, its name in bold, cut short at the end
+   when the row is narrow: a grid's item that hides what overflows counts
+   for nothing in the table's minimum, so the table shrinks it rather than
+   run past its card. */
+.name-cell:has(> .host) { display: grid; }
+.name-cell .host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ig-fg-muted); }
 /* A subdomain's tile: its initial, coloured by who can open it. */
 .tile {
   flex: none; width: 32px; height: 32px; border-radius: var(--ig-radius-control); display: grid; place-items: center;

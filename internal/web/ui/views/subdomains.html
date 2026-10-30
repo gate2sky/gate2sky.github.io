@@ -62,7 +62,7 @@
         <tr :each="sub in subdomains" :key="sub.name">
           <td>
             <a class="name-cell" :href="'/subdomains/' + encodeURIComponent(sub.name)">
-              <span><strong>{{ sub.name }}</strong><span class="url muted small">{{ sub.url }}</span></span>
+              <span class="host"><strong>{{ sub.name }}</strong><span class="muted">.{{ app.domain }}</span></span>
             </a>
           </td>
           <td><StatusBadge :tunnel="sub.tunnel" /><span :if="sub.tunnel" class="muted small hide-narrow">{{ ago(sub.tunnel.created_at) }}</span></td>
