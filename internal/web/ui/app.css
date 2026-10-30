@@ -240,6 +240,8 @@ a.name-cell:hover { text-decoration: none; }
    run past its card. */
 .name-cell:has(> .host) { display: grid; }
 .name-cell .host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ig-fg-muted); }
+/* On a phone, what its columns say goes under the name instead. */
+.row-badges { display: flex; flex-wrap: wrap; gap: var(--ig-space-2); margin-top: var(--ig-space-2); }
 /* A subdomain's tile: its initial, coloured by who can open it. */
 .tile {
   flex: none; width: 32px; height: 32px; border-radius: var(--ig-radius-control); display: grid; place-items: center;
@@ -426,6 +428,8 @@ input:not([type=radio]):not([type=checkbox]):focus, textarea:focus { outline: no
   .table.tiles th, .table.tiles tbody tr td { padding-left: 12px; padding-right: 12px; }
   .table.tiles th:first-child, .table.tiles tbody tr td:first-child { padding-left: 14px; }
   th.hide-narrow, td.hide-narrow { display: table-cell; }
+  thead.hide-narrow { display: table-header-group; }
+  .hide-wide { display: none; }
   span.hide-narrow { display: inline; }
   div.hide-narrow { display: block; }
   .form-row > [data-c79-box] > * { flex: none; }
