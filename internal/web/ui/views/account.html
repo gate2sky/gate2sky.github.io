@@ -32,12 +32,26 @@
   let busy = false
   let error = ""
 
+  // Besides the welcome's, a passkey is added in a dialog, with a name; what
+  // went wrong is said where it was asked for.
+  let addingPasskey = false
+  const startAddPasskey = () => {
+    passkeyName = ""
+    error = ""
+    addingPasskey = true
+  }
+  const stopAddPasskey = () => {
+    addingPasskey = false
+    error = ""
+  }
+
   const addPasskey = async () => {
     busy = true
     error = ""
     try {
       const added = await register(passkeyName)
       passkeyName = ""
+      addingPasskey = false
       toast(`Passkey "${added.name}" added. Next time, sign in with it.`)
       if (welcome) return go(next)
       await load()
@@ -109,7 +123,7 @@
 
 <Card :if="welcome" tone="accent" title="Sign in faster next time">
   <p>Add a passkey and sign in with your fingerprint, face or device PIN instead of waiting for an email. Passkeys can’t be phished.</p>
-  <Alert :if="error" tone="bad">{{ error }}</Alert>
+  <Alert :if="error && !addingPasskey" tone="bad">{{ error }}</Alert>
   <div class="actions">
     <Button :disabled="busy || !supported" @click="addPasskey">Add a passkey</Button>
     <a class="icon-link" :href="next">Skip for now<Icon name="arrow-right" size="sm" /></a>
@@ -148,11 +162,20 @@
     </table>
   </div>
   <p :else class="empty-inline">No passkeys yet.</p>
-  <Alert :if="error && !welcome" tone="bad">{{ error }}</Alert>
   <p :if="!supported" class="muted small">This browser does not support passkeys.</p>
-  <form class="form form-row" @submit.prevent="addPasskey">
-    <input name="passkey-name" maxlength="64" placeholder="Name, e.g. MacBook or 1Password" aria-label="Passkey name"
-           autocomplete="off" :value="passkeyName" @input="passkeyName = $event.target.value">
-    <Button type="submit" :disabled="busy || !supported">Add a passkey</Button>
-  </form>
 </Card>
+<div :if="app.passkeys" class="card-actions"><Button variant="secondary" icon="plus" :disabled="!supported" @click="startAddPasskey">Add a passkey</Button></div>
+
+<Modal :open="addingPasskey" size="md" title="Add a passkey" @close="stopAddPasskey">
+  <form id="add-passkey" class="form" @submit.prevent="addPasskey">
+    <p class="muted">Your browser or password manager creates it, with your fingerprint, face or device PIN.</p>
+    <Alert :if="error" tone="bad" flush>{{ error }}</Alert>
+    <label>Name <span class="hint">Optional. Where it lives, e.g. MacBook or 1Password.</span>
+      <input name="passkey-name" maxlength="64" autocomplete="off" :value="passkeyName" @input="passkeyName = $event.target.value">
+    </label>
+  </form>
+  <template :slot.foot>
+    <Button variant="secondary" @click="stopAddPasskey">Cancel</Button>
+    <Button type="submit" form="add-passkey" :disabled="busy">Add a passkey</Button>
+  </template>
+</Modal>

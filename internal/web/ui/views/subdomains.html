@@ -48,26 +48,27 @@
 </script>
 
 <div class="page-head">
-  <div class="page-title"><h1>Subdomains</h1><Badge size="lg">{{ subdomains.length }} of {{ app.limits.subdomains }}</Badge></div>
-  <Button :if="subdomains.length" icon="plus" @click="openRegister">Register a subdomain</Button>
+  <div class="page-title"><h1 class="hide-narrow">Subdomains</h1><Badge size="lg">{{ subdomains.length }} of {{ app.limits.subdomains }}</Badge></div>
+  <span :if="subdomains.length" class="hide-wide"><Button icon="plus" size="sm" label="Register a subdomain" @click="openRegister">Subdomain</Button></span>
+  <span :if="subdomains.length" class="hide-narrow"><Button icon="plus" @click="openRegister">Register a subdomain</Button></span>
 </div>
 
 <Alert :if="loadError" tone="bad">{{ loadError }}</Alert>
 
 <Card :if="subdomains.length">
   <div class="table-wrap">
-    <table class="table">
-      <thead><tr><th>Subdomain</th><th>Status</th><th>Access</th><th class="hide-narrow">SSH keys</th><th></th></tr></thead>
+    <table class="table tiles">
+      <thead class="hide-narrow"><tr><th>Subdomain</th><th>Status</th><th>Access</th><th>SSH keys</th><th></th></tr></thead>
       <tbody>
         <tr :each="sub in subdomains" :key="sub.name">
           <td>
             <a class="name-cell" :href="'/subdomains/' + encodeURIComponent(sub.name)">
-              <span class="tile" :class="'tile-' + sub.access" aria-hidden="true">{{ sub.name[0] }}</span>
-              <span><strong>{{ sub.name }}</strong><span class="url muted small">{{ sub.url }}</span></span>
+              <span class="host"><strong>{{ sub.name }}</strong><span class="muted">.{{ app.domain }}</span></span>
             </a>
+            <div class="row-badges hide-wide"><StatusBadge :tunnel="sub.tunnel" /><AccessBadge :access="sub.access" /></div>
           </td>
-          <td><StatusBadge :tunnel="sub.tunnel" /><span :if="sub.tunnel" class="muted small hide-narrow">{{ ago(sub.tunnel.created_at) }}</span></td>
-          <td><AccessBadge :access="sub.access" /></td>
+          <td class="hide-narrow"><StatusBadge :tunnel="sub.tunnel" /><span :if="sub.tunnel" class="muted small">{{ ago(sub.tunnel.created_at) }}</span></td>
+          <td class="hide-narrow"><AccessBadge :access="sub.access" /></td>
           <td class="hide-narrow">{{ sub.keys }}</td>
           <td class="right row-actions">
             <Button variant="ghost" square icon="external" title="Open" :label="'Open ' + sub.url" :href="sub.url" target="_blank" />

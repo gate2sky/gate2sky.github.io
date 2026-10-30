@@ -10,6 +10,7 @@
   const Badge = await import("@theme/components/badge.html")
   const Button = await import("@theme/components/button.html")
   const Card = await import("@theme/components/card.html")
+  const ChoiceCards = await import("@theme/components/choice-cards.html")
   const Facts = await import("@theme/components/facts.html")
   const Icon = await import("@theme/components/icon.html")
   const Modal = await import("@theme/components/modal.html")
@@ -68,10 +69,11 @@
   // Owners in auth.admins keep their role but can still be disabled.
   const canToggle = user => user.id !== app.user.id && (owner || user.role !== "owner")
 
+  const A_ROLE = { owner: "an owner", admin: "an admin", user: "a user" }
   const setRole = async (user, role) => {
     try {
       await api("PATCH", "/admin/users/" + user.id, { role })
-      toast(`${user.email} is now ${{ owner: "an owner", admin: "an admin", user: "a user" }[role]}.`)
+      toast(`${user.email} is now ${A_ROLE[role]}.`)
     } catch (e) {
       toast(e.message, "error")
     }
@@ -182,18 +184,35 @@
     await loadRelay()
   }
 
+  // A user is added in a dialog, with a role: owners only by owners.
+  const ROLES = [
+    { value: "user", label: "User", hint: "Their own subdomains", icon: "user", hue: "blue" },
+    { value: "admin", label: "Admin", hint: "Every subdomain and account but owners’", icon: "shield", hue: "purple" },
+    ...(owner ? [{ value: "owner", label: "Owner", hint: "Everything, owners too", icon: "crown", hue: "orange" }] : []),
+  ]
+  let addingUser = false
   let email = ""
+  let newRole = "user"
   let error = ""
+  let busy = false
+  const startAddUser = () => {
+    email = ""
+    newRole = "user"
+    error = ""
+    addingUser = true
+  }
   const addUser = async () => {
+    busy = true
     error = ""
     try {
-      const user = await api("POST", "/admin/users", { email })
-      email = ""
-      toast(`Added ${user.email}. They can now sign in with their email.`)
+      const user = await api("POST", "/admin/users", { email, role: newRole })
+      addingUser = false
+      toast(`Added ${user.email} as ${A_ROLE[user.role]}. They can now sign in with their email.`)
       load()
     } catch (e) {
       error = e.message
     }
+    busy = false
   }
 </script>
 
@@ -241,14 +260,27 @@
       </tbody>
     </table>
   </div>
-  <Alert :if="error" tone="bad">{{ error }}</Alert>
-  <form class="form form-row" @submit.prevent="addUser">
-    <input type="email" name="email" required placeholder="new.user@example.com" aria-label="Email of the new user"
-           autocomplete="off" :value="email" @input="email = $event.target.value">
-    <Button type="submit" variant="secondary">Add user</Button>
-  </form>
-  <p class="hint">Added users sign in with that email address, whatever <code>auth.allowed_*</code> says. Admins manage every subdomain and account but owners’; owners manage everything, and those in <code>auth.admins</code> stay owners.</p>
-</Card></div>
+</Card>
+  <div class="card-actions"><Button variant="secondary" icon="plus" @click="startAddUser">Add user</Button></div>
+  <Modal :open="addingUser" size="md" title="Add a user" @close="addingUser = false">
+    <form id="add-user" class="form" @submit.prevent="addUser">
+      <Alert :if="error" tone="bad" flush>{{ error }}</Alert>
+      <label>Email
+        <input type="email" name="email" required placeholder="new.user@example.com" autocomplete="off" spellcheck="false"
+               autocapitalize="off" :value="email" @input="email = $event.target.value">
+      </label>
+      <fieldset>
+        <legend>Role</legend>
+        <ChoiceCards name="new-user-role" layout="stack" :model="newRole" :items="ROLES" />
+      </fieldset>
+      <p class="hint">They sign in with that email address, whatever <code>auth.allowed_*</code> says. Those in <code>auth.admins</code> stay owners.</p>
+    </form>
+    <template :slot.foot>
+      <Button variant="secondary" @click="addingUser = false">Cancel</Button>
+      <Button type="submit" form="add-user" :disabled="busy">Add user</Button>
+    </template>
+  </Modal>
+</div>
 
 <div :elseif="tab === 'subdomains'" role="tabpanel" aria-label="Subdomains"><Card>
   <div :if="subdomains.length" class="table-wrap">

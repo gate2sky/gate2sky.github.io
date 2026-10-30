@@ -304,6 +304,30 @@ func (s *Service) CreateUser(ctx context.Context, email, actor string) (*store.U
 	return u, nil
 }
 
+// AddUser adds an account, as CreateUser does, with a role: users by
+// default; admins add users and admins, owners anyone. A role that may not
+// be given adds nobody. Addresses in auth.admins are owners whatever it is.
+func (s *Service) AddUser(ctx context.Context, email string, role store.Role, actor *store.User, actorRole store.Role) (*store.User, error) {
+	if role == "" {
+		role = store.RoleUser
+	}
+	if !role.Valid() {
+		return nil, Errorf("unknown role %q", role)
+	}
+	if role == store.RoleOwner && actorRole != store.RoleOwner {
+		return nil, Errorf("only owners can make or change owners")
+	}
+	u, err := s.CreateUser(ctx, email, actor.Email)
+	if err != nil || role == store.RoleUser || s.cfg.IsAdmin(u.Email) {
+		return u, err
+	}
+	if err := s.SetUserRole(ctx, u.ID, role, actor, actorRole); err != nil {
+		return nil, err
+	}
+	u.Role = role
+	return u, nil
+}
+
 // EnsureUser returns the account for email, creating it if needed.
 func (s *Service) EnsureUser(ctx context.Context, email, actor string) (*store.User, error) {
 	email = store.NormalizeEmail(email)
